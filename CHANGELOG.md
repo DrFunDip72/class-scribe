@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-24
+
+### Added
+
+- Added a Copy menu on completed results with separate `Summary`, `Transcript`, and `Everything` clipboard targets.
+- Added accessible copy confirmation/failure feedback and preserved complete Markdown downloads.
+- Updated the local Ollama prompts to produce streamlined study guides with a short overview, ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
+- Updated the product, architecture, worker operations, status, testing, and decision handoff documentation.
+
 ## 2026-08-23
 
 ### Added

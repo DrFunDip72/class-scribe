@@ -58,7 +58,7 @@ Claims have a 20-minute lease that the worker refreshes while processing. A stal
 
 ## Long recordings
 
-Whisper streams segments and periodically refreshes progress/lease state. Long transcripts are split on sentence boundaries, summarized per chunk, then consolidated into structured JSON with summary, key points, and action items.
+Whisper streams segments and periodically refreshes progress/lease state. Long transcripts are split on sentence boundaries, summarized per chunk, then consolidated into structured JSON with a short overview, lecture-ordered study-guide points, a final big takeaway, and genuine action items. The result page derives three clipboard-safe strings on the server—summary notes, transcript, and everything—and passes only those serializable strings to the small client-side Copy menu.
 
 ## Privacy boundary
 

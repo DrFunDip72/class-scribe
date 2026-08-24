@@ -12,7 +12,7 @@ Give students a simple account-based website that converts class recordings into
 4. The owner's Windows computer processes the oldest job one at a time.
 5. Return to a dashboard showing status and saved study notes.
 6. Optionally enable a persistent desktop/browser alert for the completed batch or each completed recording.
-7. Click the alert to open the finished result, then copy or download it.
+7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown.
 
 ## Constraints
 
@@ -30,10 +30,19 @@ Give students a simple account-based website that converts class recordings into
 ## Required result
 
 - Full transcript.
-- Concise summary.
-- Key points.
+- A concise 2-4 sentence overview.
+- Six to 14 scan-friendly key points in lecture order, emphasizing concepts, definitions, comparisons, and process steps.
+- Selective examples only when they materially clarify a concept.
+- A final `Big takeaway` key point.
 - Assignments/action items when present.
 - Detected language and processing metadata.
+
+## Result actions
+
+- `Copy -> Summary` copies the overview, key points, and action items without the transcript.
+- `Copy -> Transcript` copies only the title and full transcript.
+- `Copy -> Everything` copies the complete study notes and transcript.
+- `Download notes` continues to download everything as a Markdown file.
 
 ## Completion alerts
 

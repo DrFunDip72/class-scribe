@@ -85,3 +85,11 @@ Use standards-based Web Push for user-opted completion and failure alerts. The l
 **Reason:** The user may be working in another application or may close the dashboard tab. Web Push supplies the requested Google Calendar-style persistent alert without a paid service and without exposing the home computer.
 
 **Consequence:** Permission is controlled by the browser and operating system, delivery is best-effort, each device subscribes separately, and replacing the VAPID private key requires users to enable notifications again. Payloads must remain generic and completion must never depend on delivery success.
+
+## ADR-018 — Streamlined Study Guides and Selective Copy
+
+Generate a short overview plus six to 14 lecture-ordered study points that prioritize core concepts, definitions, comparisons, process steps, selective clarifying examples, and a final `Big takeaway`. Keep genuine action items separate. On the result page, offer `Summary`, `Transcript`, and `Everything` clipboard targets while keeping the existing complete Markdown download.
+
+**Reason:** Students need notes that scan like a study guide instead of a generic prose recap, and they often need to paste the study notes or raw transcript independently.
+
+**Consequence:** `Summary` copy includes the overview, key points, and action items but excludes the transcript. Existing completed results keep their original generated content while receiving the new copy choices; the revised generation format applies to recordings processed by worker version `1.2.0` or later.

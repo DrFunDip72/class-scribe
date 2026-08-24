@@ -32,7 +32,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -372,9 +372,11 @@ class Worker:
         for index, chunk in enumerate(chunks):
             self.touch_job(job_id, status="summarizing", progress=78 + int((index / max(1, len(chunks))) * 14), stage=f"Summarizing section {index + 1} of {len(chunks)}")
             prompt = (
-                "You are creating faithful study notes from part of a class lecture. "
-                "Return JSON only. Write a concise factual summary, 3-8 important key points, "
-                "and explicit assignments, deadlines, questions, or study actions. "
+                "You are creating faithful, scan-friendly study-guide notes from part of a class lecture. "
+                "Return JSON only. Write a 2-4 sentence factual overview in summary. Create 4-10 ordered "
+                "key points that capture the main concepts, definitions, processes, and only the examples "
+                "that materially clarify them. Prefer compact 'Concept — explanation' wording. Include "
+                "explicit assignments, deadlines, questions, or study actions in action_items. "
                 "Do not invent details. If there are no action items, use an empty array.\n\n"
                 f"LECTURE SECTION {index + 1}/{len(chunks)}:\n{chunk}"
             )
@@ -384,9 +386,12 @@ class Worker:
         combined = json.dumps(notes, ensure_ascii=False)
         self.touch_job(job_id, status="summarizing", progress=94, stage="Combining lecture notes")
         return self.ollama_json(
-            "Combine these ordered section notes into one cohesive set of class notes. "
-            "Return JSON only. Preserve important facts, remove duplicates, produce a useful "
-            "2-5 paragraph summary, 5-12 key points, and only genuine action items.\n\n"
+            "Combine these ordered section notes into one streamlined study guide. Return JSON only. "
+            "Preserve lecture order and important facts while removing repetition. The summary must be a "
+            "2-4 sentence overview. Produce 6-14 concise key points using 'Concept — explanation' wording "
+            "where useful; prioritize core topics, definitions, comparisons, and process steps, and keep only "
+            "the most instructive examples. Make the final key point start with 'Big takeaway —'. Include only "
+            "genuine assignments or study actions in action_items; use an empty array when none exist.\n\n"
             f"SECTION NOTES:\n{combined}"
         )
 

@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-08-23
-**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, and opt-in persistent completion notifications.
+**Last updated:** 2026-08-24
+**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, persistent completion notifications, streamlined study guides, and selective copy actions.
 
 ## Live resources
 
@@ -16,7 +16,7 @@ No credentials are stored in this document.
 
 ## Completed
 
-- Responsive production web app with sign-up, sign-in, sign-out, confirmation callback, forgot/reset password, protected dashboard, job history, retry, copy, and Markdown download.
+- Responsive production web app with sign-up, sign-in, sign-out, confirmation callback, forgot/reset password, protected dashboard, job history, retry, selective summary/transcript/everything copy, and complete Markdown download.
 - Direct private uploads for one to 20 supported recordings. Direct audio is capped at 50 MB; MP4/WebM/MOV/M4V/MKV video is converted locally and only its derived audio must fit the 50 MB limit.
 - Sequential browser-side video conversion to mono 16 kHz, 48 kbps AAC/M4A; original video never uploads.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
@@ -28,10 +28,11 @@ No credentials are stored in this document.
 - Production deployment `dpl_9sbGiPyFnEwXzEB8n9AwYCMFtcgT` includes browser-side video extraction and persistent notifications and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
+- Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 
 ## Last verified state
 
-- Worker heartbeat: online and idle, version 1.1.0.
+- Worker heartbeat: online and idle, version 1.2.0.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.

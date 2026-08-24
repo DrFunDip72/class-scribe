@@ -19,7 +19,7 @@ Authenticated browser
   -> privacy-safe Web Push completion alert
 ```
 
-The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the browser strips the video and creates compact speech audio on the user's device. The original video never uploads. Audio goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded audio is deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop completion alerts, which work while the site is in the background and can open the finished result.
+The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the browser strips the video and creates compact speech audio on the user's device. The original video never uploads. Audio goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded audio is deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop completion alerts, which work while the site is in the background and can open the finished result. Result pages let the user copy just the study-guide summary, just the transcript, or everything together.
 
 ## Repository map
 

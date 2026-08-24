@@ -12,7 +12,7 @@
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker` |
-| Worker version | `1.1.0` |
+| Worker version | `1.2.0` |
 | Push library | `pywebpush` 2.4.0 |
 
 Python 3.14 also exists. Always invoke `.venv-worker\Scripts\python.exe`.
@@ -56,6 +56,7 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - Completed source object: deleted only after result and completion event are saved.
 - Push deliveries: durable, attempted separately after result commit, up to three attempts with exponential backoff.
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
+- Summary output: a 2-4 sentence overview, six to 14 ordered concept/definition/process points, selective examples, a final `Big takeaway`, and only genuine action items.
 
 ## Troubleshooting
 
@@ -64,7 +65,7 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
 - **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
 - **Model missing:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3:4b`.
-- **No completion alert:** verify worker version `1.1.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
+- **No completion alert:** verify worker version `1.2.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
 - **Private push key replaced:** restart the worker, then ask each user to disable and re-enable notifications on every desired device.
 
 Do not expose Ollama, add port forwarding, or create a public tunnel.

@@ -35,7 +35,7 @@ No credentials are stored in this document.
 
 ## Last verified state
 
-- Worker heartbeat: online and idle, version 1.3.0. Restart `AudioTranscriberWorker` again after `FLUXPROMPT_API_KEY` is added.
+- Worker heartbeat: online and idle, version 1.3.0. The ignored local FluxPrompt key is configured, and the exact worker process was restarted while the queue was idle so the new environment loaded.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
@@ -57,7 +57,7 @@ No credentials are stored in this document.
 - Local authenticated dashboard email control: pass; a disposable account enabled its exact account address, rendered the saved state, disabled it, and was fully removed. A separate RLS test proved a substituted recipient is rejected.
 - Production authenticated dashboard email control: pass on `https://class-scribe-ruddy.vercel.app`; Email and Browser pop-ups both rendered, the exact account address enabled/saved/disabled, worker 1.3.0 reported online, and no horizontal overflow appeared at the desktop verification viewport. The disposable account was removed.
 - Vercel deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk`: Ready on both production aliases after a successful Next.js build. The post-deployment authenticated check produced no runtime errors or warning/error/fatal logs.
-- Live FluxPrompt delivery is not yet verified because no `FLUXPROMPT_API_KEY` is present in ignored local configuration and the owner has not confirmed the exact sample recipient address.
+- Live FluxPrompt delivery is not yet verified because the owner has not confirmed the exact sample recipient address. The local key-presence check passed without displaying or logging its value.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.
 - Production browser boundary: 20 synthetic MP3 files were accepted into the selector; 21 were rejected before upload. No test audio was uploaded or queued.
@@ -79,4 +79,4 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Securely add `FLUXPROMPT_API_KEY` to ignored `.env.worker.local`, confirm the exact sample recipient, run `worker.py --test-email`, restart `AudioTranscriberWorker`, and verify one opted-in automatic completion email. Then test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.
+Confirm the exact sample recipient, run `worker.py --test-email`, and verify one opted-in automatic completion email. Then test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.

@@ -30,8 +30,8 @@ Give students a simple account-based website that converts class recordings into
 ## Required result
 
 - Full transcript.
-- A concise 2-4 sentence overview.
-- Six to 14 scan-friendly key points in lecture order, emphasizing concepts, definitions, comparisons, and process steps.
+- A concise overview, usually 2-4 sentences and shorter when the source is extremely brief.
+- Up to 14 scan-friendly key points in lecture order, emphasizing concepts, definitions, comparisons, and process steps without padding short lectures.
 - Selective examples only when they materially clarify a concept.
 - A final `Big takeaway` key point.
 - Assignments/action items when present.

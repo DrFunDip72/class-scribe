@@ -25,14 +25,15 @@ No credentials are stored in this document.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Startup task plus named-mutex duplicate-instance protection.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_9sbGiPyFnEwXzEB8n9AwYCMFtcgT` includes browser-side video extraction and persistent notifications and is Ready on the public alias.
+- Production deployment `dpl_8RmhrLYqJ6tT4tt9Ze9JsPbU1HLZ` includes browser-side video extraction, persistent notifications, and selective copy actions and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
+- Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 
 ## Last verified state
 
-- Worker heartbeat: online and idle, version 1.2.0.
+- Worker heartbeat: online and idle, version 1.2.1.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
@@ -40,6 +41,8 @@ No credentials are stored in this document.
 - Python compile and six helper tests: pass.
 - Notification migration: applied; VAPID public key published and private key retained locally.
 - Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
+- Production selective-copy test: Summary excluded the transcript, Transcript excluded study-note sections, and Everything contained summary, key points, action items, and transcript.
+- Worker `1.2.1` study-guide test: a short production sample stayed source-faithful, retained the real assignment, avoided count padding/outside facts, and ended with `Big takeaway`.
 - Supabase migration application: pass.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.

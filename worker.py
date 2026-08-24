@@ -32,7 +32,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -373,27 +373,31 @@ class Worker:
             self.touch_job(job_id, status="summarizing", progress=78 + int((index / max(1, len(chunks))) * 14), stage=f"Summarizing section {index + 1} of {len(chunks)}")
             prompt = (
                 "You are creating faithful, scan-friendly study-guide notes from part of a class lecture. "
-                "Return JSON only. Write a 2-4 sentence factual overview in summary. Create 4-10 ordered "
-                "key points that capture the main concepts, definitions, processes, and only the examples "
-                "that materially clarify them. Prefer compact 'Concept — explanation' wording. Include "
+                "Return JSON only. Write a 2-4 sentence factual overview in summary. Create up to 10 ordered "
+                "key points that capture only the concepts, definitions, processes, and examples stated in "
+                "this lecture section. Prefer compact 'Concept — explanation' wording. Every statement must "
+                "be directly supported by the supplied lecture text: never add background knowledge, likely "
+                "details, or examples from outside it, and never pad a short section to reach a target count. Include "
                 "explicit assignments, deadlines, questions, or study actions in action_items. "
                 "Do not invent details. If there are no action items, use an empty array.\n\n"
                 f"LECTURE SECTION {index + 1}/{len(chunks)}:\n{chunk}"
             )
             notes.append(self.ollama_json(prompt))
         if len(notes) == 1:
-            return notes[0]
+            return finalize_study_guide(notes[0])
         combined = json.dumps(notes, ensure_ascii=False)
         self.touch_job(job_id, status="summarizing", progress=94, stage="Combining lecture notes")
-        return self.ollama_json(
+        combined_notes = self.ollama_json(
             "Combine these ordered section notes into one streamlined study guide. Return JSON only. "
             "Preserve lecture order and important facts while removing repetition. The summary must be a "
-            "2-4 sentence overview. Produce 6-14 concise key points using 'Concept — explanation' wording "
+            "2-4 sentence overview. Produce up to 14 concise key points using 'Concept — explanation' wording "
             "where useful; prioritize core topics, definitions, comparisons, and process steps, and keep only "
-            "the most instructive examples. Make the final key point start with 'Big takeaway —'. Include only "
+            "the most instructive examples. Use only facts present in the supplied section notes, never outside "
+            "knowledge, and do not pad the list to reach a target count. Include only "
             "genuine assignments or study actions in action_items; use an empty array when none exist.\n\n"
             f"SECTION NOTES:\n{combined}"
         )
+        return finalize_study_guide(combined_notes)
 
     def complete(self, job: dict[str, Any], transcript: str, segments: list[dict[str, Any]], language: str | None, duration: float | None, notes: dict[str, Any], elapsed: float) -> None:
         result = {
@@ -639,6 +643,28 @@ def clean_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()][:15]
+
+
+def finalize_study_guide(notes: dict[str, Any]) -> dict[str, Any]:
+    summary = str(notes.get("summary", "")).strip()
+    key_points = clean_list(notes.get("key_points"))
+    regular_points: list[str] = []
+    takeaway: str | None = None
+    for point in key_points:
+        if re.match(r"^big takeaway\s*(?:—|-|:)", point, flags=re.IGNORECASE):
+            takeaway = point
+        else:
+            regular_points.append(point)
+    if takeaway is None and summary:
+        first_sentence = re.split(r"(?<=[.!?])\s+", summary, maxsplit=1)[0].strip()
+        takeaway = f"Big takeaway — {first_sentence}"
+    if takeaway:
+        regular_points = regular_points[:14] + [takeaway]
+    return {
+        "summary": summary,
+        "key_points": regular_points,
+        "action_items": clean_list(notes.get("action_items")),
+    }
 
 
 def chunk_text(text: str, max_chars: int) -> list[str]:

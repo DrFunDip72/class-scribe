@@ -2,10 +2,10 @@
 
 ## Automated and build checks — PASS
 
-**Date:** 2026-08-23
+**Date:** 2026-08-24
 
 - Python compile: `worker.py`, bootstrap, verifier, and tests.
-- Worker helper tests: 6/6 pass (chunking, list cleanup, suffix safety, model JSON/thinking cleanup, privacy-safe push payload, and browser-compatible VAPID public-key encoding).
+- Worker helper tests: 7/7 pass (chunking, list cleanup, deterministic final takeaway, suffix safety, model JSON/thinking cleanup, privacy-safe push payload, and browser-compatible VAPID public-key encoding).
 - Worker Python dependency integrity: `pip check` pass after adding pinned `pywebpush==2.4.0`.
 - Next.js `npm run lint`: pass.
 - Next.js `npm run build`: pass; all routes compile under Next.js 16.3.2.
@@ -40,6 +40,21 @@
 **Result:** PASS.
 
 Chrome's runtime Incognito limitation was also exercised: Push API subscription is unavailable there, so the supported path is a normal browser profile.
+
+## Selective copy and study-guide format — PASS
+
+**Environment:** production deployment `dpl_8RmhrLYqJ6tT4tt9Ze9JsPbU1HLZ`, disposable production account, production Supabase, and Windows worker `1.2.1`.
+**Input:** `verification-sample.mp3`, 39 KB, containing one source fact and one explicit assignment.
+
+1. The completed result exposed `Summary`, `Transcript`, and `Everything` choices from the Copy control.
+2. Captured Summary output contained the summary, key points, and action items but no transcript heading.
+3. Captured Transcript output contained the transcript heading and expected speech but no summary heading.
+4. Captured Everything output contained all four summary, key-point, action-item, and transcript sections.
+5. The worker's final source-faithfulness prompt returned only the stated photosynthesis fact and chapter-review assignment; it did not pad the short lecture with external concepts.
+6. Deterministic post-processing placed `Big takeaway` last even though the small model did not emit it itself.
+7. The source Storage object was deleted. The browser signed out, its Auth session count reached zero, the disposable user and cascaded rows were deleted, and the browser closed.
+
+**Result:** PASS.
 
 ## Local inference — PASS
 

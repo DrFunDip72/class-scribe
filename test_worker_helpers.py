@@ -2,7 +2,7 @@ import unittest
 
 from py_vapid import Vapid01
 
-from worker import build_push_payload, chunk_text, clean_list, parse_json_object, safe_suffix, strip_thinking, vapid_public_key
+from worker import build_push_payload, chunk_text, clean_list, finalize_study_guide, parse_json_object, safe_suffix, strip_thinking, vapid_public_key
 
 
 class WorkerHelperTests(unittest.TestCase):
@@ -19,6 +19,14 @@ class WorkerHelperTests(unittest.TestCase):
 
     def test_clean_list(self) -> None:
         self.assertEqual(clean_list([" one ", "", 2]), ["one", "2"])
+
+    def test_finalize_study_guide_adds_last_takeaway(self) -> None:
+        notes = finalize_study_guide({
+            "summary": "CBT connects thoughts, feelings, and behaviors. Each can influence the others.",
+            "key_points": ["Cognitive triad — Thoughts, feelings, and behaviors influence one another."],
+            "action_items": [],
+        })
+        self.assertEqual(notes["key_points"][-1], "Big takeaway — CBT connects thoughts, feelings, and behaviors.")
 
     def test_safe_suffix(self) -> None:
         self.assertEqual(safe_suffix("lecture.MP3"), ".mp3")

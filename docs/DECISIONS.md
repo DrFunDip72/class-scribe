@@ -88,8 +88,8 @@ Use standards-based Web Push for user-opted completion and failure alerts. The l
 
 ## ADR-018 — Streamlined Study Guides and Selective Copy
 
-Generate a short overview plus six to 14 lecture-ordered study points that prioritize core concepts, definitions, comparisons, process steps, selective clarifying examples, and a final `Big takeaway`. Keep genuine action items separate. On the result page, offer `Summary`, `Transcript`, and `Everything` clipboard targets while keeping the existing complete Markdown download.
+Generate a brief overview plus up to 14 lecture-ordered study points that prioritize core concepts, definitions, comparisons, process steps, selective clarifying examples, and a final `Big takeaway`. Do not pad short lectures or add outside knowledge, and skip the consolidation model call when only one transcript chunk exists. Keep genuine action items separate. On the result page, offer `Summary`, `Transcript`, and `Everything` clipboard targets while keeping the existing complete Markdown download.
 
 **Reason:** Students need notes that scan like a study guide instead of a generic prose recap, and they often need to paste the study notes or raw transcript independently.
 
-**Consequence:** `Summary` copy includes the overview, key points, and action items but excludes the transcript. Existing completed results keep their original generated content while receiving the new copy choices; the revised generation format applies to recordings processed by worker version `1.2.0` or later.
+**Consequence:** `Summary` copy includes the overview, key points, and action items but excludes the transcript. Existing completed results keep their original generated content while receiving the new copy choices; the revised generation format applies to recordings processed by worker version `1.2.1` or later.

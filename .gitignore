@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+!.env.worker.example
+.venv-worker/
+__pycache__/
+*.py[cod]
+.worker-temp/
+.worker-auth-bootstrap.json
+web/node_modules/
+web/.next/
+web/.vercel/
+web/.env*
+!web/.env.example
+supabase/.temp/
+*.log
+.DS_Store

@@ -1,0 +1,47 @@
+# Deployment and Recovery
+
+## Production resources
+
+- Vercel URL: https://class-scribe-ruddy.vercel.app
+- Vercel project ID: `prj_hhjU0dQL2pTWWxjNq4A1EqkDVYq7`
+- Vercel team: `justin-maxwells-projects` (Hobby)
+- Supabase project: `class-transcriber`
+- Supabase ref: `wmsotywnkqdajhmiultx`
+- GitHub: https://github.com/DrFunDip72/class-scribe
+
+## Web deployment
+
+`web/` is the Vercel project root. Its only runtime configuration is the public Supabase project URL and publishable key. They are browser-visible identifiers, not secrets. Prefer Vercel environment-variable settings for future deployments; never add worker credentials.
+
+Before deployment:
+
+```powershell
+cd web
+npm ci
+npm run lint
+npm run build
+```
+
+## Required Supabase Auth URLs
+
+In `Authentication -> URL Configuration`:
+
+- Site URL: `https://class-scribe-ruddy.vercel.app`
+- Allowed: `https://class-scribe-ruddy.vercel.app/auth/confirm`
+- Allowed: `https://class-scribe-ruddy.vercel.app/reset-password`
+- Development: `http://localhost:3000/**`
+
+Update this list if the primary domain changes.
+
+## Database changes
+
+Add a timestamped migration under `supabase/migrations/`, review grants/RLS, apply it to the selected project, then run both Supabase advisors. Use a forward corrective migration for rollback.
+
+## Recovery
+
+- Web: restore/promote the last verified Vercel deployment.
+- Database: apply a forward corrective migration; do not reset production.
+- Worker: stop the task, restore the last verified commit, reinstall pinned dependencies if necessary, restart, and confirm a fresh heartbeat.
+- Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, pull both models, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
+
+Queued jobs survive web/worker restarts in Supabase. Expired worker leases are automatically recovered on the next claim.

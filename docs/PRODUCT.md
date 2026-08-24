@@ -14,6 +14,8 @@ Give students a simple account-based website that converts class recordings into
 6. Optionally enable a persistent desktop/browser alert for the completed batch or each completed recording.
 7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown.
 
+The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
+
 ## Constraints
 
 - Typical recording: 30-60 minutes.
@@ -43,6 +45,7 @@ Give students a simple account-based website that converts class recordings into
 - `Copy -> Transcript` copies only the title and full transcript.
 - `Copy -> Everything` copies the complete study notes and transcript.
 - `Download notes` continues to download everything as a Markdown file.
+- On screens 640 CSS pixels wide or narrower, Copy choices open as a bottom action sheet that stays within the visible viewport and respects the device safe area. Tapping outside, the close control, or pressing Escape dismisses it.
 
 ## Completion alerts
 
@@ -61,4 +64,4 @@ Give students a simple account-based website that converts class recordings into
 
 ## Acceptance
 
-The initial release is accepted when an authenticated production user can upload up to 20 recordings, locally reduce video to audio without uploading the original, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results.
+The initial release is accepted when an authenticated production user can upload up to 20 recordings, locally reduce video to audio without uploading the original, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results. Landing, authentication, dashboard, and result screens must also work at 320 CSS pixels without horizontal overflow or requiring the user to zoom out.

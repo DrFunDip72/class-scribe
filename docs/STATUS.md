@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-24
-**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, persistent completion notifications, streamlined study guides, and selective copy actions.
+**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, persistent completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
 
 ## Live resources
 
@@ -30,6 +30,7 @@ No credentials are stored in this document.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
+- Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 
 ## Last verified state
 
@@ -42,6 +43,10 @@ No credentials are stored in this document.
 - Notification migration: applied; VAPID public key published and private key retained locally.
 - Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
 - Production selective-copy test: Summary excluded the transcript, Transcript excluded study-note sections, and Everything contained summary, key points, action items, and transcript.
+- Local mobile browser test: landing, sign-up, dashboard, and result layouts had no horizontal overflow at 320, 360, 390, and 430 CSS pixels; all visible dashboard/result controls were at least 44 pixels in both dimensions.
+- Mobile Copy action sheet: stayed fully inside a 320 x 568 viewport, focused its first choice, closed by outside tap or Escape, returned focus to Copy, and preserved the compact desktop dropdown at 1280 x 800.
+- Automated WCAG 2 A/AA scan: zero detected violations on the mobile dashboard, completed result, and open Copy action sheet after contrast corrections.
+- Disposable mobile QA account: source audio was removed after processing, the Auth session was revoked, the user and cascaded test rows were deleted, and zero test media remained.
 - Worker `1.2.1` study-guide test: a short production sample stayed source-faithful, retained the real assignment, avoided count padding/outside facts, and ended with `Big takeaway`.
 - Supabase migration application: pass.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.

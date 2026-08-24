@@ -56,6 +56,23 @@ Chrome's runtime Incognito limitation was also exercised: Push API subscription 
 
 **Result:** PASS.
 
+## Mobile usability and Copy action sheet — PASS
+
+**Environment:** local Next.js production-connected app, Chromium automation, production Supabase, Windows worker, and a disposable immediate-session account.
+**Viewports:** 320 x 568, 320 x 800, 360 x 800, 390 x 800/844, 430 x 800, plus a 1280 x 800 desktop regression check.
+
+1. Landing, sign-up, dashboard, and completed-result documents reported `scrollWidth === innerWidth` at every tested phone width.
+2. All visible links, buttons, fields, selects, and file-drop controls on the dashboard and result screen measured at least 44 by 44 CSS pixels at 320, 360, 390, and 430 widths.
+3. At 320 x 568, the open Copy sheet measured 300 x 263 pixels with bounds `left=10`, `right=310`, `top=295`, and `bottom=558`; it remained entirely inside the viewport.
+4. The sheet automatically focused Summary, closed through Escape and backdrop/close controls, trapped Tab focus, and restored focus to Copy.
+5. Summary selection closed the sheet. Existing clipboard-content separation had already passed the production selective-copy test above.
+6. At 1280 x 800, Copy remained an anchored 260-pixel desktop dropdown and stayed entirely within the viewport.
+7. Automated axe-core WCAG 2 A/AA checks reported zero violations on the mobile dashboard, completed result, and open Copy sheet after correcting three low-contrast secondary text styles.
+8. Next.js lint and production build passed after the final responsive changes.
+9. The sample completed through the worker, remote audio was deleted, the browser signed out, the Auth session count reached zero, the disposable user and cascaded rows were removed, and zero test media remained.
+
+**Result:** PASS.
+
 ## Local inference — PASS
 
 Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then summarized by local Ollama `qwen3:4b`. Transcript and summary were non-empty and accurate.
@@ -118,6 +135,6 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 - [x] A 21st selected file is rejected before upload.
 - [ ] Restart the computer during a long recording and confirm stale-lease recovery.
 - [ ] Measure 30- and 60-minute processing time and peak memory.
-- [ ] Keyboard/mobile usability review on the final production domain.
+- [ ] Repeat the completed mobile usability review on the final production deployment and one physical phone.
 
 Do not promise processing time until real long-class benchmarks are recorded.

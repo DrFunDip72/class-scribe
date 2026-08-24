@@ -93,3 +93,11 @@ Generate a brief overview plus up to 14 lecture-ordered study points that priori
 **Reason:** Students need notes that scan like a study guide instead of a generic prose recap, and they often need to paste the study notes or raw transcript independently.
 
 **Consequence:** `Summary` copy includes the overview, key points, and action items but excludes the transcript. Existing completed results keep their original generated content while receiving the new copy choices; the revised generation format applies to recordings processed by worker version `1.2.1` or later.
+
+## ADR-019 — 320-Pixel Mobile Baseline and Copy Action Sheet
+
+Treat 320 CSS pixels as the minimum supported web viewport. At 640 pixels or narrower, stack dense dashboard and result controls, preserve visible action labels, require at least 44 by 44 CSS pixels for visible touch targets, and render Copy choices as a safe-area-aware bottom action sheet. Keep the anchored Copy dropdown on wider screens.
+
+**Reason:** Phone users were forced to zoom out, and the desktop-sized Copy dropdown could extend beyond the visible screen. A bounded action sheet makes all three clipboard targets readable and reachable without compromising the desktop layout.
+
+**Consequence:** Mobile layout changes must be checked for horizontal overflow at 320, 360, 390, and 430 CSS pixels. The Copy sheet must stay inside the viewport, close from its backdrop/close control/Escape, contain keyboard focus while open, and return focus to its trigger.

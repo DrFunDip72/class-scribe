@@ -58,7 +58,11 @@ Claims have a 20-minute lease that the worker refreshes while processing. A stal
 
 ## Long recordings
 
-Whisper streams segments and periodically refreshes progress/lease state. Long transcripts are split on sentence boundaries, summarized per chunk, then consolidated into structured JSON with a brief overview, lecture-ordered study-guide points, a final big takeaway, and genuine action items. Single-section recordings skip the second consolidation call to reduce latency and hallucination risk. The result page derives three clipboard-safe strings on the server—summary notes, transcript, and everything—and passes only those serializable strings to the small client-side Copy menu.
+Whisper streams segments and periodically refreshes progress/lease state. Long transcripts are split on sentence boundaries, summarized per chunk, then consolidated into structured JSON with a brief overview, lecture-ordered study-guide points, a final big takeaway, and genuine action items. Single-section recordings skip the second consolidation call to reduce latency and hallucination risk. The result page derives three clipboard-safe strings on the server—summary notes, transcript, and everything—and passes only those serializable strings to the small client-side Copy control. That control renders a compact anchored dropdown on wider screens and a fixed, safe-area-aware bottom action sheet at 640 CSS pixels or narrower. The sheet traps keyboard focus, closes on Escape or backdrop activation, and returns focus to its trigger.
+
+## Responsive web boundary
+
+The web UI is designed from a 320 CSS-pixel minimum viewport upward. Flex and grid children use shrink-safe sizing, long filenames and generated text wrap instead of widening the document, dense dashboard controls stack on narrow screens, and visible phone controls provide at least a 44 by 44 CSS-pixel target. Horizontal clipping is a final document-level guard; component sizing remains responsible for preventing overflow.
 
 ## Privacy boundary
 

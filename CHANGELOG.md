@@ -9,6 +9,9 @@
 - Updated the local Ollama prompts to produce streamlined study guides with a short overview, ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 - Prevented short lectures from being padded with outside knowledge and enforce the final big takeaway in worker code.
 - Updated the product, architecture, worker operations, status, testing, and decision handoff documentation.
+- Added a 320-pixel mobile layout baseline across landing, authentication, dashboard, and result screens with no horizontal overflow.
+- Added 44-pixel-or-larger phone touch targets, safer long-text wrapping, stacked narrow controls, and improved mobile secondary-text contrast.
+- Replaced the narrow-screen Copy dropdown with a safe-area-aware bottom action sheet that supports outside-tap, close-button, and Escape dismissal plus keyboard focus containment/restoration.
 
 ## 2026-08-23
 

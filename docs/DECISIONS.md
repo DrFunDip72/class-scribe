@@ -69,3 +69,11 @@ Allow one to 20 files in a single batch while preserving one-at-a-time FIFO proc
 **Reason:** A class day can produce 12 or more short 5-10 minute videos, and selecting them together is substantially easier.
 
 **Consequence:** A maximum-size batch can approach the entire 1 GB Supabase Free Storage quota. Audio deletion after success and storage monitoring remain required.
+
+## ADR-016 — Local Streaming Video-to-Audio Preparation
+
+For MP4, WebM, MOV, M4V, and MKV input, use pinned Mediabunny packages in the authenticated browser to read the source lazily, discard video, and produce mono 16 kHz, 48 kbps AAC/M4A. Prepare and upload selected files sequentially. Only the derived audio may cross the network.
+
+**Reason:** Source class videos can exceed the Supabase Free 50 MB object limit even when their speech audio is small. Local extraction preserves the $0 stack, avoids Vercel media limits, reduces Storage/egress use, and keeps the original video private.
+
+**Consequence:** An up-to-date browser must be able to decode the source audio codec; preparation uses the user's CPU and holds the completed M4A in browser memory. The derived output remains subject to the 50 MB Storage limit. Do not switch to whole-file FFmpeg/WASM buffering without measuring memory behavior on long class videos.

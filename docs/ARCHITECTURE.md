@@ -3,6 +3,7 @@
 ```text
 Vercel-hosted Next.js browser
   |  Supabase Auth session
+  |  video input: local lazy read -> mono AAC/M4A
   |  direct upload (private bucket)
   v
 Supabase Auth + Postgres + Storage
@@ -16,9 +17,11 @@ Windows startup task -> worker.py
 
 ## Web application
 
-The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refreshes sessions and protects `/dashboard` and `/jobs/*`. The browser uploads directly to Storage, then calls `create_upload_batch` once so all file metadata and jobs are inserted atomically.
+The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refreshes sessions and protects `/dashboard` and `/jobs/*`. Direct audio uploads to Storage unchanged. Video input is dynamically handled by pinned Mediabunny packages: a lazy `BlobSource` uses an 8 MiB read cache, the video track is discarded, and the primary audio track is decoded and encoded as mono 16 kHz, 48 kbps AAC in M4A. Conversion and upload happen sequentially so a 20-file selection does not process every video in memory at once.
 
-Vercel does not receive audio and performs no inference. This avoids function payload/duration limits and keeps the cloud portion inexpensive.
+After every selected file has uploaded, the browser calls `create_upload_batch` once so all file metadata and jobs are inserted atomically. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
+
+Vercel serves the application code but does not receive media and performs no inference. The original video never leaves the browser; only derived audio is sent directly to Supabase. This avoids Vercel Function payload/duration limits and keeps the cloud portion inexpensive.
 
 ## Supabase
 
@@ -39,7 +42,7 @@ A Windows named mutex prevents duplicate worker processes. Database atomic claim
 ## Lifecycle
 
 ```text
-browser upload -> queued -> transcribing -> summarizing -> completed
+local video extraction (when needed) -> audio upload -> queued -> transcribing -> summarizing -> completed
                          \-> failed -> user retry -> queued
 ```
 
@@ -51,4 +54,4 @@ Whisper streams segments and periodically refreshes progress/lease state. Long t
 
 ## Privacy boundary
 
-No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Storage objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.
+No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Original videos never upload. Derived audio and direct audio Storage objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.

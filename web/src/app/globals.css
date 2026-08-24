@@ -115,6 +115,7 @@ button { color: inherit; }
 .card-heading > span { color: var(--muted); font-size: 11px; font-weight: 750; }
 .drop-zone { min-height: 145px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #bbcac1; border-radius: 12px; background: #f8faf8; cursor: pointer; transition: .15s; }
 .drop-zone:hover, .drop-zone.dragging { border-color: var(--green); background: #f1f8f4; }
+.drop-zone.disabled { cursor: wait; opacity: .65; }
 .drop-zone strong { margin-top: 10px; font-size: 13px; }
 .drop-zone small { margin-top: 6px; color: #88918d; font-size: 9px; }
 .upload-icon { width: 42px; height: 42px; display: grid; place-items: center; color: var(--green); border-radius: 12px; background: var(--green-soft); }
@@ -126,6 +127,11 @@ button { color: inherit; }
 .selected-file strong { font-size: 10px; }
 .selected-file small { margin-top: 3px; color: var(--muted); font-size: 9px; }
 .selected-file button { padding: 4px; border: 0; background: transparent; cursor: pointer; color: #8a9490; }
+.selected-file button:disabled { cursor: not-allowed; opacity: .45; }
+.preparation-status { margin-top: 14px; padding: 12px 13px; border: 1px solid #d5e7dc; border-radius: 10px; background: #f0f7f3; }
+.preparation-status > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #315e4d; font-size: 11px; }
+.preparation-status .progress-track { margin-top: 9px; }
+.preparation-status small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; }
 .upload-footer { margin-top: 15px; display: flex; align-items: end; gap: 12px; }
 .upload-footer label { flex: 1; margin: 0; }
 .upload-footer input { height: 44px; }

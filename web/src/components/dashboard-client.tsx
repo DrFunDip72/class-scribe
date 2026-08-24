@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Check, Clock3, FileAudio, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
 
@@ -10,11 +10,12 @@ type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
   transcription_results: { summary: string; key_points: string[] } | null;
 };
 type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
-type UploadState = "idle" | "uploading" | "creating";
+type UploadState = "idle" | "preparing" | "uploading" | "creating";
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
-const acceptedExtensions = ["mp3", "m4a", "wav", "flac", "ogg", "webm", "mp4"];
+const videoExtensions = new Set(["mp4", "webm", "mov", "m4v", "mkv"]);
+const acceptedExtensions = new Set(["mp3", "m4a", "wav", "flac", "ogg", ...videoExtensions]);
 const mimeByExtension: Record<string, string> = {
   mp3: "audio/mpeg", m4a: "audio/x-m4a", wav: "audio/wav", flac: "audio/flac",
   ogg: "audio/ogg", webm: "audio/webm", mp4: "audio/mp4",
@@ -26,7 +27,17 @@ function safeName(name: string) {
 }
 
 function formatBytes(bytes: number) {
-  return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function extensionOf(file: File) {
+  return file.name.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function isVideo(file: File) {
+  return file.type.startsWith("video/") || videoExtensions.has(extensionOf(file));
 }
 
 function relativeTime(value: string) {
@@ -46,6 +57,8 @@ export function DashboardClient({ userId }: { userId: string }) {
   const [label, setLabel] = useState("");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadCount, setUploadCount] = useState(0);
+  const [preparationProgress, setPreparationProgress] = useState(0);
+  const [preparationIndex, setPreparationIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,9 +90,9 @@ export function DashboardClient({ userId }: { userId: string }) {
     const combined = [...files, ...incoming];
     if (combined.length > MAX_FILES) { setError(`You can upload a maximum of ${MAX_FILES} recordings at once.`); return; }
     for (const file of incoming) {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (!acceptedExtensions.includes(ext)) { setError(`${file.name} is not a supported audio format.`); return; }
-      if (file.size > MAX_BYTES) { setError(`${file.name} is larger than the free 50 MB file limit.`); return; }
+      const ext = extensionOf(file);
+      if (!acceptedExtensions.has(ext)) { setError(`${file.name} is not a supported recording format.`); return; }
+      if (!isVideo(file) && file.size > MAX_BYTES) { setError(`${file.name} is larger than the free 50 MB audio-file limit.`); return; }
       if (file.size === 0) { setError(`${file.name} is empty.`); return; }
     }
     setFiles(combined);
@@ -92,7 +105,19 @@ export function DashboardClient({ userId }: { userId: string }) {
     const records: Array<{ job_id: string; original_filename: string; storage_path: string; size_bytes: number; mime_type: string }> = [];
     try {
       for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
+        const sourceFile = files[index];
+        let file = sourceFile;
+        if (isVideo(sourceFile)) {
+          setUploadState("preparing");
+          setPreparationIndex(index + 1);
+          setPreparationProgress(0);
+          const { extractAudioForUpload } = await import("@/lib/media/extract-audio");
+          file = await extractAudioForUpload(sourceFile, setPreparationProgress);
+          if (file.size > MAX_BYTES) {
+            throw new Error(`${sourceFile.name} produced more than 50 MB of audio. Split the recording into shorter parts and try again.`);
+          }
+        }
+        setUploadState("uploading");
         const jobId = crypto.randomUUID();
         const filename = safeName(file.name);
         const extension = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -108,7 +133,7 @@ export function DashboardClient({ userId }: { userId: string }) {
       const { error: queueError } = await supabase.rpc("create_upload_batch", { p_label: label.trim(), p_files: records as unknown as Json });
       if (queueError) throw queueError;
       setSuccess(`${files.length} recording${files.length === 1 ? "" : "s"} added to the queue.`);
-      setFiles([]); setLabel(""); setUploadCount(0);
+      setFiles([]); setLabel(""); setUploadCount(0); setPreparationProgress(0); setPreparationIndex(0);
       if (inputRef.current) inputRef.current.value = "";
       await refresh();
     } catch (caught) {
@@ -135,13 +160,14 @@ export function DashboardClient({ userId }: { userId: string }) {
       </div>
 
       <div className="upload-card">
-        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Each file can be up to 50 MB.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
-        <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,audio/*" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
-        <label htmlFor="audio-input" className={`drop-zone ${dragging ? "dragging" : ""}`} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}>
-          <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop audio files here</strong><small>or click to browse · MP3, M4A, WAV, FLAC, OGG, WebM, MP4</small>
+        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Videos become compact audio on this device before upload.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
+        <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple disabled={uploadState !== "idle"} accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,.mov,.m4v,.mkv,audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/x-matroska" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
+        <label htmlFor="audio-input" aria-disabled={uploadState !== "idle"} className={`drop-zone ${dragging ? "dragging" : ""} ${uploadState !== "idle" ? "disabled" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (uploadState === "idle") setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); if (uploadState === "idle") addFiles(Array.from(event.dataTransfer.files)); }}>
+          <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop recordings here</strong><small>Audio plus MP4, WebM, MOV, M4V, and MKV video</small>
         </label>
-        {files.length > 0 && <div className="selected-files">{files.map((file, index) => <div className="selected-file" key={`${file.name}-${file.lastModified}`}><FileAudio size={17} /><div><strong>{file.name}</strong><small>{formatBytes(file.size)}</small></div><button aria-label={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div>)}</div>}
-        {files.length > 0 && <div className="upload-footer"><label>Batch label <input value={label} maxLength={80} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Add to queue</> : <><LoaderCircle className="spin" size={17} />{uploadState === "uploading" ? `Uploading ${uploadCount}/${files.length}` : "Creating jobs…"}</>}</button></div>}
+        {files.length > 0 && <div className="selected-files">{files.map((file, index) => <div className="selected-file" key={`${file.name}-${file.lastModified}`}>{isVideo(file) ? <FileVideo size={17} /> : <FileAudio size={17} />}<div><strong>{file.name}</strong><small>{formatBytes(file.size)}{isVideo(file) ? " · audio extracts locally" : ""}</small></div><button aria-label={`Remove ${file.name}`} disabled={uploadState !== "idle"} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div>)}</div>}
+        {uploadState === "preparing" && <div className="preparation-status" role="status"><div><span>Extracting audio locally from file {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>The original video stays on this device.</small></div>}
+        {files.length > 0 && <div className="upload-footer"><label>Batch label <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Add to queue</> : <><LoaderCircle className="spin" size={17} />{uploadState === "preparing" ? `Preparing ${preparationIndex}/${files.length}` : uploadState === "uploading" ? `Uploading ${Math.min(uploadCount + 1, files.length)}/${files.length}` : "Creating jobs…"}</>}</button></div>}
         {error && <p className="inline-alert error" role="alert"><AlertCircle size={16} />{error}</p>}
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}
       </div>
@@ -152,8 +178,8 @@ export function DashboardClient({ userId }: { userId: string }) {
       </div>
     </section>
     <aside className="dashboard-aside">
-      <div className="aside-card"><Server size={19} /><h3>How processing works</h3><ol><li><span>1</span>Your files upload privately.</li><li><span>2</span>Your computer takes the next job.</li><li><span>3</span>Audio is transcribed and summarized.</li><li><span>4</span>The original audio is deleted.</li></ol></div>
-      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Audio retention</h3><p>Audio is kept only until a job succeeds. Your transcript and notes remain saved to your account.</p></div>
+      <div className="aside-card"><Server size={19} /><h3>How processing works</h3><ol><li><span>1</span>Video becomes compact audio locally.</li><li><span>2</span>Only audio uploads privately.</li><li><span>3</span>Your computer creates the notes.</li><li><span>4</span>The uploaded audio is deleted.</li></ol></div>
+      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Media retention</h3><p>Original videos never upload. Temporary audio is kept only until a job succeeds; transcripts and notes remain in your account.</p></div>
     </aside>
   </div>;
 }

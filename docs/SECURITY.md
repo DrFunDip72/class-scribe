@@ -10,6 +10,8 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 - RLS on all exposed project tables.
 - Private Storage with UUID-prefixed ownership policies.
 - Browser validation plus authoritative database/bucket limits.
+- Local video preprocessing: original MP4/WebM/MOV/M4V/MKV files never leave the user's device; only compact derived audio uploads.
+- Lazy source reads and one-at-a-time conversion reduce browser memory pressure for large videos.
 - Dedicated worker Auth role instead of a broad service-role key.
 - Atomic queue claims, leases, capped retries, and duplicate-worker protection.
 - Outbound-only local network design; Ollama stays on localhost.
@@ -34,6 +36,7 @@ Unused-index informational notices are expected while the new tables contain lit
 - Monitor Supabase Storage/egress/database usage.
 - Confirm Vercel Hobby use remains personal and non-commercial.
 - Obtain appropriate permission before uploading recordings containing other people's voices.
+- Remember that extracted audio still contains the recording's speech and remains private educational data even though the video track was removed.
 
 ## Secret handling
 

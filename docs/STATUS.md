@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-23
-**Phase:** Built, deployed, and end-to-end verified with a 20-file batch limit.
+**Phase:** Built, deployed, and end-to-end verified with 20-file batches and local video-to-audio extraction.
 
 ## Live resources
 
@@ -17,13 +17,15 @@ No credentials are stored in this document.
 ## Completed
 
 - Responsive production web app with sign-up, sign-in, sign-out, confirmation callback, forgot/reset password, protected dashboard, job history, retry, copy, and Markdown download.
-- Direct private uploads for one to 20 supported audio files, with client and database validation at 50 MB each.
+- Direct private uploads for one to 20 supported recordings. Direct audio is capped at 50 MB; MP4/WebM/MOV/M4V/MKV video is converted locally and only its derived audio must fit the 50 MB limit.
+- Sequential browser-side video conversion to mono 16 kHz, 48 kbps AAC/M4A; original video never uploads.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Startup task plus named-mutex duplicate-instance protection.
 - Production Vercel deployment and production login/dashboard/result verification.
+- Production deployment `dpl_3UCh1PMhNGfbtBKjTj2TNnpkmxYz` includes browser-side video extraction and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 
 ## Last verified state
@@ -38,6 +40,9 @@ No credentials are stored in this document.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.
 - Production browser boundary: 20 synthetic MP3 files were accepted into the selector; 21 were rejected before upload. No test audio was uploaded or queued.
+- Oversized-video path: a valid 57.3 MB MP4 was accepted, converted locally to a 55 KB M4A, uploaded, transcribed, summarized, rendered, and fully cleaned up.
+- Deployed browser boundary: the public production dashboard accepted a synthetic 57.3 MB MP4 and labeled it for local extraction without uploading it; the disposable account was then removed and Storage remained empty.
+- Vercel post-deployment health: no runtime errors or warning/error logs for the new deployment.
 - Supabase performance advisor: only one expected unused heartbeat-index informational notice after consolidating the duplicate read policy.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
 
@@ -55,4 +60,4 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Test a real 12-recording class batch when source files are available, then measure its total upload, transcription, and summarization time.
+Test a real 12-recording class batch when source files are available, including at least one long video, then measure browser preparation time, upload time, transcription/summarization time, and peak memory.

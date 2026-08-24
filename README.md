@@ -1,6 +1,6 @@
 # Class Scribe
 
-Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload up to 20 recordings together; a Windows worker processes them one at a time with local AI.
+Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload up to 20 audio or video recordings together; a Windows worker processes them one at a time with local AI.
 
 - Live app: https://class-scribe-ruddy.vercel.app
 - Supabase project: `class-transcriber` (`wmsotywnkqdajhmiultx`)
@@ -10,6 +10,7 @@ Class Scribe is a deployed, account-based web app for turning class recordings i
 
 ```text
 Authenticated browser
+  -> local video-to-audio extraction when needed
   -> private Supabase Storage + durable Postgres queue
   -> outbound-only Windows worker
   -> faster-whisper small (CPU INT8)
@@ -17,7 +18,7 @@ Authenticated browser
   -> private saved result in Supabase
 ```
 
-The Next.js site runs on Vercel. Audio never passes through a Vercel Function. The browser uploads directly to a private Supabase bucket, and the local worker makes outbound HTTPS requests only. Audio is deleted after successful processing; results stay with the user's account.
+The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the browser strips the video and creates compact speech audio on the user's device. The original video never uploads. Audio goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded audio is deleted after successful processing; results stay with the user's account.
 
 ## Repository map
 

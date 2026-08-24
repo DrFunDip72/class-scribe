@@ -15,6 +15,8 @@
 - Replaced the planning documentation with an exact operational handoff.
 - Changed sign-up to immediate account access without an email-confirmation step, per owner preference.
 - Raised the browser and database batch limit from 5 to 20 files while retaining sequential FIFO processing.
+- Added local browser extraction for MP4, WebM, MOV, M4V, and MKV input. Videos are read lazily, converted sequentially to compact mono AAC/M4A, and never uploaded in their original form.
+- Verified the video path end to end with a 57.3 MB MP4 that produced a 55 KB audio upload, completed local transcription and summarization, rendered its result, and left no test account or media behind.
 
 ### Security and reliability
 

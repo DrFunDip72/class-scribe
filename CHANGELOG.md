@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added optional completion email beside browser pop-ups, with shared batch/per-recording/failure preferences and an account-email-only recipient.
+- Integrated the FluxPrompt Email Agent from the outbound local worker using its exact ordered inputs, unique sessions, defensive response parsing, and a local-only API key.
+- Added a branded responsive HTML email with a private-dashboard call to action and no filename, transcript, summary, attachment, or signed URL.
+- Converted `completion_events` into a durable three-attempt email outbox and added opt-out rechecks so unsent events are canceled when email is disabled.
+- Added a `worker.py --test-email` operational check and documented setup, recovery, costs, limits, privacy, and troubleshooting.
 - Added a Copy menu on completed results with separate `Summary`, `Transcript`, and `Everything` clipboard targets.
 - Added accessible copy confirmation/failure feedback and preserved complete Markdown downloads.
 - Updated the local Ollama prompts to produce streamlined study guides with a short overview, ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
@@ -36,6 +41,7 @@
 
 ### Security and reliability
 
+- Locked email recipients through RLS to the authenticated account's lowercase JWT email and kept the FluxPrompt key off Vercel, Supabase, and browser code.
 - Browser uploads go directly to private Supabase Storage.
 - Audio is deleted after successful processing.
 - Worker secrets and generated bootstrap material are ignored.

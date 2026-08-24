@@ -101,3 +101,11 @@ Treat 320 CSS pixels as the minimum supported web viewport. At 640 pixels or nar
 **Reason:** Phone users were forced to zoom out, and the desktop-sized Copy dropdown could extend beyond the visible screen. A bounded action sheet makes all three clipboard targets readable and reachable without compromising the desktop layout.
 
 **Consequence:** Mobile layout changes must be checked for horizontal overflow at 320, 360, 390, and 430 CSS pixels. The Copy sheet must stay inside the viewport, close from its backdrop/close control/Escape, contain keyboard focus while open, and return focus to its trigger.
+
+## ADR-020 — Optional FluxPrompt Completion Email
+
+Supersede ADR-008's email deferral. Add Email as an independent account-level notification channel beside per-device Web Push, using the owner's FluxPrompt Email Agent from the outbound-only Windows worker. Reuse `completion_events` as a durable retry outbox. Keep the batch/per-recording and failure preferences shared across enabled channels.
+
+**Reason:** Users may miss a browser pop-up or use a browser/device where persistent Push is unavailable. A concise email with a dashboard link lets them return to private results without adding cloud inference or a separate mail vendor.
+
+**Consequence:** The FluxPrompt API key lives only in ignored `.env.worker.local`. RLS restricts the stored recipient to the current Supabase JWT email, and the worker rechecks opt-in before sending. Email subject/body remain generic and contain no filename, transcript, summary, attachment, signed URL, or account-specific result URL. Delivery retries cannot change transcription state. Because mandatory sign-up confirmation is disabled, email ownership is not assured; add anti-abuse controls before broad public launch. FluxPrompt account pricing and request allowance remain an external operational limit.

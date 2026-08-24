@@ -49,7 +49,7 @@ function relativeTime(value: string) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function DashboardClient({ userId }: { userId: string }) {
+export function DashboardClient({ userId, userEmail }: { userId: string; userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -173,7 +173,7 @@ export function DashboardClient({ userId }: { userId: string }) {
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}
       </div>
 
-      <NotificationSettings userId={userId} />
+      <NotificationSettings userId={userId} accountEmail={userEmail} />
 
       <div className="history-section">
         <div className="card-heading"><div><h2>Recent recordings</h2><p>{completeCount} complete · {queueCount} waiting</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>

@@ -28,11 +28,11 @@ Repository documentation is authoritative over conversation history.
 - RLS account isolation. Treat recordings and transcripts as private educational data.
 - Web Push is opt-in and account-scoped. Keep notification payloads generic: never include filenames, transcript text, summaries, or signed URLs.
 - The VAPID private key belongs only in ignored `.worker-secrets/`; only its public key may be stored in Supabase or sent to a browser.
-- Email delivery is deferred; use `completion_events` as its future integration point.
+- Email is opt-in and account-scoped. The outbound worker uses `completion_events` as a durable FluxPrompt outbox; the API key lives only in ignored `.env.worker.local`.
 
 ## Current state
 
-The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side extraction has also passed with an original video larger than the Supabase 50 MB file limit. Persistent Web Push completion notifications are implemented through the local worker and service worker. Completed results use streamlined study-guide notes and let users copy the summary, transcript, or everything independently. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
+The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side extraction has also passed with an original video larger than the Supabase 50 MB file limit. Persistent Web Push and optional FluxPrompt completion email are implemented through the local worker; live email delivery still requires the owner-held API key and approved test recipient. Completed results use streamlined study-guide notes and let users copy the summary, transcript, or everything independently. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
 
 ## Security rules
 

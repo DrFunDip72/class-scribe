@@ -12,8 +12,9 @@
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker` |
-| Worker version | `1.2.1` |
+| Worker version | `1.3.0` |
 | Push library | `pywebpush` 2.4.0 |
+| Email transport | FluxPrompt Email Agent over outbound HTTPS |
 
 Python 3.14 also exists. Always invoke `.venv-worker\Scripts\python.exe`.
 
@@ -22,6 +23,8 @@ Python 3.14 also exists. Always invoke `.venv-worker\Scripts\python.exe`.
 Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase URL, publishable key, and dedicated worker email/password. Do not use a service-role key and do not commit the file.
 
 `VAPID_SUBJECT` identifies the Web Push sender and defaults to the production site URL. On its first authenticated start, the worker creates `.worker-secrets/vapid_private_key.pem`, publishes only the corresponding public key to Supabase, and restricts the local file permissions where Windows permits. Back up this private key securely with the worker credentials. Losing or replacing it invalidates existing browser subscriptions; users must enable notifications again.
+
+`FLUXPROMPT_API_KEY` is the only required email secret. Add it to ignored `.env.worker.local`; never add it to Vercel, Supabase, a `NEXT_PUBLIC_` variable, Git, logs, or chat. `FLUXPROMPT_API_URL`, `FLUXPROMPT_FLOW_ID`, and `SITE_URL` have production defaults in `.env.worker.example`. Restart the startup task after changing the file. With no key, transcription and Web Push continue normally and opted-in email events wait durably.
 
 `bootstrap-worker-auth.py` creates local bootstrap material for an administrator to provision the dedicated Auth row with `app_metadata.role=worker`. Its generated JSON and local environment are ignored. Revoke the old Auth identity before provisioning a replacement computer.
 
@@ -33,6 +36,9 @@ Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase
 
 # Process at most one queued job
 \.venv-worker\Scripts\python.exe worker.py --once
+
+# Send the branded three-recording sample (requires FLUXPROMPT_API_KEY)
+\.venv-worker\Scripts\python.exe worker.py --test-email you@example.com
 
 # Task state
 Get-ScheduledTask -TaskName AudioTranscriberWorker
@@ -55,6 +61,7 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - Temporary audio: `.worker-temp`, removed in `finally`.
 - Completed source object: deleted only after result and completion event are saved.
 - Push deliveries: durable, attempted separately after result commit, up to three attempts with exponential backoff.
+- Email deliveries: durable, recheck opt-in immediately before sending, then call FluxPrompt separately with up to three attempts and exponential backoff.
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
 - Summary output: a brief overview (usually 2-4 sentences), up to 14 ordered concept/definition/process points without padding, selective examples, a final `Big takeaway`, and only genuine action items. Single-section recordings skip the consolidation pass.
 
@@ -65,7 +72,8 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
 - **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
 - **Model missing:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3:4b`.
-- **No completion alert:** verify worker version `1.2.1`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
+- **No browser pop-up:** verify worker version `1.3.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
+- **No completion email:** confirm the account enabled Email, verify `FLUXPROMPT_API_KEY` is set locally, restart the startup task, and inspect only the safe state/error metadata in `completion_events`. Do not log the recipient, HTML body, API key, or API response body.
 - **Private push key replaced:** restart the worker, then ask each user to disable and re-enable notifications on every desired device.
 
 Do not expose Ollama, add port forwarding, or create a public tunnel.

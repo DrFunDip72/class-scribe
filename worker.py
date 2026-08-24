@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import base64
 import ctypes
+import html
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ import signal
 import socket
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -32,7 +34,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -70,6 +72,10 @@ class Settings(BaseSettings):
     ollama_url: str = Field(default="http://127.0.0.1:11434", alias="OLLAMA_URL")
     poll_seconds: float = Field(default=8, ge=2, le=60, alias="POLL_SECONDS")
     vapid_subject: str = Field(default="https://class-scribe-ruddy.vercel.app", alias="VAPID_SUBJECT")
+    fluxprompt_api_key: str | None = Field(default=None, alias="FLUXPROMPT_API_KEY")
+    fluxprompt_api_url: str = Field(default="https://api.fluxprompt.ai/flux/api-v2", alias="FLUXPROMPT_API_URL")
+    fluxprompt_flow_id: str = Field(default="2000e2ec-450e-4da3-9d7f-0061adfe1c17", alias="FLUXPROMPT_FLOW_ID")
+    site_url: str = Field(default="https://class-scribe-ruddy.vercel.app", alias="SITE_URL")
 
 
 class Worker:
@@ -294,6 +300,136 @@ class Worker:
                     }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
                 )
 
+    def enqueue_email_delivery(self, job: dict[str, Any], *, failed: bool = False) -> None:
+        preference_rows = self.retry(
+            lambda: self.db.table("notification_preferences")
+            .select(
+                "email_notifications_enabled,email_address,notify_each_recording,"
+                "notify_batch_complete,notify_failures"
+            )
+            .eq("user_id", job["user_id"])
+            .execute()
+        ).data or []
+        if not preference_rows:
+            return
+        preferences = preference_rows[0]
+        recipient = preferences.get("email_address")
+        if not preferences.get("email_notifications_enabled") or not recipient:
+            return
+
+        event_key: str | None = None
+        delivery_kind: str | None = None
+        batch_size = 1
+        if failed:
+            if preferences.get("notify_failures"):
+                event_key = f"job:{job['id']}:failed:{job.get('attempt_count', 0)}"
+                delivery_kind = "failed"
+        elif preferences.get("notify_each_recording"):
+            event_key = f"job:{job['id']}:completed"
+            delivery_kind = "recording"
+        elif preferences.get("notify_batch_complete"):
+            batch_jobs = self.retry(
+                lambda: self.db.table("transcription_jobs")
+                .select("id,status").eq("batch_id", job["batch_id"]).execute()
+            ).data or []
+            if batch_jobs and all(item["status"] == "completed" for item in batch_jobs):
+                event_key = f"batch:{job['batch_id']}:completed"
+                delivery_kind = "batch"
+                batch_size = len(batch_jobs)
+
+        if not event_key or not delivery_kind:
+            return
+
+        event = {
+            "job_id": job["id"],
+            "user_id": job["user_id"],
+            "state": "pending",
+            "event_key": event_key,
+            "delivery_kind": delivery_kind,
+            "recipient": str(recipient).lower().strip(),
+            "payload": {"batch_size": batch_size, "url": "/dashboard"},
+            "attempt_count": 0,
+            "next_attempt_at": iso_now(),
+            "last_error": None,
+            "delivered_at": None,
+            "external_reference": None,
+        }
+        existing = self.retry(
+            lambda: self.db.table("completion_events")
+            .select("job_id").eq("job_id", job["id"]).execute()
+        ).data or []
+        if existing:
+            self.retry(
+                lambda: self.db.table("completion_events").update(
+                    event, returning=ReturnMethod.minimal
+                ).eq("job_id", job["id"]).execute()
+            )
+        else:
+            self.retry(
+                lambda: self.db.table("completion_events").insert(
+                    event, returning=ReturnMethod.minimal
+                ).execute()
+            )
+
+    def process_email_deliveries(self) -> None:
+        if not self.settings.fluxprompt_api_key:
+            return
+        deliveries = self.retry(
+            lambda: self.db.table("completion_events")
+            .select("id,user_id,recipient,delivery_kind,payload,attempt_count")
+            .in_("state", ["pending", "failed"])
+            .lt("attempt_count", 3)
+            .lte("next_attempt_at", iso_now())
+            .order("created_at")
+            .limit(20)
+            .execute()
+        ).data or []
+        for delivery in deliveries:
+            attempt_count = int(delivery["attempt_count"]) + 1
+            try:
+                preferences = self.retry(
+                    lambda: self.db.table("notification_preferences")
+                    .select("email_notifications_enabled,email_address")
+                    .eq("user_id", delivery["user_id"])
+                    .maybe_single()
+                    .execute()
+                ).data
+                if (
+                    not preferences
+                    or not preferences.get("email_notifications_enabled")
+                    or preferences.get("email_address") != delivery["recipient"]
+                ):
+                    self.retry(
+                        lambda: self.db.table("completion_events").update({
+                            "state": "delivered",
+                            "delivered_at": iso_now(),
+                            "last_error": None,
+                            "external_reference": "email-disabled-before-delivery",
+                        }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                    )
+                    continue
+                send_fluxprompt_email(self.settings, delivery)
+            except Exception as error:
+                self.retry(
+                    lambda: self.db.table("completion_events").update({
+                        "state": "failed",
+                        "attempt_count": attempt_count,
+                        "next_attempt_at": iso_after(minutes=min(60, 2 ** attempt_count)),
+                        "last_error": email_error_message(error),
+                    }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
+                LOG.warning("A completion email could not be delivered (attempt %d of 3).", attempt_count)
+            else:
+                self.retry(
+                    lambda: self.db.table("completion_events").update({
+                        "state": "delivered",
+                        "attempt_count": attempt_count,
+                        "delivered_at": iso_now(),
+                        "last_error": None,
+                        "external_reference": "fluxprompt-accepted",
+                    }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
+
     def ensure_model(self) -> WhisperModel:
         if self.model is None:
             LOG.info("Loading Whisper model '%s' on CPU (INT8).", self.settings.whisper_model)
@@ -426,19 +562,6 @@ class Worker:
                 result, returning=ReturnMethod.minimal
             ).execute())
 
-        event = {"job_id": job["id"], "user_id": job["user_id"], "state": "pending"}
-        existing_event = self.retry(
-            lambda: self.db.table("completion_events")
-            .select("job_id").eq("job_id", job["id"]).execute()
-        ).data
-        if existing_event:
-            self.retry(lambda: self.db.table("completion_events").update(
-                event, returning=ReturnMethod.minimal
-            ).eq("job_id", job["id"]).execute())
-        else:
-            self.retry(lambda: self.db.table("completion_events").insert(
-                event, returning=ReturnMethod.minimal
-            ).execute())
         self.retry(lambda: self.db.table("transcription_jobs").update({
             "status": "completed",
             "progress": 100,
@@ -459,6 +582,11 @@ class Worker:
             self.process_push_deliveries()
         except Exception:
             LOG.warning("Job %s completed, but its notification will be retried later.", short_id(job["id"]))
+        try:
+            self.enqueue_email_delivery(job)
+            self.process_email_deliveries()
+        except Exception:
+            LOG.warning("Job %s completed, but its email will be retried later.", short_id(job["id"]))
 
     def fail(self, job: dict[str, Any], error: Exception) -> None:
         if isinstance(error, InterruptedError):
@@ -482,6 +610,11 @@ class Worker:
             self.process_push_deliveries()
         except Exception:
             LOG.warning("The failure notification for job %s will be retried later.", short_id(job["id"]))
+        try:
+            self.enqueue_email_delivery(job, failed=True)
+            self.process_email_deliveries()
+        except Exception:
+            LOG.warning("The failure email for job %s will be retried later.", short_id(job["id"]))
         LOG.error("Job %s failed: %s", short_id(job["id"]), message)
 
     def process(self, job: dict[str, Any]) -> None:
@@ -521,6 +654,13 @@ class Worker:
             self.process_push_deliveries()
         except Exception as error:
             LOG.warning("Web Push initialization is unavailable: %s", public_error(error))
+        if self.settings.fluxprompt_api_key:
+            try:
+                self.process_email_deliveries()
+            except Exception:
+                LOG.warning("Pending completion emails could not be checked.")
+        else:
+            LOG.info("Completion email delivery is disabled until FLUXPROMPT_API_KEY is configured.")
         while not self.stopping:
             try:
                 self.heartbeat("idle")
@@ -528,6 +668,10 @@ class Worker:
                     self.process_push_deliveries()
                 except Exception:
                     LOG.warning("Pending completion notifications could not be checked.")
+                try:
+                    self.process_email_deliveries()
+                except Exception:
+                    LOG.warning("Pending completion emails could not be checked.")
                 job = self.claim()
                 if job:
                     self.process(job)
@@ -606,6 +750,165 @@ def build_push_payload(kind: str, *, job_id: str, batch_id: str, batch_size: int
         "url": f"/jobs/{job_id}",
         "tag": f"job-{job_id}-completed",
     }
+
+
+FLUXPROMPT_INPUT_IDS = (
+    "varInputNode_1785963273043_0.6691",
+    "varInputNode_1785963273305_0.3299",
+    "varInputNode_1787543733759_0.7895",
+    "varInputNode_1787543754846_0.6423",
+)
+
+
+def build_email_content(kind: str, *, batch_size: int, site_url: str) -> tuple[str, str]:
+    dashboard_url = f"{site_url.rstrip('/')}/dashboard"
+    escaped_url = html.escape(dashboard_url, quote=True)
+    if kind == "failed":
+        subject = "A Class Scribe recording needs attention"
+        eyebrow = "Processing update"
+        headline = "A recording needs your attention"
+        message = "We could not finish one recording. Open your private dashboard to review it or try again."
+        button = "Review my dashboard"
+    elif kind == "batch" and batch_size > 1:
+        subject = "Your Class Scribe notes are ready"
+        eyebrow = "Batch complete"
+        headline = f"All {batch_size} recordings are ready"
+        message = "Your private transcripts and study guides are waiting in Class Scribe."
+        button = "View my class notes"
+    else:
+        subject = "Your Class Scribe notes are ready"
+        eyebrow = "Notes ready"
+        headline = "Your recording is ready"
+        message = "Your private transcript and study guide are waiting in Class Scribe."
+        button = "View my class notes"
+
+    body = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{html.escape(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f6f3;color:#15231e;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{html.escape(headline)} — open your private Class Scribe dashboard.</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:#f3f6f3;">
+      <tr>
+        <td align="center" style="padding:36px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#ffffff;border:1px solid #dfe7e2;border-radius:18px;box-shadow:0 12px 38px rgba(21,35,30,.08);overflow:hidden;">
+            <tr>
+              <td style="padding:26px 30px;background:#0e513c;color:#ffffff;">
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="width:42px;height:42px;border-radius:12px;background:#ffffff;color:#187a59;text-align:center;font-size:22px;font-weight:700;">CS</td>
+                    <td style="padding-left:12px;font-size:18px;font-weight:700;letter-spacing:-.2px;">Class Scribe</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:34px 30px 32px;">
+                <p style="margin:0 0 10px;color:#187a59;font-size:12px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">{html.escape(eyebrow)}</p>
+                <h1 style="margin:0 0 14px;color:#15231e;font-size:30px;line-height:1.18;letter-spacing:-.8px;">{html.escape(headline)}</h1>
+                <p style="margin:0 0 26px;color:#596761;font-size:16px;line-height:1.65;">{html.escape(message)}</p>
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="border-radius:10px;background:#187a59;">
+                      <a href="{escaped_url}" style="display:inline-block;padding:14px 21px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">{html.escape(button)}</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:25px 0 0;color:#78837f;font-size:12px;line-height:1.6;">For privacy, this email contains no recording names, transcripts, or summaries. Sign in to Class Scribe to view your saved results.</p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:18px auto 0;max-width:520px;color:#89938f;font-size:11px;line-height:1.55;">You received this because email notifications are enabled in your Class Scribe account. You can turn them off from the dashboard.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+    return subject, body
+
+
+def build_fluxprompt_payload(subject: str, body: str, recipient: str) -> dict[str, Any]:
+    values = (subject, body, recipient, "")
+    return {
+        "variableInputs": [
+            {"inputId": input_id, "inputText": value}
+            for input_id, value in zip(FLUXPROMPT_INPUT_IDS, values, strict=True)
+        ]
+    }
+
+
+def extract_fluxprompt_response_text(data: Any) -> str | None:
+    if not isinstance(data, dict):
+        return None
+    inner = data.get("data")
+    if isinstance(inner, dict):
+        messages = inner.get("message")
+        if isinstance(messages, list) and messages and isinstance(messages[0], dict):
+            text = messages[0].get("text")
+            if isinstance(text, str) and text:
+                return text
+    for key in ("output", "result", "message", "text", "response", "content", "answer"):
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            return value
+    for key in ("data", "outputs", "choices", "results"):
+        nested = data.get(key)
+        if not isinstance(nested, list) or not nested or not isinstance(nested[0], dict):
+            continue
+        item = nested[0]
+        for item_key in ("text", "content", "output", "result", "message"):
+            value = item.get(item_key)
+            if isinstance(value, str) and value:
+                return value
+        message = item.get("message")
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                return content
+    return None
+
+
+def send_fluxprompt_email(settings: Settings, delivery: dict[str, Any]) -> str:
+    if not settings.fluxprompt_api_key:
+        raise RuntimeError("FluxPrompt email delivery is not configured")
+    payload = delivery.get("payload") if isinstance(delivery.get("payload"), dict) else {}
+    subject, body = build_email_content(
+        str(delivery.get("delivery_kind") or "recording"),
+        batch_size=max(1, int(payload.get("batch_size") or 1)),
+        site_url=settings.site_url,
+    )
+    with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+        response = client.post(
+            settings.fluxprompt_api_url,
+            params={
+                "flowId": settings.fluxprompt_flow_id,
+                "sessionId": f"class-scribe-{delivery['id']}",
+            },
+            headers={"api-key": settings.fluxprompt_api_key},
+            json=build_fluxprompt_payload(subject, body, str(delivery["recipient"])),
+        )
+        response.raise_for_status()
+        try:
+            response_data = response.json()
+        except json.JSONDecodeError as error:
+            raise RuntimeError("FluxPrompt returned an invalid response") from error
+    response_text = extract_fluxprompt_response_text(response_data)
+    if not response_text:
+        raise RuntimeError("FluxPrompt returned no delivery confirmation")
+    return response_text
+
+
+def email_error_message(error: Exception) -> str:
+    if isinstance(error, httpx.HTTPStatusError):
+        return f"Email service returned HTTP {error.response.status_code}"
+    if isinstance(error, httpx.TimeoutException):
+        return "Email service timed out"
+    if isinstance(error, httpx.ConnectError):
+        return "Email service is unavailable"
+    return type(error).__name__[:120]
 
 
 def push_error_message(error: Exception) -> str:
@@ -701,17 +1004,35 @@ def public_error(error: Exception) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Class Scribe local queue worker")
     parser.add_argument("--once", action="store_true", help="Process at most one queued job and exit")
+    parser.add_argument("--test-email", metavar="ADDRESS", help="Send a sample completion email and exit")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    instance_handle = acquire_single_instance()
-    if instance_handle is None:
-        LOG.info("Another Class Scribe worker is already running; exiting.")
-        return 0
     try:
         settings = Settings()
     except Exception:
         LOG.error("Worker configuration is missing or invalid. Copy .env.worker.example to .env.worker.local.")
         return 2
+    if args.test_email:
+        recipient = args.test_email.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", recipient):
+            LOG.error("The test email address is invalid.")
+            return 2
+        try:
+            send_fluxprompt_email(settings, {
+                "id": f"test-{uuid.uuid4()}",
+                "recipient": recipient,
+                "delivery_kind": "batch",
+                "payload": {"batch_size": 3},
+            })
+        except Exception as error:
+            LOG.error("The sample completion email could not be sent: %s", email_error_message(error))
+            return 1
+        LOG.info("The sample completion email was accepted by FluxPrompt.")
+        return 0
+    instance_handle = acquire_single_instance()
+    if instance_handle is None:
+        LOG.info("Another Class Scribe worker is already running; exiting.")
+        return 0
     worker = Worker(settings)
     def stop(_signum: int, _frame: Any) -> None:
         worker.stopping = True

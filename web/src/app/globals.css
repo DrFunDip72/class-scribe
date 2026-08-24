@@ -145,6 +145,14 @@ button { color: inherit; }
 .notification-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .notification-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; color: #4f5c57; background: #eef1ef; font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .notification-status.active { color: #13704f; background: #e5f5ed; }
+.notification-channels { margin: 16px 0 0 50px; display: grid; gap: 9px; }
+.notification-channel { min-width: 0; padding: 11px 12px; display: flex; align-items: center; gap: 11px; border: 1px solid #e2e8e4; border-radius: 11px; background: #fff; }
+.notification-channel > div { min-width: 0; flex: 1; }
+.notification-channel strong, .notification-channel small { display: block; }
+.notification-channel strong { color: var(--ink); font-size: 11px; }
+.notification-channel small { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.45; overflow-wrap: anywhere; }
+.notification-channel > button { flex: 0 0 auto; }
+.channel-icon { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 9px; color: var(--green); background: var(--green-soft); }
 .notification-preferences { margin: 15px 0 0 50px; display: flex; align-items: center; gap: 18px; }
 .notification-preferences label { display: flex; align-items: center; gap: 8px; color: #4b5953; font-size: 10px; font-weight: 700; }
 .notification-preferences select { min-height: 34px; padding: 0 28px 0 9px; border: 1px solid #d8e1dc; border-radius: 8px; color: var(--ink); background: white; font-size: 10px; }
@@ -283,6 +291,12 @@ button { color: inherit; }
   .notification-heading h2 { font-size: 15px; }
   .notification-heading p { font-size: 11px; }
   .notification-status { flex: 0 0 auto; }
+  .notification-channels { margin-left: 0; }
+  .notification-channel { padding: 12px 10px; align-items: flex-start; flex-wrap: wrap; }
+  .notification-channel > div { flex-basis: calc(100% - 44px); }
+  .notification-channel > button { width: 100%; min-height: 44px; justify-content: center; }
+  .notification-channel strong { font-size: 12px; }
+  .notification-channel small { font-size: 10px; }
   .notification-preferences { margin-left: 0; align-items: stretch; flex-direction: column; gap: 10px; }
   .notification-preferences label { align-items: stretch; flex-direction: column; }
   .notification-preferences select { width: 100%; min-height: 44px; font-size: 12px; }

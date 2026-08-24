@@ -16,30 +16,54 @@ export type Database = {
     Tables: {
       completion_events: {
         Row: {
+          attempt_count: number
           created_at: string
           delivered_at: string | null
+          delivery_kind: string | null
+          event_key: string | null
           external_reference: string | null
           id: string
           job_id: string
+          last_error: string | null
+          next_attempt_at: string
+          payload: Json | null
+          recipient: string | null
           state: string
+          updated_at: string
           user_id: string
         }
         Insert: {
+          attempt_count?: number
           created_at?: string
           delivered_at?: string | null
+          delivery_kind?: string | null
+          event_key?: string | null
           external_reference?: string | null
           id?: string
           job_id: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json | null
+          recipient?: string | null
           state?: string
+          updated_at?: string
           user_id: string
         }
         Update: {
+          attempt_count?: number
           created_at?: string
           delivered_at?: string | null
+          delivery_kind?: string | null
+          event_key?: string | null
           external_reference?: string | null
           id?: string
           job_id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json | null
+          recipient?: string | null
           state?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -73,6 +97,8 @@ export type Database = {
       notification_preferences: {
         Row: {
           created_at: string
+          email_address: string | null
+          email_notifications_enabled: boolean
           notify_batch_complete: boolean
           notify_each_recording: boolean
           notify_failures: boolean
@@ -81,6 +107,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email_address?: string | null
+          email_notifications_enabled?: boolean
           notify_batch_complete?: boolean
           notify_each_recording?: boolean
           notify_failures?: boolean
@@ -89,6 +117,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_address?: string | null
+          email_notifications_enabled?: boolean
           notify_batch_complete?: boolean
           notify_each_recording?: boolean
           notify_failures?: boolean

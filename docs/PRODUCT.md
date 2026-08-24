@@ -11,7 +11,7 @@ Give students a simple account-based website that converts class recordings into
 3. Let the browser strip video locally when needed, then upload only the compact audio privately and leave it queued.
 4. The owner's Windows computer processes the oldest job one at a time.
 5. Return to a dashboard showing status and saved study notes.
-6. Optionally enable a persistent desktop/browser alert for the completed batch or each completed recording.
+6. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
 7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown.
 
 The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
@@ -27,7 +27,7 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - Audio is private and deleted after successful processing.
 - Text results remain associated with the user.
 - Processing pauses while the Windows computer is unavailable; queued work remains durable.
-- Notifications are opt-in per browser/device and require browser plus operating-system permission. Completion is never coupled to successful alert delivery.
+- Email and browser notifications are independent opt-in channels. Browser pop-ups require browser plus operating-system permission. Completion is never coupled to successful notification delivery.
 
 ## Required result
 
@@ -47,17 +47,18 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - `Download notes` continues to download everything as a Markdown file.
 - On screens 640 CSS pixels wide or narrower, Copy choices open as a bottom action sheet that stays within the visible viewport and respects the device safe area. Tapping outside, the close control, or pressing Escape dismisses it.
 
-## Completion alerts
+## Completion notifications
 
 - Default: one privacy-safe alert after every recording in an upload batch reaches a terminal state.
 - Optional: one alert after each recording instead.
 - Optional failure alerts remain enabled by default.
-- Alerts contain no recording filename, transcript, summary, or signed media URL.
+- The shared batch/per-recording and failure preferences apply to every enabled channel.
+- Emails go only to the signed-in account address. They use a branded responsive HTML template with a generic sign-in link to the private dashboard.
+- Emails and browser alerts contain no recording filename, transcript, summary, or signed media URL.
 - Chrome or Edge on Windows is the recommended path. The browser may be closed after permission and subscription are established, subject to browser and operating-system background-notification settings.
 
 ## Deferred
 
-- Email delivery through the owner's agent-builder API caller.
 - Speaker diarization and live transcription.
 - Paid cloud inference fallback.
 - Teams, sharing, billing, and subscriptions.

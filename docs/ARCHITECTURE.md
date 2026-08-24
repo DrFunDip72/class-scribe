@@ -14,6 +14,7 @@ Windows startup task -> worker.py
   -> faster-whisper small / CPU INT8
   -> Ollama qwen3:4b on 127.0.0.1
   -> signed Web Push -> browser service worker -> OS notification
+  -> FluxPrompt Email Agent -> account email with dashboard link
 ```
 
 ## Web application
@@ -31,7 +32,7 @@ Supabase is the durable coordination layer:
 - Auth owns users and sessions.
 - The private `recordings` bucket stores queued source audio.
 - Postgres stores batches, queue jobs, results, worker heartbeat, and completion events.
-- Postgres stores account preferences, browser push subscriptions, public notification configuration, and durable per-device push deliveries.
+- Postgres stores account preferences, browser push subscriptions, public notification configuration, durable per-device push deliveries, and a durable email outbox.
 - RLS makes user ownership authoritative.
 - `claim_next_job` uses `FOR UPDATE SKIP LOCKED` and recovers expired leases.
 
@@ -39,13 +40,21 @@ Supabase is the durable coordination layer:
 
 The Windows scheduled task starts Ollama if needed, then `worker.py`. The worker signs in as a dedicated Auth user tagged with `app_metadata.role=worker`, polls over outbound HTTPS, claims exactly one oldest job, downloads it, transcribes, summarizes, saves results, records a completion event, and deletes the source object.
 
-A Windows named mutex prevents duplicate worker processes. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push uses a separate retryable outbox, so a push-provider or browser failure cannot fail or roll back a transcription.
+A Windows named mutex prevents duplicate worker processes. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
 
 ## Browser notifications
 
 The dashboard registers `web/public/sw.js` only after the user chooses to enable notifications. The browser creates a Push API subscription using the public VAPID key published by the worker. The account-scoped endpoint and encryption keys are stored behind RLS. The service worker can receive an encrypted push while the tab is hidden or closed, asks the operating system to show a persistent alert, and focuses or opens the relevant result when clicked.
 
 The private VAPID key never leaves `.worker-secrets/vapid_private_key.pem`. Notification payloads deliberately contain only a generic status message and an authenticated app-relative URL. Expired provider endpoints are removed after HTTP 404/410 responses.
+
+## Email notifications
+
+Email is an independent account-level opt-in. The browser may write only the lowercase email claim from its own Supabase JWT; RLS rejects any other recipient, preventing the public app from becoming an arbitrary mail relay. The worker rechecks the preference immediately before delivery so turning email off cancels queued, unsent mail.
+
+After a qualifying completion or failure, the worker writes a generic event to `completion_events` and calls the FluxPrompt Email Agent over outbound HTTPS. The API key exists only in ignored `.env.worker.local`, is sent only in the `api-key` header, and never reaches Vercel, Supabase, or browser code. The four FluxPrompt variable inputs remain in the agent-required order: subject, HTML body, account recipient, and an empty attachment value. Calls use a unique session ID and retry up to three times with backoff.
+
+The responsive HTML email contains a Class Scribe heading, status text, and `https://class-scribe-ruddy.vercel.app/dashboard`. It intentionally excludes filenames, transcripts, summaries, and signed links. Users must authenticate at the dashboard to see private results.
 
 ## Lifecycle
 

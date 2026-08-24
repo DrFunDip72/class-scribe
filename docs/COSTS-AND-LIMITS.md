@@ -1,6 +1,6 @@
 # Costs and Limits
 
-**Checked:** 2026-08-23. Platform limits can change; verify official pricing before expanding use.
+**Checked:** 2026-08-24. Platform limits can change; verify official pricing before expanding use.
 
 ## Current monthly cost
 
@@ -13,12 +13,14 @@
 | Ollama / qwen3:4b | Local runtime/model | $0 |
 | Local computer | Existing hardware | Electricity only |
 | Custom domain | Not used | $0 |
-| Email delivery | Deferred | $0 |
+| Email delivery | Existing FluxPrompt Email Agent | $0 added by Class Scribe; account allowance applies |
 | Web Push | Browser/vendor push services + local signing | $0 |
 
 No paid AI API is used.
 
 Web Push adds a few small Postgres rows per browser and delivery but no paid API or Vercel Function. Its practical limits are browser/OS policy and the existing Supabase database quota, not a per-notification bill. Delivery is best-effort: battery-saving, Focus/Do Not Disturb, revoked permission, browser background restrictions, or a vendor outage can delay or suppress the visible toast.
+
+Class Scribe does not provision a separate email provider and makes one FluxPrompt agent call per delivered completion/failure email. FluxPrompt's public site offers a free entry point but does not publish a dependable API request quota or account-specific price table. Treat the owner's existing FluxPrompt allowance as an external limit: verify its dashboard before higher-volume or public use. If that allowance is exhausted, transcriptions still complete and email events retry/fail independently.
 
 ## Limits that matter
 
@@ -80,6 +82,14 @@ This project does not require GitHub Actions to operate.
 - On iPhone/iPad, Web Push requires installing the site to the Home Screen before permission can be requested. Platform support and behavior can change.
 - Payloads are intentionally tiny and contain no private class content. Durable delivery rows are small but should be pruned later if volume becomes material.
 
+### Completion email
+
+- Email is opt-in per account and goes only to that account's Supabase Auth email.
+- One batch-complete preference usually means one FluxPrompt call for the batch; per-recording mode means one call per successful recording. Optional failures add a call per failed attempt event.
+- The worker retries a delivery at most three times with exponential backoff, so a provider outage can consume up to three calls for one event.
+- The branded HTML is generated locally and adds no rendering service cost. No attachments or class content are sent.
+- Delivery depends on the Windows worker, FluxPrompt agent/API availability, the configured API allowance, and the recipient mail system.
+
 ## Cost triggers
 
 Do not enable these without an explicit new decision: Vercel Pro, Supabase Pro/add-ons, paid email service, custom domain, cloud AI APIs, cloud GPU workers, or paid overages.
@@ -93,3 +103,4 @@ Do not enable these without an explicit new decision: Vercel Pro, Supabase Pro/a
 - https://vercel.com/docs/plans/hobby
 - https://vercel.com/docs/limits/fair-use-guidelines
 - https://docs.github.com/en/get-started/learning-about-github/githubs-plans
+- https://fluxprompt.ai/

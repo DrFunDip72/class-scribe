@@ -8,7 +8,7 @@ Committed migrations under `supabase/migrations/` are authoritative and have bee
 - `transcription_jobs` — owner, storage path, display metadata, FIFO status, progress, attempts, claim/lease, and safe errors.
 - `transcription_results` — transcript, segments, summary, key points, action items, language, duration, and model metadata.
 - `worker_heartbeats` — worker state, active job, version, and last seen.
-- `completion_events` — durable future email/webhook outbox.
+- `completion_events` — worker-only durable FluxPrompt email outbox with event keys, recipient, generic payload, attempts, backoff, safe errors, and delivery state.
 
 ## RPCs
 
@@ -16,7 +16,7 @@ Notification tables added by `web_push_notifications`:
 
 - `notification_configuration` — worker-published Web Push public key; authenticated users can read it and only the worker can change it.
 - `push_subscriptions` — account-owned per-browser Push API endpoints and encryption keys.
-- `notification_preferences` — batch/per-recording and failure-alert settings for each account.
+- `notification_preferences` — enabled email channel, JWT-locked account address, and shared batch/per-recording/failure settings for each account.
 - `push_notification_deliveries` — worker-only durable per-device delivery outbox with attempts, backoff, and sent state.
 
 - `create_upload_batch(label, files)` validates authentication, 1-20 items, supported media, 50 MB per item, user-prefixed paths, then creates the batch and jobs atomically.
@@ -27,7 +27,7 @@ These functions intentionally use SECURITY DEFINER to perform narrow validated m
 
 ## RLS
 
-Authenticated users can see only rows where `user_id = auth.uid()`. They cannot write worker state, delivery rows, notification configuration, or another user's records. Users may manage only their own subscriptions and preferences. The dedicated worker's signed JWT contains `app_metadata.role=worker`; policies permit only the queue/result/heartbeat/storage and notification-delivery operations it needs.
+Authenticated users can see only rows where `user_id = auth.uid()`. They cannot write worker state, delivery rows, notification configuration, or another user's records. Users may manage only their own subscriptions and preferences. Preference insert/update RLS additionally requires any email recipient to equal the lowercase `email` claim in the current JWT. The dedicated worker's signed JWT contains `app_metadata.role=worker`; policies permit only the queue/result/heartbeat/storage and notification-delivery operations it needs.
 
 ## Storage
 
@@ -44,5 +44,7 @@ Bucket `recordings` is private, accepts the supported audio/video MIME types, an
 7. `increase_batch_limit_to_20` — raises both the table constraint and atomic batch RPC limit from 5 to 20.
 
 The timestamped `web_push_notifications` migration adds public-key configuration, account-scoped subscriptions/preferences, durable deliveries, indexes, triggers, grants, and RLS.
+
+The timestamped `email_completion_notifications` migration adds account-email preferences, strengthens preference RLS, converts the original completion-event placeholder into the retryable email outbox, and marks pre-feature placeholder rows delivered so no historical job sends retroactively.
 
 Use forward migrations; never reset the production database.

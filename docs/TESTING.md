@@ -1,16 +1,29 @@
 # Testing and Verification
 
+## Optional completion email — IMPLEMENTED, LIVE SEND PENDING
+
+**Environment:** local Next.js app, production Supabase project, local worker code `1.3.0`.
+
+1. `npm run lint` and `npm run build` passed after adding independent Email and Browser pop-up controls. A disposable authenticated browser account rendered both channels, enabled Email, showed the exact account address and saved confirmation, then disabled it successfully.
+2. Worker compilation passed. Twelve helper tests cover the exact four ordered FluxPrompt input IDs, `api-key` header, flow/session query parameters, responsive branded HTML, generic dashboard link, empty attachment, defensive primary/fallback response parsing, and sanitized bounded delivery metadata.
+3. Production migration `email_completion_notifications` applied successfully. The expected columns, partial indexes, RLS policies, and worker read policy were inspected afterward.
+4. A separate disposable normal Auth user enabled its own lowercase account address. An attempted different recipient was rejected by RLS. The preference was disabled, the session was revoked, and both disposable Auth users plus cascaded preference rows were deleted.
+5. Supabase security and performance advisors were rerun. No new email-related security finding appeared; the new pending-event index is expectedly unused before live delivery traffic.
+6. A real FluxPrompt call has not run because ignored `.env.worker.local` does not yet contain `FLUXPROMPT_API_KEY`, and the owner has not confirmed the exact sample recipient. Automatic email must not be described as live-verified until `worker.py --test-email <approved-address>` succeeds and one opted-in completion is observed.
+
+**Result:** code, database, RLS, and mocked request boundary pass; live provider delivery pending the owner-held secret and recipient.
+
 ## Automated and build checks — PASS
 
 **Date:** 2026-08-24
 
 - Python compile: `worker.py`, bootstrap, verifier, and tests.
-- Worker helper tests: 7/7 pass (chunking, list cleanup, deterministic final takeaway, suffix safety, model JSON/thinking cleanup, privacy-safe push payload, and browser-compatible VAPID public-key encoding).
+- Worker helper tests: 12/12 pass, including existing transcription/summary/push helpers plus the email template, exact FluxPrompt payload/request contract, response fallbacks, and safe delivery metadata.
 - Worker Python dependency integrity: `pip check` pass after adding pinned `pywebpush==2.4.0`.
 - Next.js `npm run lint`: pass.
 - Next.js `npm run build`: pass; all routes compile under Next.js 16.3.2.
 - Duplicate worker launch: exits 0 while the scheduled worker remains the only active instance.
-- Supabase production schema and all seven committed migration files are represented; the latest batch-limit migration applied successfully.
+- Supabase production schema and all nine committed migration files are represented; the email completion migration is the latest applied change.
 - Batch-limit migration: applied successfully; a rolled-back production transaction accepted 20 metadata records/jobs atomically and rejected 21 with zero rows created.
 - Production browser selector: accepted 20 synthetic 1 KB MP3 files and displayed `20/20`; rejected 21 with the expected message and retained `0/20`. No test audio was uploaded.
 - Browser video-size boundary: accepted a valid 57.3 MB MP4 even though its original size exceeded the 50 MB Supabase object limit.

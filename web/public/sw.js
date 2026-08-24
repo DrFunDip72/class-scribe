@@ -12,8 +12,8 @@ self.addEventListener("push", (event) => {
   }
   event.waitUntil(self.registration.showNotification(payload.title || "Class Scribe", {
     body: payload.body || "Your class notes are ready.",
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
+    icon: "/class-scribe-icon.svg",
+    badge: "/class-scribe-icon.svg",
     tag: payload.tag || "class-scribe-completed",
     renotify: false,
     data: { url: payload.url || DEFAULT_URL },

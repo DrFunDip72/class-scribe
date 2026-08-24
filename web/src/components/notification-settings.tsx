@@ -10,8 +10,8 @@ type DeliveryMode = "batch" | "recording";
 
 const TEST_NOTIFICATION = {
   body: "Desktop notifications are working. You can keep working in another app.",
-  icon: "/favicon.ico",
-  badge: "/favicon.ico",
+  icon: "/class-scribe-icon.svg",
+  badge: "/class-scribe-icon.svg",
   tag: "class-scribe-test",
   data: { url: "/dashboard" },
 };

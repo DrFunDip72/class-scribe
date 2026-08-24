@@ -28,6 +28,7 @@ Unused-index informational notices are expected while the new tables contain lit
 ## Pre-public checklist
 
 - Complete production Auth URL configuration.
+- Because sign-up confirmation is disabled by owner decision, prioritize CAPTCHA and registration throttling before broad public promotion.
 - Test two-account row and Storage isolation.
 - Add an approved per-user daily submission policy before promoting this beyond limited personal/class use.
 - Monitor Supabase Storage/egress/database usage.

@@ -20,7 +20,7 @@ Repository documentation is authoritative over conversation history.
 
 - Vercel Hobby, Supabase Free, GitHub Free, and local inference.
 - Next.js/TypeScript, Supabase Auth/Postgres/private Storage.
-- One to five files per batch; 50 MB maximum per file.
+- One to 20 files per batch; 50 MB maximum per file.
 - FIFO, one active inference job on the Windows computer.
 - `faster-whisper` small, CPU, INT8; Ollama `qwen3:4b`.
 - Outbound worker traffic only. Never expose the computer, Ollama, or router ports.

@@ -6,8 +6,8 @@ Give students a simple account-based website that converts class recordings into
 
 ## Core experience
 
-1. Create an email/password account and sign in.
-2. Drag or select one to five class recordings.
+1. Create an email/password account and enter the dashboard immediately; sign-up confirmation email is disabled.
+2. Drag or select one to 20 class recordings.
 3. Upload privately and leave them queued.
 4. The owner's Windows computer processes the oldest job one at a time.
 5. Return to a dashboard showing status and saved study notes.
@@ -39,4 +39,4 @@ Give students a simple account-based website that converts class recordings into
 
 ## Acceptance
 
-The initial release is accepted when an authenticated production user can upload up to five recordings, observe durable sequential processing, survive worker interruption through lease recovery, and privately retrieve saved results.
+The initial release is accepted when an authenticated production user can upload up to 20 recordings, observe durable sequential processing, survive worker interruption through lease recovery, and privately retrieve saved results.

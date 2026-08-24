@@ -12,7 +12,7 @@ Committed migrations under `supabase/migrations/` are authoritative and have bee
 
 ## RPCs
 
-- `create_upload_batch(label, files)` validates authentication, 1-5 items, supported media, 50 MB per item, user-prefixed paths, then creates the batch and jobs atomically.
+- `create_upload_batch(label, files)` validates authentication, 1-20 items, supported media, 50 MB per item, user-prefixed paths, then creates the batch and jobs atomically.
 - `retry_transcription_job(job_id)` checks ownership, failed status, and remaining attempts.
 - `claim_next_job(worker_id)` requires the dedicated worker JWT role (or service role), recovers stale leases, and atomically claims the oldest eligible row with `SKIP LOCKED`.
 
@@ -34,5 +34,6 @@ Bucket `recordings` is private, accepts the supported audio/video MIME types, an
 4. `worker_role` — least-privileged worker RLS and guarded claim.
 5. `fix_service_role_claim_guard` — checks JWT role correctly inside SECURITY DEFINER.
 6. `consolidate_job_read_policy` — combines user and worker SELECT policies.
+7. `increase_batch_limit_to_20` — raises both the table constraint and atomic batch RPC limit from 5 to 20.
 
 Use forward migrations; never reset the production database.

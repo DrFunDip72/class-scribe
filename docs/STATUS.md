@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-23
-**Phase:** Built, deployed, and end-to-end verified; one owner-operated Auth dashboard setting remains.
+**Phase:** Built, deployed, and end-to-end verified with a 20-file batch limit.
 
 ## Live resources
 
@@ -17,7 +17,7 @@ No credentials are stored in this document.
 ## Completed
 
 - Responsive production web app with sign-up, sign-in, sign-out, confirmation callback, forgot/reset password, protected dashboard, job history, retry, copy, and Markdown download.
-- Direct private uploads for one to five supported audio files, with client and database validation at 50 MB each.
+- Direct private uploads for one to 20 supported audio files, with client and database validation at 50 MB each.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
@@ -35,23 +35,17 @@ No credentials are stored in this document.
 - Next.js lint/build: pass.
 - Python compile and four helper tests: pass.
 - Supabase migration application: pass.
+- Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
+- Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.
+- Production browser boundary: 20 synthetic MP3 files were accepted into the selector; 21 were rejected before upload. No test audio was uploaded or queued.
 - Supabase performance advisor: only one expected unused heartbeat-index informational notice after consolidating the duplicate read policy.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
 
-## Remaining owner action
+## Supabase Auth policy
 
-Supabase Auth redirect configuration is not exposed by the connected project API. In Supabase Dashboard, open:
+Email/password sign-up remains enabled, but mandatory email confirmation is disabled by owner decision. New users receive a session immediately and are sent directly to the dashboard.
 
-`Authentication -> URL Configuration`
-
-Set:
-
-- Site URL: `https://class-scribe-ruddy.vercel.app`
-- Redirect URL: `https://class-scribe-ruddy.vercel.app/auth/confirm`
-- Redirect URL: `https://class-scribe-ruddy.vercel.app/reset-password`
-- Local redirect: `http://localhost:3000/**`
-
-Save, then create a new account with an inbox you can access and verify the confirmation link returns to the production app. Existing confirmed accounts and sign-in already work in production.
+Password-reset email stays enabled. The production reset URL should remain allow-listed even though sign-up confirmation is off.
 
 ## Deferred by design
 
@@ -61,4 +55,4 @@ Save, then create a new account with an inbox you can access and verify the conf
 
 ## Exact next task
 
-Complete the four Supabase Auth URL entries above, then run the sign-up/email-confirmation/password-reset checklist in `docs/TESTING.md`.
+Test a real 12-recording class batch when source files are available, then measure its total upload, transcription, and summarization time.

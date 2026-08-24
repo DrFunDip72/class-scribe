@@ -30,7 +30,7 @@ No paid AI API is used.
 - Low-activity free projects may be paused after about seven days and can be restored from the dashboard.
 - Leaked-password protection is not included on Free.
 
-Class recordings are commonly larger than 50 MB when uncompressed. Export as MP3/M4A at speech-friendly bitrate before upload. Because processed audio is deleted, storage capacity is primarily the live queue. A worst-case five-file batch can temporarily consume about 250 MB, so several simultaneous users can exhaust 1 GB quickly.
+Class recordings are commonly larger than 50 MB when uncompressed. Export as MP3/M4A at speech-friendly bitrate before upload. Because processed audio is deleted, storage capacity is primarily the live queue. A worst-case 20-file batch can approach the full 1 GB Storage quota, so avoid submitting 20 files near 50 MB each. Twelve short compressed videos should normally be much smaller, but actual file sizes determine usage.
 
 ### Vercel Hobby
 

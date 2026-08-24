@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 type Mode = "login" | "signup" | "forgot" | "reset";
 const content = {
   login: { title: "Welcome back", subtitle: "Sign in to your recordings and study notes.", button: "Sign in" },
-  signup: { title: "Create your account", subtitle: "Your private lecture library starts here.", button: "Create account" },
+  signup: { title: "Create your account", subtitle: "Sign up and start uploading right away.", button: "Create account" },
   forgot: { title: "Reset your password", subtitle: "We’ll send a secure reset link to your email.", button: "Send reset link" },
   reset: { title: "Choose a new password", subtitle: "Use at least eight characters.", button: "Update password" },
 } satisfies Record<Mode, { title: string; subtitle: string; button: string }>;
@@ -33,10 +33,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
         if (authError) throw authError;
         router.push("/dashboard"); router.refresh();
       } else if (mode === "signup") {
-        const { data, error: authError } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/confirm` } });
+        const { data, error: authError } = await supabase.auth.signUp({ email, password });
         if (authError) throw authError;
-        if (data.session) { router.push("/dashboard"); router.refresh(); }
-        else setMessage("Check your inbox to confirm your email, then sign in.");
+        if (!data.session) {
+          throw new Error("Your account was created, but automatic sign-in is unavailable. Try signing in.");
+        }
+        router.replace("/dashboard"); router.refresh();
       } else if (mode === "forgot") {
         const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         if (authError) throw authError;

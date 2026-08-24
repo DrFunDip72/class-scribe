@@ -1,6 +1,6 @@
 # Class Scribe
 
-Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload one to five recordings together; a Windows worker processes them one at a time with local AI.
+Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload up to 20 recordings together; a Windows worker processes them one at a time with local AI.
 
 - Live app: https://class-scribe-ruddy.vercel.app
 - Supabase project: `class-transcriber` (`wmsotywnkqdajhmiultx`)

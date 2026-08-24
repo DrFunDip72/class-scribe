@@ -9,7 +9,9 @@
 - Next.js `npm run lint`: pass.
 - Next.js `npm run build`: pass; all routes compile under Next.js 16.3.2.
 - Duplicate worker launch: exits 0 while the scheduled worker remains the only active instance.
-- Supabase migrations: six applied successfully.
+- Supabase production schema and all seven committed migration files are represented; the latest batch-limit migration applied successfully.
+- Batch-limit migration: applied successfully; a rolled-back production transaction accepted 20 metadata records/jobs atomically and rejected 21 with zero rows created.
+- Production browser selector: accepted 20 synthetic 1 KB MP3 files and displayed `20/20`; rejected 21 with the expected message and retained `0/20`. No test audio was uploaded.
 - Worker heartbeat: online/idle within seconds of the check.
 
 ## Local inference — PASS
@@ -37,18 +39,24 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 
 ## Validation checks exercised
 
-- One-to-five UI limit and 50 MB client validation are implemented.
-- Database RPC independently enforces 1-5, 50 MB, MIME type, and owner path.
+- One-to-20 UI limit and 50 MB client validation are implemented.
+- Database RPC independently enforces 1-20, 50 MB, MIME type, and owner path.
 - Storage bucket independently enforces 50 MB and allowed content types.
 - Queue claim requires the dedicated worker JWT role.
 - A normal signed-in test account could not act as the worker during authorization checks.
 
+## Production Auth — PASS
+
+- A disposable new account received a session immediately and was marked confirmed without an email-confirmation step.
+- The test session was revoked and the disposable account was removed afterward.
+
 ## Still requiring owner-operated tests
 
-- [ ] New-account confirmation link after production Auth URLs are saved.
 - [ ] Forgot/reset password email and return URL.
 - [ ] Two real user accounts cannot read each other's rows or Storage objects.
 - [ ] Five real 30-60 minute classes remain FIFO and sequential.
+- [ ] A 12-file batch of 5-10 minute recordings uploads and remains FIFO/sequential.
+- [x] A 21st selected file is rejected before upload.
 - [ ] Restart the computer during a long recording and confirm stale-lease recovery.
 - [ ] Measure 30- and 60-minute processing time and peak memory.
 - [ ] Keyboard/mobile usability review on the final production domain.

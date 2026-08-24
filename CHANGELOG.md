@@ -13,6 +13,8 @@
 - Deployed the production site to Vercel Hobby.
 - Added local helper tests and completed a real browser-to-worker-to-result production-data-path test.
 - Replaced the planning documentation with an exact operational handoff.
+- Changed sign-up to immediate account access without an email-confirmation step, per owner preference.
+- Raised the browser and database batch limit from 5 to 20 files while retaining sequential FIFO processing.
 
 ### Security and reliability
 

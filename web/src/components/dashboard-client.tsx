@@ -12,7 +12,7 @@ type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
 type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 type UploadState = "idle" | "uploading" | "creating";
 
-const MAX_FILES = 5;
+const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
 const acceptedExtensions = ["mp3", "m4a", "wav", "flac", "ogg", "webm", "mp4"];
 const mimeByExtension: Record<string, string> = {
@@ -75,7 +75,7 @@ export function DashboardClient({ userId }: { userId: string }) {
   function addFiles(incoming: File[]) {
     setError(null); setSuccess(null);
     const combined = [...files, ...incoming];
-    if (combined.length > MAX_FILES) { setError("You can upload a maximum of five recordings at once."); return; }
+    if (combined.length > MAX_FILES) { setError(`You can upload a maximum of ${MAX_FILES} recordings at once.`); return; }
     for (const file of incoming) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       if (!acceptedExtensions.includes(ext)) { setError(`${file.name} is not a supported audio format.`); return; }
@@ -126,6 +126,7 @@ export function DashboardClient({ userId }: { userId: string }) {
   const activeWorker = workers.find((worker) => checkedAt - new Date(worker.last_seen_at).getTime() < 45000);
   const queueCount = jobs.filter((job) => job.status === "queued").length;
   const completeCount = jobs.filter((job) => job.status === "completed").length;
+  const selectedBytes = files.reduce((total, file) => total + file.size, 0);
 
   return <div className="dashboard-grid">
     <section className="dashboard-main">
@@ -134,7 +135,7 @@ export function DashboardClient({ userId }: { userId: string }) {
       </div>
 
       <div className="upload-card">
-        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to five files. Each file can be up to 50 MB.</p></div><span>{files.length}/{MAX_FILES}</span></div>
+        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Each file can be up to 50 MB.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
         <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,audio/*" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
         <label htmlFor="audio-input" className={`drop-zone ${dragging ? "dragging" : ""}`} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}>
           <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop audio files here</strong><small>or click to browse · MP3, M4A, WAV, FLAC, OGG, WebM, MP4</small>

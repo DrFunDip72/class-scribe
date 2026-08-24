@@ -16,7 +16,7 @@ The worker polls Supabase over outbound HTTPS. Do not expose the worker or Ollam
 
 ## ADR-004 — Sequential FIFO Processing
 
-Accept up to five simultaneous uploads but process one oldest-first job at a time to fit CPU/RAM limits.
+Accept up to 20 simultaneous uploads but process one oldest-first job at a time to fit CPU/RAM limits.
 
 ## ADR-005 — Small Whisper on CPU INT8
 
@@ -53,3 +53,19 @@ Store one durable pending completion event per job so later delivery failures ca
 ## ADR-013 — Single-Instance Worker Defense
 
 Use both a Windows named mutex and atomic database claims to prevent duplicate processing.
+
+## ADR-014 — No Sign-Up Email Confirmation
+
+Disable mandatory email confirmation and send a successful new sign-up directly to the dashboard.
+
+**Reason:** The owner explicitly prefers immediate account creation and accepts the reduced email-ownership assurance.
+
+**Consequence:** Anyone can register an address they do not control. Add CAPTCHA and abuse limits before broad public promotion. Password-reset email remains enabled.
+
+## ADR-015 — Twenty-File Upload Batches
+
+Allow one to 20 files in a single batch while preserving one-at-a-time FIFO processing.
+
+**Reason:** A class day can produce 12 or more short 5-10 minute videos, and selecting them together is substantially easier.
+
+**Consequence:** A maximum-size batch can approach the entire 1 GB Supabase Free Storage quota. Audio deletion after success and storage monitoring remain required.

@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: "Class Scribe", template: "%s · Class Scribe" },
   description: "Private, local-first transcription and summaries for class recordings.",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

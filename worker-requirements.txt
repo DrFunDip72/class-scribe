@@ -2,5 +2,6 @@ bcrypt==4.3.0
 faster-whisper==1.2.1
 httpx==0.28.1
 pydantic-settings==2.15.0
+pywebpush==2.4.0
 supabase==2.31.0
 tenacity==9.1.4

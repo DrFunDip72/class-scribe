@@ -1,6 +1,6 @@
 # Class Scribe Web
 
-Next.js 16 frontend for Class Scribe. It uses Supabase SSR for Auth and account data, and uploads audio directly from the authenticated browser to private Supabase Storage.
+Next.js 16 frontend for Class Scribe. It uses Supabase SSR for Auth and account data, uploads audio directly from the authenticated browser to private Supabase Storage, and registers a root service worker for user-opted persistent Web Push completion alerts.
 
 ```powershell
 Copy-Item .env.example .env.local

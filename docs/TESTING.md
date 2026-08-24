@@ -5,7 +5,8 @@
 **Date:** 2026-08-23
 
 - Python compile: `worker.py`, bootstrap, verifier, and tests.
-- Worker helper tests: 4/4 pass (chunking, list cleanup, suffix safety, model JSON/thinking cleanup).
+- Worker helper tests: 6/6 pass (chunking, list cleanup, suffix safety, model JSON/thinking cleanup, privacy-safe push payload, and browser-compatible VAPID public-key encoding).
+- Worker Python dependency integrity: `pip check` pass after adding pinned `pywebpush==2.4.0`.
 - Next.js `npm run lint`: pass.
 - Next.js `npm run build`: pass; all routes compile under Next.js 16.3.2.
 - Duplicate worker launch: exits 0 while the scheduled worker remains the only active instance.
@@ -17,6 +18,13 @@
 - Production deployment: Ready on the existing public alias; the live dashboard accepted a synthetic 57.3 MB MP4 for local extraction without uploading it.
 - Post-deployment Vercel check: no runtime errors and no warning/error logs for deployment `dpl_3UCh1PMhNGfbtBKjTj2TNnpkmxYz`.
 - Worker heartbeat: online/idle within seconds of the check.
+- Worker notification startup: version `1.1.0` heartbeat online/idle; local VAPID private key generated in ignored storage and the 87-character public key published.
+- Notification RLS with two disposable immediate-session users: each saw only its own subscription; cross-account subscription insertion, configuration writes, and delivery writes were blocked; delivery rows were invisible; authenticated public-key read succeeded.
+- Notification RLS cleanup: both sessions were globally revoked, both disposable users were deleted, and zero synthetic subscriptions remained.
+
+## Persistent completion notification — pending production browser pass
+
+The service worker, permission controls, per-device subscription, local test notification, durable worker delivery, provider response, and click-through are implemented. The final live HTTPS browser subscription and real push-provider round trip are tested after the production deployment containing this feature becomes Ready.
 
 ## Local inference — PASS
 

@@ -12,12 +12,16 @@
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker` |
+| Worker version | `1.1.0` |
+| Push library | `pywebpush` 2.4.0 |
 
 Python 3.14 also exists. Always invoke `.venv-worker\Scripts\python.exe`.
 
 ## Configuration
 
 Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase URL, publishable key, and dedicated worker email/password. Do not use a service-role key and do not commit the file.
+
+`VAPID_SUBJECT` identifies the Web Push sender and defaults to the production site URL. On its first authenticated start, the worker creates `.worker-secrets/vapid_private_key.pem`, publishes only the corresponding public key to Supabase, and restricts the local file permissions where Windows permits. Back up this private key securely with the worker credentials. Losing or replacing it invalidates existing browser subscriptions; users must enable notifications again.
 
 `bootstrap-worker-auth.py` creates local bootstrap material for an administrator to provision the dedicated Auth row with `app_metadata.role=worker`. Its generated JSON and local environment are ignored. Revoke the old Auth identity before provisioning a replacement computer.
 
@@ -50,6 +54,8 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - Maximum attempts: 3.
 - Temporary audio: `.worker-temp`, removed in `finally`.
 - Completed source object: deleted only after result and completion event are saved.
+- Push deliveries: durable, attempted separately after result commit, up to three attempts with exponential backoff.
+- Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
 
 ## Troubleshooting
 
@@ -58,5 +64,7 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
 - **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
 - **Model missing:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3:4b`.
+- **No completion alert:** verify worker version `1.1.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
+- **Private push key replaced:** restart the worker, then ask each user to disable and re-enable notifications on every desired device.
 
 Do not expose Ollama, add port forwarding, or create a public tunnel.

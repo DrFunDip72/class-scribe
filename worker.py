@@ -8,6 +8,7 @@ It never exposes a port or logs transcript content.
 from __future__ import annotations
 
 import argparse
+import base64
 import ctypes
 import json
 import logging
@@ -21,14 +22,17 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 import httpx
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from faster_whisper import WhisperModel
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from postgrest.types import ReturnMethod
+from py_vapid import Vapid01
+from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -65,6 +69,7 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="qwen3:4b", alias="OLLAMA_MODEL")
     ollama_url: str = Field(default="http://127.0.0.1:11434", alias="OLLAMA_URL")
     poll_seconds: float = Field(default=8, ge=2, le=60, alias="POLL_SECONDS")
+    vapid_subject: str = Field(default="https://class-scribe-ruddy.vercel.app", alias="VAPID_SUBJECT")
 
 
 class Worker:
@@ -75,6 +80,9 @@ class Worker:
         self.stopping = False
         self.temp_root = ROOT / ".worker-temp"
         self.temp_root.mkdir(exist_ok=True)
+        self.secret_root = ROOT / ".worker-secrets"
+        self.vapid_key_path = self.secret_root / "vapid_private_key.pem"
+        self.vapid: Vapid01 | None = None
 
     def retry(self, operation: Callable[[], T], attempts: int = 4) -> T:
         delay = 1.0
@@ -117,6 +125,174 @@ class Worker:
         )
         rows = response.data or []
         return rows[0] if rows else None
+
+    def ensure_push_identity(self) -> None:
+        self.secret_root.mkdir(exist_ok=True)
+        key_existed = self.vapid_key_path.exists()
+        self.vapid = Vapid01.from_file(str(self.vapid_key_path))
+        if not key_existed:
+            try:
+                os.chmod(self.vapid_key_path, 0o600)
+            except OSError:
+                pass
+            LOG.info("Created the local Web Push signing identity.")
+
+        public_key = vapid_public_key(self.vapid)
+        existing = self.retry(
+            lambda: self.db.table("notification_configuration")
+            .select("public_value").eq("key", "web_push").execute()
+        ).data or []
+        if existing and existing[0]["public_value"] != public_key:
+            self.retry(
+                lambda: self.db.table("push_subscriptions")
+                .delete(returning=ReturnMethod.minimal)
+                .neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            )
+            LOG.warning("The Web Push identity changed; users must enable notifications again.")
+        self.retry(
+            lambda: self.db.table("notification_configuration").upsert({
+                "key": "web_push",
+                "public_value": public_key,
+            }, on_conflict="key", returning=ReturnMethod.minimal).execute()
+        )
+
+    def enqueue_push_deliveries(self, job: dict[str, Any], *, failed: bool = False) -> None:
+        subscriptions = self.retry(
+            lambda: self.db.table("push_subscriptions")
+            .select("id").eq("user_id", job["user_id"]).execute()
+        ).data or []
+        if not subscriptions:
+            return
+
+        preferences_rows = self.retry(
+            lambda: self.db.table("notification_preferences")
+            .select("notify_each_recording,notify_batch_complete,notify_failures")
+            .eq("user_id", job["user_id"]).execute()
+        ).data or []
+        preferences = preferences_rows[0] if preferences_rows else {
+            "notify_each_recording": False,
+            "notify_batch_complete": True,
+            "notify_failures": True,
+        }
+
+        event_key: str | None = None
+        payload: dict[str, Any] | None = None
+        if failed:
+            if preferences["notify_failures"]:
+                event_key = f"job:{job['id']}:failed:{job.get('attempt_count', 0)}"
+                payload = build_push_payload("failed", job_id=job["id"], batch_id=job["batch_id"])
+        elif preferences["notify_each_recording"]:
+            event_key = f"job:{job['id']}:completed"
+            payload = build_push_payload("recording", job_id=job["id"], batch_id=job["batch_id"])
+        elif preferences["notify_batch_complete"]:
+            batch_jobs = self.retry(
+                lambda: self.db.table("transcription_jobs")
+                .select("id,status").eq("batch_id", job["batch_id"]).execute()
+            ).data or []
+            if batch_jobs and all(item["status"] == "completed" for item in batch_jobs):
+                event_key = f"batch:{job['batch_id']}:completed"
+                payload = build_push_payload(
+                    "batch",
+                    job_id=job["id"],
+                    batch_id=job["batch_id"],
+                    batch_size=len(batch_jobs),
+                )
+
+        if not event_key or not payload:
+            return
+
+        for subscription in subscriptions:
+            existing = self.retry(
+                lambda subscription_id=subscription["id"]: self.db.table("push_notification_deliveries")
+                .select("id").eq("subscription_id", subscription_id).eq("event_key", event_key).execute()
+            ).data or []
+            if existing:
+                continue
+            self.retry(
+                lambda subscription_id=subscription["id"]: self.db.table("push_notification_deliveries").insert({
+                    "subscription_id": subscription_id,
+                    "user_id": job["user_id"],
+                    "event_key": event_key,
+                    "payload": payload,
+                }, returning=ReturnMethod.minimal).execute()
+            )
+
+    def process_push_deliveries(self) -> None:
+        if self.vapid is None:
+            return
+        deliveries = self.retry(
+            lambda: self.db.table("push_notification_deliveries")
+            .select("id,subscription_id,payload,attempt_count")
+            .in_("state", ["pending", "failed"])
+            .lt("attempt_count", 3)
+            .lte("next_attempt_at", iso_now())
+            .order("created_at")
+            .limit(20)
+            .execute()
+        ).data or []
+        for delivery in deliveries:
+            subscriptions = self.retry(
+                lambda: self.db.table("push_subscriptions")
+                .select("endpoint,p256dh,auth_key")
+                .eq("id", delivery["subscription_id"]).execute()
+            ).data or []
+            if not subscriptions:
+                self.retry(
+                    lambda: self.db.table("push_notification_deliveries")
+                    .delete(returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
+                continue
+            subscription = subscriptions[0]
+            attempt_count = int(delivery["attempt_count"]) + 1
+            try:
+                webpush(
+                    subscription_info={
+                        "endpoint": subscription["endpoint"],
+                        "keys": {"p256dh": subscription["p256dh"], "auth": subscription["auth_key"]},
+                    },
+                    data=json.dumps(delivery["payload"], separators=(",", ":")),
+                    vapid_private_key=str(self.vapid_key_path),
+                    vapid_claims={"sub": self.settings.vapid_subject},
+                    ttl=86_400,
+                    timeout=15,
+                )
+            except WebPushException as error:
+                status_code = getattr(getattr(error, "response", None), "status_code", None)
+                if status_code in {404, 410}:
+                    self.retry(
+                        lambda: self.db.table("push_subscriptions")
+                        .delete(returning=ReturnMethod.minimal).eq("id", delivery["subscription_id"]).execute()
+                    )
+                    LOG.info("Removed an expired Web Push subscription.")
+                    continue
+                self.retry(
+                    lambda: self.db.table("push_notification_deliveries").update({
+                        "state": "failed",
+                        "attempt_count": attempt_count,
+                        "next_attempt_at": iso_after(minutes=min(60, 2 ** attempt_count)),
+                        "last_error": push_error_message(error),
+                    }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
+                LOG.warning("A completion notification could not be delivered (attempt %d of 3).", attempt_count)
+            except Exception as error:
+                self.retry(
+                    lambda: self.db.table("push_notification_deliveries").update({
+                        "state": "failed",
+                        "attempt_count": attempt_count,
+                        "next_attempt_at": iso_after(minutes=min(60, 2 ** attempt_count)),
+                        "last_error": push_error_message(error),
+                    }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
+                LOG.warning("A completion notification could not be delivered (attempt %d of 3).", attempt_count)
+            else:
+                self.retry(
+                    lambda: self.db.table("push_notification_deliveries").update({
+                        "state": "sent",
+                        "attempt_count": attempt_count,
+                        "sent_at": iso_now(),
+                        "last_error": None,
+                    }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
+                )
 
     def ensure_model(self) -> WhisperModel:
         if self.model is None:
@@ -269,6 +445,11 @@ class Worker:
             self.retry(lambda: self.db.storage.from_("recordings").remove([job["storage_path"]]), attempts=3)
         except Exception:
             LOG.warning("Job %s completed, but source audio cleanup needs attention.", short_id(job["id"]))
+        try:
+            self.enqueue_push_deliveries(job)
+            self.process_push_deliveries()
+        except Exception:
+            LOG.warning("Job %s completed, but its notification will be retried later.", short_id(job["id"]))
 
     def fail(self, job: dict[str, Any], error: Exception) -> None:
         if isinstance(error, InterruptedError):
@@ -287,6 +468,11 @@ class Worker:
             }).eq("id", job["id"]).execute())
         except Exception:
             LOG.error("Could not persist failure state for job %s.", short_id(job["id"]))
+        try:
+            self.enqueue_push_deliveries(job, failed=True)
+            self.process_push_deliveries()
+        except Exception:
+            LOG.warning("The failure notification for job %s will be retried later.", short_id(job["id"]))
         LOG.error("Job %s failed: %s", short_id(job["id"]), message)
 
     def process(self, job: dict[str, Any]) -> None:
@@ -321,9 +507,18 @@ class Worker:
             "email": self.settings.worker_email,
             "password": self.settings.worker_password,
         }))
+        try:
+            self.ensure_push_identity()
+            self.process_push_deliveries()
+        except Exception as error:
+            LOG.warning("Web Push initialization is unavailable: %s", public_error(error))
         while not self.stopping:
             try:
                 self.heartbeat("idle")
+                try:
+                    self.process_push_deliveries()
+                except Exception:
+                    LOG.warning("Pending completion notifications could not be checked.")
                 job = self.claim()
                 if job:
                     self.process(job)
@@ -369,6 +564,42 @@ def safe_filename(value: str) -> str:
 def safe_suffix(filename: str) -> str:
     suffix = Path(filename).suffix.lower()
     return suffix if suffix in {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".webm", ".mp4"} else ".audio"
+
+
+def vapid_public_key(vapid: Vapid01) -> str:
+    raw = vapid.public_key.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def build_push_payload(kind: str, *, job_id: str, batch_id: str, batch_size: int = 1) -> dict[str, Any]:
+    if kind == "failed":
+        return {
+            "title": "Class Scribe needs attention",
+            "body": "A recording could not be processed. Click to review it.",
+            "url": "/dashboard",
+            "tag": f"job-{job_id}-failed",
+        }
+    if kind == "batch":
+        noun = "recording is" if batch_size == 1 else "recordings are"
+        return {
+            "title": "Your class notes are ready",
+            "body": f"All {batch_size} {noun} ready. Click to view your notes.",
+            "url": f"/jobs/{job_id}" if batch_size == 1 else "/dashboard",
+            "tag": f"batch-{batch_id}-completed",
+        }
+    return {
+        "title": "Your class notes are ready",
+        "body": "One transcription is complete. Click to view your notes.",
+        "url": f"/jobs/{job_id}",
+        "tag": f"job-{job_id}-completed",
+    }
+
+
+def push_error_message(error: Exception) -> str:
+    if isinstance(error, WebPushException):
+        status_code = getattr(getattr(error, "response", None), "status_code", None)
+        return f"Push service returned HTTP {status_code}" if status_code else "Push service rejected the message"
+    return type(error).__name__[:120]
 
 
 def strip_thinking(text: str) -> str:

@@ -77,3 +77,11 @@ For MP4, WebM, MOV, M4V, and MKV input, use pinned Mediabunny packages in the au
 **Reason:** Source class videos can exceed the Supabase Free 50 MB object limit even when their speech audio is small. Local extraction preserves the $0 stack, avoids Vercel media limits, reduces Storage/egress use, and keeps the original video private.
 
 **Consequence:** An up-to-date browser must be able to decode the source audio codec; preparation uses the user's CPU and holds the completed M4A in browser memory. The derived output remains subject to the 50 MB Storage limit. Do not switch to whole-file FFmpeg/WASM buffering without measuring memory behavior on long class videos.
+
+## ADR-017 — Local-Worker Web Push Completion Alerts
+
+Use standards-based Web Push for user-opted completion and failure alerts. The local Windows worker owns the VAPID private key, publishes only its public key, creates durable per-device delivery rows, and sends encrypted pushes after transcription state is committed. A root-scoped service worker displays the operating-system notification and opens the relevant authenticated page when clicked.
+
+**Reason:** The user may be working in another application or may close the dashboard tab. Web Push supplies the requested Google Calendar-style persistent alert without a paid service and without exposing the home computer.
+
+**Consequence:** Permission is controlled by the browser and operating system, delivery is best-effort, each device subscribes separately, and replacing the VAPID private key requires users to enable notifications again. Payloads must remain generic and completion must never depend on delivery success.

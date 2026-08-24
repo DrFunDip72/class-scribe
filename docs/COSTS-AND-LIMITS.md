@@ -14,8 +14,11 @@
 | Local computer | Existing hardware | Electricity only |
 | Custom domain | Not used | $0 |
 | Email delivery | Deferred | $0 |
+| Web Push | Browser/vendor push services + local signing | $0 |
 
 No paid AI API is used.
+
+Web Push adds a few small Postgres rows per browser and delivery but no paid API or Vercel Function. Its practical limits are browser/OS policy and the existing Supabase database quota, not a per-notification bill. Delivery is best-effort: battery-saving, Focus/Do Not Disturb, revoked permission, browser background restrictions, or a vendor outage can delay or suppress the visible toast.
 
 ## Limits that matter
 
@@ -67,6 +70,14 @@ This project does not require GitHub Actions to operate.
 - Encoding time depends on the user's CPU, browser codec support, source resolution/codec, and recording length.
 - MP4, WebM, MOV, M4V, and MKV containers are accepted, but an unsupported audio codec or a video with no audio track is rejected with a browser-side error.
 - The open-source Mediabunny and AAC encoder packages add no usage fee.
+
+### Browser notifications
+
+- A user must explicitly grant permission from a button click; the website cannot bypass a browser denial.
+- Each browser profile/device is a separate subscription. Clearing site data, disabling browser notifications, or rotating the VAPID key requires enabling again.
+- Windows Chrome and Edge provide the intended over-other-applications experience. Operating-system Focus/Do Not Disturb settings always take precedence.
+- On iPhone/iPad, Web Push requires installing the site to the Home Screen before permission can be requested. Platform support and behavior can change.
+- Payloads are intentionally tiny and contain no private class content. Durable delivery rows are small but should be pruned later if volume becomes material.
 
 ## Cost triggers
 

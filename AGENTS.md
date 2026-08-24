@@ -26,11 +26,13 @@ Repository documentation is authoritative over conversation history.
 - `faster-whisper` small, CPU, INT8; Ollama `qwen3:4b`.
 - Outbound worker traffic only. Never expose the computer, Ollama, or router ports.
 - RLS account isolation. Treat recordings and transcripts as private educational data.
+- Web Push is opt-in and account-scoped. Keep notification payloads generic: never include filenames, transcript text, summaries, or signed URLs.
+- The VAPID private key belongs only in ignored `.worker-secrets/`; only its public key may be stored in Supabase or sent to a browser.
 - Email delivery is deferred; use `completion_events` as its future integration point.
 
 ## Current state
 
-The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side extraction has also passed with an original video larger than the Supabase 50 MB file limit. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
+The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side extraction has also passed with an original video larger than the Supabase 50 MB file limit. Persistent Web Push completion notifications are implemented through the local worker and service worker. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
 
 ## Security rules
 
@@ -48,6 +50,7 @@ The complete system is built and deployed. The public app, production sign-in, b
 - Do not claim completion without verification evidence.
 - Preserve the direct-browser upload design and outbound-only worker boundary.
 - Preserve lazy browser-side video reading and sequential conversion. Do not replace it with a whole-file-in-memory FFmpeg/WASM path without a measured reason.
+- Preserve durable push delivery rows and per-device subscriptions. A transcription must still complete if notification delivery fails.
 
 ## Required handoff
 

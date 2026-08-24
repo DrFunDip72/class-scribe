@@ -13,6 +13,8 @@
 
 `web/` is the Vercel project root. Its only runtime configuration is the public Supabase project URL and publishable key. They are browser-visible identifiers, not secrets. Prefer Vercel environment-variable settings for future deployments; never add worker credentials.
 
+`public/sw.js` must be served from the site root and `manifest.webmanifest` must remain reachable. Web Push requires HTTPS in production; Vercel provides it automatically. Do not cache the service-worker script with an immutable policy.
+
 Before deployment:
 
 ```powershell
@@ -42,6 +44,8 @@ Add a timestamped migration under `supabase/migrations/`, review grants/RLS, app
 - Web: restore/promote the last verified Vercel deployment.
 - Database: apply a forward corrective migration; do not reset production.
 - Worker: stop the task, restore the last verified commit, reinstall pinned dependencies if necessary, restart, and confirm a fresh heartbeat.
-- Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, pull both models, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
+- Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, pull both models, restore `.worker-secrets/vapid_private_key.pem` from a secure backup, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
+
+If the VAPID private key cannot be restored, let the replacement worker generate one. It will publish the new public key and remove subscriptions signed for the old key. Users must then enable notifications again on each browser.
 
 Queued jobs survive web/worker restarts in Supabase. Expired worker leases are automatically recovered on the next claim.

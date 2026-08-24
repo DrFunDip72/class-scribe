@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, Check, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
+import { NotificationSettings } from "@/components/notification-settings";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
 
@@ -171,6 +172,8 @@ export function DashboardClient({ userId }: { userId: string }) {
         {error && <p className="inline-alert error" role="alert"><AlertCircle size={16} />{error}</p>}
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}
       </div>
+
+      <NotificationSettings userId={userId} />
 
       <div className="history-section">
         <div className="card-heading"><div><h2>Recent recordings</h2><p>{completeCount} complete · {queueCount} waiting</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>

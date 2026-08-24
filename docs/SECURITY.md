@@ -18,6 +18,10 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 - No transcript/credential/signed-URL logging.
 - Local temporary cleanup and remote audio deletion after success.
 - Ignored local environment, venv, model cache, temp, bootstrap, and build files.
+- Opt-in, account-scoped Push API subscriptions protected by RLS.
+- A local-only VAPID private key; Supabase and browsers receive only its public key.
+- Privacy-safe push payloads with generic status text and no filename, transcript, summary, or signed URL.
+- Notification failure isolation: delivery retries cannot make a completed transcription fail.
 
 ## Advisor notes
 
@@ -41,3 +45,5 @@ Unused-index informational notices are expected while the new tables contain lit
 ## Secret handling
 
 Tracked examples contain names/placeholders only. Real values live in ignored `.env.local` / `.env.worker.local` files or platform settings. If any credential enters Git history or logs, revoke and replace it immediately rather than merely deleting the file.
+
+The generated `.worker-secrets/vapid_private_key.pem` is also a secret. Keep it out of Git and ordinary cloud documents. Store any recovery copy in the same protected secret/password backup used for worker credentials. Rotating it is safe but invalidates all current push subscriptions.

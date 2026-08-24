@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-23
-**Phase:** Built, deployed, and end-to-end verified with 20-file batches and local video-to-audio extraction.
+**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, and opt-in persistent completion notifications.
 
 ## Live resources
 
@@ -27,15 +27,17 @@ No credentials are stored in this document.
 - Production Vercel deployment and production login/dashboard/result verification.
 - Production deployment `dpl_3UCh1PMhNGfbtBKjTj2TNnpkmxYz` includes browser-side video extraction and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
+- Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 
 ## Last verified state
 
-- Worker heartbeat: online and idle, version 1.0.0.
+- Worker heartbeat: online and idle, version 1.1.0.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
 - Next.js lint/build: pass.
-- Python compile and four helper tests: pass.
+- Python compile and six helper tests: pass.
+- Notification migration: applied; VAPID public key published and private key retained locally.
 - Supabase migration application: pass.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.
@@ -60,4 +62,4 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Test a real 12-recording class batch when source files are available, including at least one long video, then measure browser preparation time, upload time, transcription/summarization time, and peak memory.
+After the production push deployment is verified, test a real 12-recording class batch when source files are available, including at least one long video, then measure browser preparation time, upload time, transcription/summarization time, notification arrival, and peak memory.

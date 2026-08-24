@@ -2,14 +2,15 @@
 
 ## Optional completion email — IMPLEMENTED, LIVE SEND PENDING
 
-**Environment:** local Next.js app, production Supabase project, local worker code `1.3.0`.
+**Environment:** local Next.js app, production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk`, production Supabase project, and local worker `1.3.0`.
 
-1. `npm run lint` and `npm run build` passed after adding independent Email and Browser pop-up controls. A disposable authenticated browser account rendered both channels, enabled Email, showed the exact account address and saved confirmation, then disabled it successfully.
+1. `npm run lint` and `npm run build` passed after adding independent Email and Browser pop-up controls. Disposable authenticated accounts repeated the UI check locally and on the public production alias: both channels rendered, Email enabled only for the exact account address, the saved confirmation appeared, and disabling succeeded.
 2. Worker compilation passed. Twelve helper tests cover the exact four ordered FluxPrompt input IDs, `api-key` header, flow/session query parameters, responsive branded HTML, generic dashboard link, empty attachment, defensive primary/fallback response parsing, and sanitized bounded delivery metadata.
 3. Production migration `email_completion_notifications` applied successfully. The expected columns, partial indexes, RLS policies, and worker read policy were inspected afterward.
 4. A separate disposable normal Auth user enabled its own lowercase account address. An attempted different recipient was rejected by RLS. The preference was disabled, the session was revoked, and both disposable Auth users plus cascaded preference rows were deleted.
 5. Supabase security and performance advisors were rerun. No new email-related security finding appeared; the new pending-event index is expectedly unused before live delivery traffic.
-6. A real FluxPrompt call has not run because ignored `.env.worker.local` does not yet contain `FLUXPROMPT_API_KEY`, and the owner has not confirmed the exact sample recipient. Automatic email must not be described as live-verified until `worker.py --test-email <approved-address>` succeeds and one opted-in completion is observed.
+6. Production deployment reached Ready and its alias moved successfully. The authenticated dashboard reported worker 1.3.0 online, showed no desktop horizontal overflow, and produced no Vercel runtime errors or warning/error/fatal logs. The disposable production account and cascaded row were deleted.
+7. A real FluxPrompt call has not run because ignored `.env.worker.local` does not yet contain `FLUXPROMPT_API_KEY`, and the owner has not confirmed the exact sample recipient. Automatic email must not be described as live-verified until `worker.py --test-email <approved-address>` succeeds and one opted-in completion is observed.
 
 **Result:** code, database, RLS, and mocked request boundary pass; live provider delivery pending the owner-held secret and recipient.
 

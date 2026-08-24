@@ -25,7 +25,7 @@ No credentials are stored in this document.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Startup task plus named-mutex duplicate-instance protection.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_4tGJ5KyeLzEtwXNc4rQnoMH4KGdo` includes browser-side video extraction, persistent notifications, selective copy actions, and the mobile-first layout and is Ready on the public alias.
+- Production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk` includes optional email/browser channels, browser-side video extraction, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Independent opt-in email controls using the signed-in account email, shared batch/per-recording/failure preferences, a branded privacy-safe HTML template, and durable FluxPrompt delivery retries from the outbound local worker.
@@ -55,6 +55,8 @@ No credentials are stored in this document.
 - Email migration `email_completion_notifications`: applied to production; expected columns, partial indexes, worker/user policies, and JWT-email RLS checks are present.
 - Email implementation checks: Next.js lint/build pass; Python compile and 12 helper tests pass for exact input ordering, request authentication/routing, responsive private HTML, defensive FluxPrompt parsing, response/error sanitization, and existing worker helpers.
 - Local authenticated dashboard email control: pass; a disposable account enabled its exact account address, rendered the saved state, disabled it, and was fully removed. A separate RLS test proved a substituted recipient is rejected.
+- Production authenticated dashboard email control: pass on `https://class-scribe-ruddy.vercel.app`; Email and Browser pop-ups both rendered, the exact account address enabled/saved/disabled, worker 1.3.0 reported online, and no horizontal overflow appeared at the desktop verification viewport. The disposable account was removed.
+- Vercel deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk`: Ready on both production aliases after a successful Next.js build. The post-deployment authenticated check produced no runtime errors or warning/error/fatal logs.
 - Live FluxPrompt delivery is not yet verified because no `FLUXPROMPT_API_KEY` is present in ignored local configuration and the owner has not confirmed the exact sample recipient address.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.

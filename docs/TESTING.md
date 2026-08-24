@@ -10,9 +10,9 @@
 4. A separate disposable normal Auth user enabled its own lowercase account address. An attempted different recipient was rejected by RLS. The preference was disabled, the session was revoked, and both disposable Auth users plus cascaded preference rows were deleted.
 5. Supabase security and performance advisors were rerun. No new email-related security finding appeared; the new pending-event index is expectedly unused before live delivery traffic.
 6. Production deployment reached Ready and its alias moved successfully. The authenticated dashboard reported worker 1.3.0 online, showed no desktop horizontal overflow, and produced no Vercel runtime errors or warning/error/fatal logs. The disposable production account and cascaded row were deleted.
-7. The ignored local `FLUXPROMPT_API_KEY` now loads successfully without displaying or logging its value. The idle worker process was restarted and returned on worker 1.3.0. A real FluxPrompt call has not run because the owner has not confirmed the exact sample recipient. Automatic email must not be described as live-verified until `worker.py --test-email <approved-address>` succeeds and one opted-in completion is observed.
+7. The ignored local `FLUXPROMPT_API_KEY` loads successfully without displaying or logging its value. The idle worker process was restarted and returned on worker 1.3.0. With an explicitly owner-approved recipient, `worker.py --test-email` sent the branded three-recording sample; FluxPrompt returned HTTP 200 and the defensive parser accepted its non-empty success response. The response body and recipient were not written to project documentation. Inbox arrival and an automatic completion-event delivery remain owner-operated checks.
 
-**Result:** code, database, RLS, and mocked request boundary pass; live provider delivery pending the owner-held secret and recipient.
+**Result:** code, database, RLS, production UI, mocked request boundary, and live FluxPrompt acceptance pass; inbox arrival and automatic completion-event delivery remain to be observed.
 
 ## Automated and build checks — PASS
 

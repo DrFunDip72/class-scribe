@@ -57,7 +57,7 @@ No credentials are stored in this document.
 - Local authenticated dashboard email control: pass; a disposable account enabled its exact account address, rendered the saved state, disabled it, and was fully removed. A separate RLS test proved a substituted recipient is rejected.
 - Production authenticated dashboard email control: pass on `https://class-scribe-ruddy.vercel.app`; Email and Browser pop-ups both rendered, the exact account address enabled/saved/disabled, worker 1.3.0 reported online, and no horizontal overflow appeared at the desktop verification viewport. The disposable account was removed.
 - Vercel deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk`: Ready on both production aliases after a successful Next.js build. The post-deployment authenticated check produced no runtime errors or warning/error/fatal logs.
-- Live FluxPrompt delivery is not yet verified because the owner has not confirmed the exact sample recipient address. The local key-presence check passed without displaying or logging its value.
+- Live FluxPrompt API call: pass. The owner approved the exact recipient, `worker.py --test-email` sent the branded three-recording sample, FluxPrompt returned HTTP 200, and the defensive parser found the expected non-empty success response. No API key, HTML body, recipient, or provider response body was persisted in project documentation.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.
 - Production browser boundary: 20 synthetic MP3 files were accepted into the selector; 21 were rejected before upload. No test audio was uploaded or queued.
@@ -79,4 +79,4 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Confirm the exact sample recipient, run `worker.py --test-email`, and verify one opted-in automatic completion email. Then test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.
+Confirm the sample arrived in the owner's inbox, then verify one opted-in automatic completion email from a finished recording and its `completion_events` delivery state. After that, test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.

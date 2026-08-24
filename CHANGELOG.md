@@ -43,6 +43,7 @@
 
 - Verified the local FluxPrompt key loads without exposing its value and restarted the idle worker process so worker 1.3.0 uses the updated environment.
 - Sent the owner-approved branded sample through the live FluxPrompt Email Agent and received HTTP 200 plus a valid success response without persisting its recipient or response body.
+- Repeated the owner-approved live sample and received a second HTTP 200 success response, confirming the provider call is repeatable.
 - Locked email recipients through RLS to the authenticated account's lowercase JWT email and kept the FluxPrompt key off Vercel, Supabase, and browser code.
 - Browser uploads go directly to private Supabase Storage.
 - Audio is deleted after successful processing.

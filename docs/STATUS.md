@@ -25,7 +25,7 @@ No credentials are stored in this document.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Startup task plus named-mutex duplicate-instance protection.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_3UCh1PMhNGfbtBKjTj2TNnpkmxYz` includes browser-side video extraction and is Ready on the public alias.
+- Production deployment `dpl_9sbGiPyFnEwXzEB8n9AwYCMFtcgT` includes browser-side video extraction and persistent notifications and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 

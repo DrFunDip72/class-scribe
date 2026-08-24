@@ -16,7 +16,8 @@
 - Browser video-size boundary: accepted a valid 57.3 MB MP4 even though its original size exceeded the 50 MB Supabase object limit.
 - Browser extraction: converted that MP4 locally to a 55 KB mono AAC/M4A and uploaded only the derived audio.
 - Production deployment: Ready on the existing public alias; the live dashboard accepted a synthetic 57.3 MB MP4 for local extraction without uploading it.
-- Post-deployment Vercel check: no runtime errors and no warning/error logs for deployment `dpl_3UCh1PMhNGfbtBKjTj2TNnpkmxYz`.
+- Final production deployment `dpl_9sbGiPyFnEwXzEB8n9AwYCMFtcgT`: Ready on both production aliases; no runtime error clusters and no runtime warning/error/fatal logs after deployment.
+- Final public smoke check: landing page title/URL passed with no browser page errors or console messages; `manifest.webmanifest` and `class-scribe-icon.svg` both returned HTTP 200.
 - Worker heartbeat: online/idle within seconds of the check.
 - Worker notification startup: version `1.1.0` heartbeat online/idle; local VAPID private key generated in ignored storage and the 87-character public key published.
 - Notification RLS with two disposable immediate-session users: each saw only its own subscription; cross-account subscription insertion, configuration writes, and delivery writes were blocked; delivery rows were invisible; authenticated public-key read succeeded.

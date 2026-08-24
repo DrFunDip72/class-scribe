@@ -25,7 +25,7 @@ No credentials are stored in this document.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Startup task plus named-mutex duplicate-instance protection.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_8RmhrLYqJ6tT4tt9Ze9JsPbU1HLZ` includes browser-side video extraction, persistent notifications, and selective copy actions and is Ready on the public alias.
+- Production deployment `dpl_4tGJ5KyeLzEtwXNc4rQnoMH4KGdo` includes browser-side video extraction, persistent notifications, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
@@ -47,6 +47,8 @@ No credentials are stored in this document.
 - Mobile Copy action sheet: stayed fully inside a 320 x 568 viewport, focused its first choice, closed by outside tap or Escape, returned focus to Copy, and preserved the compact desktop dropdown at 1280 x 800.
 - Automated WCAG 2 A/AA scan: zero detected violations on the mobile dashboard, completed result, and open Copy action sheet after contrast corrections.
 - Disposable mobile QA account: source audio was removed after processing, the Auth session was revoked, the user and cascaded test rows were deleted, and zero test media remained.
+- Final production mobile check: the public Vercel dashboard and completed result had no overflow and no sub-44-pixel visible targets at 320 x 568; the Copy sheet remained inside the viewport and its WCAG 2 A/AA scan had zero detected violations.
+- Vercel post-deployment health for `dpl_4tGJ5KyeLzEtwXNc4rQnoMH4KGdo`: build Ready with no build failures and no production runtime warning, error, or fatal logs after the authenticated mobile test.
 - Worker `1.2.1` study-guide test: a short production sample stayed source-faithful, retained the real assignment, avoided count padding/outside facts, and ended with `Big takeaway`.
 - Supabase migration application: pass.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.

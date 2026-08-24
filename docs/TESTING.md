@@ -58,7 +58,7 @@ Chrome's runtime Incognito limitation was also exercised: Push API subscription 
 
 ## Mobile usability and Copy action sheet — PASS
 
-**Environment:** local Next.js production-connected app, Chromium automation, production Supabase, Windows worker, and a disposable immediate-session account.
+**Environment:** local Next.js production-connected app, production deployment `dpl_4tGJ5KyeLzEtwXNc4rQnoMH4KGdo`, Chromium automation, production Supabase, Windows worker, and disposable immediate-session accounts.
 **Viewports:** 320 x 568, 320 x 800, 360 x 800, 390 x 800/844, 430 x 800, plus a 1280 x 800 desktop regression check.
 
 1. Landing, sign-up, dashboard, and completed-result documents reported `scrollWidth === innerWidth` at every tested phone width.
@@ -70,6 +70,8 @@ Chrome's runtime Incognito limitation was also exercised: Push API subscription 
 7. Automated axe-core WCAG 2 A/AA checks reported zero violations on the mobile dashboard, completed result, and open Copy sheet after correcting three low-contrast secondary text styles.
 8. Next.js lint and production build passed after the final responsive changes.
 9. The sample completed through the worker, remote audio was deleted, the browser signed out, the Auth session count reached zero, the disposable user and cascaded rows were removed, and zero test media remained.
+10. The final public Vercel domain repeated the 320 x 568 dashboard/result measurements, opened the Copy sheet fully within the viewport, and passed the open-sheet WCAG 2 A/AA scan with zero detected violations.
+11. The final Vercel deployment reached Ready; its authenticated production check produced no runtime warning, error, or fatal logs.
 
 **Result:** PASS.
 
@@ -135,6 +137,6 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 - [x] A 21st selected file is rejected before upload.
 - [ ] Restart the computer during a long recording and confirm stale-lease recovery.
 - [ ] Measure 30- and 60-minute processing time and peak memory.
-- [ ] Repeat the completed mobile usability review on the final production deployment and one physical phone.
+- [ ] Repeat the completed mobile usability review on one physical phone.
 
 Do not promise processing time until real long-class benchmarks are recorded.

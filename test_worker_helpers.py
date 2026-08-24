@@ -41,6 +41,8 @@ class WorkerHelperTests(unittest.TestCase):
         self.assertEqual(payload["url"], "/dashboard")
         self.assertIn("12 recordings", payload["body"])
         self.assertNotIn("transcript", payload["body"].lower())
+        singular = build_push_payload("batch", job_id="job-id", batch_id="batch-id")
+        self.assertEqual(singular["body"], "Your recording is ready. Click to view your notes.")
 
 
 if __name__ == "__main__":

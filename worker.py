@@ -580,10 +580,14 @@ def build_push_payload(kind: str, *, job_id: str, batch_id: str, batch_size: int
             "tag": f"job-{job_id}-failed",
         }
     if kind == "batch":
-        noun = "recording is" if batch_size == 1 else "recordings are"
+        body = (
+            "Your recording is ready. Click to view your notes."
+            if batch_size == 1
+            else f"All {batch_size} recordings are ready. Click to view your notes."
+        )
         return {
             "title": "Your class notes are ready",
-            "body": f"All {batch_size} {noun} ready. Click to view your notes.",
+            "body": body,
             "url": f"/jobs/{job_id}" if batch_size == 1 else "/dashboard",
             "tag": f"batch-{batch_id}-completed",
         }

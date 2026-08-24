@@ -22,9 +22,23 @@
 - Notification RLS with two disposable immediate-session users: each saw only its own subscription; cross-account subscription insertion, configuration writes, and delivery writes were blocked; delivery rows were invisible; authenticated public-key read succeeded.
 - Notification RLS cleanup: both sessions were globally revoked, both disposable users were deleted, and zero synthetic subscriptions remained.
 
-## Persistent completion notification — pending production browser pass
+## Persistent completion notification — PASS
 
-The service worker, permission controls, per-device subscription, local test notification, durable worker delivery, provider response, and click-through are implemented. The final live HTTPS browser subscription and real push-provider round trip are tested after the production deployment containing this feature becomes Ready.
+**Environment:** production HTTPS site, temporary normal Chrome profile, production Supabase, and production Windows worker `1.1.0`.
+**Input:** generated `verification-sample.mp3`, 39 KB, non-private class-style speech.
+
+1. A disposable production account signed in and granted the site notification permission.
+2. The app registered the root service worker and created a real FCM Push API subscription.
+3. The browser stored only its own account-scoped device subscription and showed the local enabled/test notification.
+4. The browser uploaded the sample, the worker transcribed and summarized it, and the dashboard reached Completed.
+5. The worker created one durable batch-completion delivery, signed and sent it on attempt one, and recorded `state=sent` with no error.
+6. The service worker received the encrypted payload and retained a persistent notification titled `Your class notes are ready`, with generic body text and a click-through URL to the completed private result.
+7. The source Storage object count was zero after completion.
+8. The test session was signed out, the disposable user and cascaded rows were deleted, the temporary browser was closed, and no test media remained.
+
+**Result:** PASS.
+
+Chrome's runtime Incognito limitation was also exercised: Push API subscription is unavailable there, so the supported path is a normal browser profile.
 
 ## Local inference — PASS
 

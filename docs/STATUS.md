@@ -38,6 +38,7 @@ No credentials are stored in this document.
 - Next.js lint/build: pass.
 - Python compile and six helper tests: pass.
 - Notification migration: applied; VAPID public key published and private key retained locally.
+- Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
 - Supabase migration application: pass.
 - Production batch boundary: 20 files accepted as 20 jobs; 21 files rejected with no batch created.
 - Production Auth sign-up: a disposable account received a session immediately with no email-confirmation gate; its session was revoked and the account removed after the test.

@@ -76,6 +76,7 @@ This project does not require GitHub Actions to operate.
 - A user must explicitly grant permission from a button click; the website cannot bypass a browser denial.
 - Each browser profile/device is a separate subscription. Clearing site data, disabling browser notifications, or rotating the VAPID key requires enabling again.
 - Windows Chrome and Edge provide the intended over-other-applications experience. Operating-system Focus/Do Not Disturb settings always take precedence.
+- Chrome disables Push API subscriptions in Incognito windows; enable notifications in a normal browser profile.
 - On iPhone/iPad, Web Push requires installing the site to the Home Screen before permission can be requested. Platform support and behavior can change.
 - Payloads are intentionally tiny and contain no private class content. Durable delivery rows are small but should be pruned later if volume becomes material.
 

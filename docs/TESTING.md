@@ -31,6 +31,7 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 7. Source Storage object was deleted (remaining test audio count 0).
 8. Dashboard showed Completed and worker online.
 9. Production sign-in and result page displayed the saved private notes.
+10. The temporary QA Auth user and its cascaded rows were deleted after verification; Storage remained empty and the worker remained live.
 
 **Result:** PASS.
 

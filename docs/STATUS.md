@@ -35,7 +35,7 @@ No credentials are stored in this document.
 - Next.js lint/build: pass.
 - Python compile and four helper tests: pass.
 - Supabase migration application: pass.
-- Supabase performance advisor: only expected unused-index informational notices after consolidating the duplicate read policy.
+- Supabase performance advisor: only one expected unused heartbeat-index informational notice after consolidating the duplicate read policy.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
 
 ## Remaining owner action

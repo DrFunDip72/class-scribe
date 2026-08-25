@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added a sourced business-model and economics document covering commercial-readiness blockers, free-tier and local-worker capacity, recommended pricing, unit economics, profitability scenarios, required work, risks, and a staged validation plan.
 - Added optional completion email beside browser pop-ups, with shared batch/per-recording/failure preferences and an account-email-only recipient.
 - Integrated the FluxPrompt Email Agent from the outbound local worker using its exact ordered inputs, unique sessions, defensive response parsing, and a local-only API key.
 - Added a branded responsive HTML email with a private-dashboard call to action and no filename, transcript, summary, attachment, or signed URL.

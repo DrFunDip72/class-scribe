@@ -154,3 +154,16 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 - [ ] Repeat the completed mobile usability review on one physical phone.
 
 Do not promise processing time until real long-class benchmarks are recorded.
+
+## Business-model documentation review — PASS
+
+**Date:** 2026-08-24
+**Scope:** `docs/BUSINESS-MODEL.md`; documentation-only change, so no application runtime test was required.
+
+1. Reconciled the analysis with the deployed architecture, current computer specifications, and documented free-tier limits.
+2. Checked Vercel, Supabase, Stripe, Otter, Notta, Fireflies, and faster-whisper claims against their official pricing, documentation, or repository pages linked in the document.
+3. Recalculated the 48 kbps audio-size estimate, free-egress capacity, Stripe fee examples, break-even subscriber count, MRR, annualized revenue, and contribution table.
+4. Labeled unmeasured capacity, electricity, acquisition, mature infrastructure, and growth figures as assumptions or scenarios rather than verified results.
+5. Preserved the existing warning that processing-time promises require real 30- and 60-minute benchmarks.
+
+**Result:** PASS.

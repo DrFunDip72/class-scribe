@@ -32,6 +32,7 @@ No credentials are stored in this document.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
+- Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
 
 ## Last verified state
 
@@ -80,3 +81,5 @@ Password-reset email stays enabled. The production reset URL should remain allow
 ## Exact next task
 
 Confirm the sample arrived in the owner's inbox, then verify one opted-in automatic completion email from a finished recording and its `completion_events` delivery state. After that, test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.
+
+For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

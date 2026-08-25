@@ -50,6 +50,7 @@ The public Supabase URL and publishable key belong in `web/.env.local`. Worker c
 - [Local worker operations](docs/LOCAL-WORKER.md)
 - [Deployment and recovery](docs/DEPLOYMENT.md)
 - [Costs and limits](docs/COSTS-AND-LIMITS.md)
+- [Business model and economics](docs/BUSINESS-MODEL.md)
 - [Security](docs/SECURITY.md)
 - [Testing evidence](docs/TESTING.md)
 - [Decision log](docs/DECISIONS.md)

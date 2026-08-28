@@ -53,6 +53,22 @@
 
 **Result:** PASS.
 
+## Unattended worker startup and layered recovery — PASS
+
+**Date:** 2026-08-28
+**Environment:** production Supabase queue, Windows Task Scheduler, local Ollama, and worker `1.3.1`.
+
+1. The initial health check found Vercel Ready and Supabase Active Healthy, but the local worker heartbeat was about 58 hours stale. Ten jobs were queued, none were active, and the existing interactive task's final result was `0xC000013A` after only three configured restarts.
+2. Installed the task as the Windows `SYSTEM` service account with startup, logon, and five-minute repeating triggers. Exported task XML confirmed a five-minute interval, 3,650-day repetition duration, 999 one-minute restart attempts, `StartWhenAvailable`, no execution time limit, and `IgnoreNew` overlap handling.
+3. The new persistent launcher restarted the old interactive worker, which resumed the durable queue. A second launcher invocation exited 0 in 0.45 seconds because the cross-process lock was already held.
+4. Waited for an observed zero-active-job boundary before terminating the old interactive process tree. No active transcription was interrupted. The next recovery trigger started the task under `SYSTEM`.
+5. Supabase reported a fresh `processing` heartbeat from worker `1.3.1` 17 seconds before verification. The queue had resumed with five queued, one active, 15 completed, and zero failed jobs at that observation.
+6. A manual interactive `worker.py --once` invocation while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, verifying the global cross-session mutex.
+7. Both PowerShell scripts parsed without errors. `worker.py` and `test_worker_helpers.py` compiled, and all 13 helper tests passed, including the access-denied/global-mutex duplicate path.
+8. `.worker-state`, `.worker-secrets`, and `.env.worker.local` are ignored; no secret path was added to Git.
+
+**Result:** PASS. A physical Windows reboot was intentionally not forced during this session; the installed boot trigger should be confirmed on the next planned restart.
+
 Chrome's runtime Incognito limitation was also exercised: Push API subscription is unavailable there, so the supported path is a normal browser profile.
 
 ## Selective copy and study-guide format — PASS

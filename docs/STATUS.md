@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-08-24
-**Phase:** Built and deployed with 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
+**Last updated:** 2026-08-28
+**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
 
 ## Live resources
 
@@ -23,7 +23,7 @@ No credentials are stored in this document.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
-- Startup task plus named-mutex duplicate-instance protection.
+- Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
 - Production Vercel deployment and production login/dashboard/result verification.
 - Production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk` includes optional email/browser channels, browser-side video extraction, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
@@ -36,7 +36,12 @@ No credentials are stored in this document.
 
 ## Last verified state
 
-- Worker heartbeat: online and idle, version 1.3.0. The ignored local FluxPrompt key is configured, and the exact worker process was restarted while the queue was idle so the new environment loaded.
+- On 2026-08-28, a live health check found Vercel Ready and Supabase Active Healthy but found the local worker stale for about 58 hours with 10 queued recordings. The prior logon-only task had exited with `0xC000013A` after exhausting three restarts.
+- The hardened task is installed as `SYSTEM` with startup, logon, and five-minute repeating triggers, `StartWhenAvailable`, no execution time limit, `IgnoreNew`, wake support, and 999 one-minute restart attempts.
+- The old interactive worker was stopped only during an observed idle boundary. The five-minute recovery trigger started the task under `SYSTEM`; Supabase then reported a fresh processing heartbeat from worker `1.3.1` and the durable queue resumed with zero failed jobs.
+- A manual interactive `worker.py --once` launch while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, proving the global cross-session mutex blocks a second worker.
+- PowerShell parsing, Python compilation, and all 13 worker helper tests passed. The ignored `.worker-state`, `.worker-secrets`, and `.env.worker.local` paths remain untracked.
+- Worker heartbeat: online on version 1.3.1. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
@@ -80,6 +85,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Confirm the sample arrived in the owner's inbox, then verify one opted-in automatic completion email from a finished recording and its `completion_events` delivery state. After that, test a real 12-recording class batch when source files are available, including at least one long video, and measure preparation, upload, inference, notification arrival, and peak memory.
+Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

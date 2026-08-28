@@ -34,7 +34,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -47,9 +47,15 @@ def acquire_single_instance() -> object | None:
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
     kernel32.CreateMutexW.restype = ctypes.c_void_p
-    handle = kernel32.CreateMutexW(None, False, "Local\\ClassScribeQueueWorker")
+    handle = kernel32.CreateMutexW(None, False, "Global\\ClassScribeQueueWorker")
     if not handle:
-        raise OSError(ctypes.get_last_error(), "Could not create the worker mutex")
+        error_code = ctypes.get_last_error()
+        # A SYSTEM-owned global mutex may deny a non-elevated manual process
+        # before Windows can report ERROR_ALREADY_EXISTS. In either case,
+        # another worker owns the cross-session singleton.
+        if error_code == 5:  # ERROR_ACCESS_DENIED
+            return None
+        raise OSError(error_code, "Could not create the worker mutex")
     if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
         kernel32.CloseHandle(handle)
         return None

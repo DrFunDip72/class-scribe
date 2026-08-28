@@ -43,7 +43,7 @@ Add a timestamped migration under `supabase/migrations/`, review grants/RLS, app
 
 - Web: restore/promote the last verified Vercel deployment.
 - Database: apply a forward corrective migration; do not reset production.
-- Worker: stop the task, restore the last verified commit, reinstall pinned dependencies if necessary, restart, and confirm a fresh heartbeat.
+- Worker: disable and stop the task, restore the last verified commit, reinstall pinned dependencies if necessary, run `.\install-worker-task.ps1` from Administrator PowerShell, confirm the task uses `SYSTEM` with three triggers, and confirm a fresh heartbeat.
 - Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, pull both models, restore `.worker-secrets/vapid_private_key.pem` from a secure backup, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
 
 If the VAPID private key cannot be restored, let the replacement worker generate one. It will publish the new public key and remove subscriptions signed for the old key. Users must then enable notifications again on each browser.
@@ -51,3 +51,9 @@ If the VAPID private key cannot be restored, let the replacement worker generate
 Email recovery also requires restoring `FLUXPROMPT_API_KEY` to the replacement computer's ignored `.env.worker.local`. The other email settings have tracked defaults. Restart the worker and run `worker.py --test-email <approved-address>` before relying on automatic mail. Pending events remain in Supabase while the worker or FluxPrompt is unavailable.
 
 Queued jobs survive web/worker restarts in Supabase. Expired worker leases are automatically recovered on the next claim.
+
+## Unattended Windows recovery
+
+`install-worker-task.ps1` is the authoritative task definition. It may be rerun safely to repair configuration drift. It requires administrator approval because the worker runs as `SYSTEM` before any user signs in. The persistent launcher and the task's one-minute restart policy recover process crashes; the repeating five-minute trigger recovers the task if its normal restart attempts are bypassed.
+
+The Windows task can start only after Windows itself boots. For recovery after a building power outage, configure the computer firmware/BIOS setting commonly named `Restore on AC Power Loss` or `AC Back` to power on. That firmware setting is machine-specific and is not changed by this repository.

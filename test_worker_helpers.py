@@ -7,6 +7,7 @@ from py_vapid import Vapid01
 
 from worker import (
     FLUXPROMPT_INPUT_IDS,
+    acquire_single_instance,
     build_email_content,
     build_fluxprompt_payload,
     build_push_payload,
@@ -24,6 +25,20 @@ from worker import (
 
 
 class WorkerHelperTests(unittest.TestCase):
+    @patch("worker.ctypes.get_last_error", return_value=5)
+    @patch("worker.ctypes.WinDLL")
+    def test_global_mutex_access_denied_means_worker_already_running(
+        self,
+        win_dll: MagicMock,
+        _get_last_error: MagicMock,
+    ) -> None:
+        win_dll.return_value.CreateMutexW.return_value = 0
+        self.assertIsNone(acquire_single_instance())
+        self.assertEqual(
+            win_dll.return_value.CreateMutexW.call_args.args[2],
+            "Global\\ClassScribeQueueWorker",
+        )
+
     def test_chunk_text_preserves_content(self) -> None:
         text = "First sentence. Second sentence. Third sentence."
         chunks = chunk_text(text, 22)

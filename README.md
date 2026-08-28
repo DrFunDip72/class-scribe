@@ -27,7 +27,8 @@ The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the bro
 - `web/` — Next.js 16 TypeScript application
 - `supabase/migrations/` — schema, RLS, storage, queue, and worker-role migrations
 - `worker.py` — sequential local processor
-- `worker-launcher.ps1` — Windows logon-task launcher
+- `worker-launcher.ps1` — persistent Windows worker/Ollama supervisor
+- `install-worker-task.ps1` — repeatable administrator installer for unattended startup and recovery triggers
 - `docs/` — product, operations, security, deployment, and test handoff
 
 ## Start locally

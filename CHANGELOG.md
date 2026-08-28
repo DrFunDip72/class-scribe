@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-28
+
+### Reliability
+
+- Replaced the one-shot launcher with a persistent Ollama/worker supervisor that retries local-service startup and relaunches the queue worker after any exit.
+- Added a repeatable administrator installer for a pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, wake, and 999 one-minute restart protections.
+- Moved the worker singleton mutex to the global Windows namespace so `SYSTEM` and interactive sessions cannot run separate queue workers.
+- Pointed unattended Ollama startup at the existing owner model store and added an ignored supervisor-state/log directory.
+- Documented installation, maintenance, recovery, privacy-safe logging, and the separate firmware requirement for automatic power restoration.
+
 ## 2026-08-24
 
 ### Added

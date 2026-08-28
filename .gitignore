@@ -6,6 +6,7 @@
 __pycache__/
 *.py[cod]
 .worker-temp/
+.worker-state/
 .worker-secrets/
 .worker-auth-bootstrap.json
 web/node_modules/

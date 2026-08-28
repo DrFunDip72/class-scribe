@@ -109,3 +109,11 @@ Supersede ADR-008's email deferral. Add Email as an independent account-level no
 **Reason:** Users may miss a browser pop-up or use a browser/device where persistent Push is unavailable. A concise email with a dashboard link lets them return to private results without adding cloud inference or a separate mail vendor.
 
 **Consequence:** The FluxPrompt API key lives only in ignored `.env.worker.local`. RLS restricts the stored recipient to the current Supabase JWT email, and the worker rechecks opt-in before sending. Email subject/body remain generic and contain no filename, transcript, summary, attachment, signed URL, or account-specific result URL. Delivery retries cannot change transcription state. Because mandatory sign-up confirmation is disabled, email ownership is not assured; add anti-abuse controls before broad public launch. FluxPrompt account pricing and request allowance remain an external operational limit.
+
+## ADR-021 — SYSTEM Startup Task with Layered Recovery
+
+Run the local launcher as a Windows `SYSTEM` scheduled task with startup, logon, and five-minute repeating triggers. Keep Task Scheduler restart-on-failure enabled for 999 one-minute attempts, and make the launcher itself supervise Ollama and the Python worker in a persistent retry loop.
+
+**Reason:** The prior interactive logon task stopped after its worker process was interrupted and its three automatic retries were exhausted. It also could not start after an unattended reboot until the owner signed in.
+
+**Consequence:** The task requires one administrator-approved installation but no stored Windows password or interactive login afterward. Because `SYSTEM` has a different profile, the launcher must use the owner's existing Ollama model directory explicitly. Planned maintenance must disable the task before stopping it, or the recurring trigger will restore it. The worker mutex uses the global Windows namespace so a manual user-session launch cannot overlap the `SYSTEM` worker; launcher locking and database claims add two more duplicate defenses. The worker remains outbound-only.

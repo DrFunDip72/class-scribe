@@ -11,8 +11,8 @@
 | Whisper | `small` |
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
-| Startup task | `AudioTranscriberWorker` |
-| Worker version | `1.3.0` |
+| Startup task | `AudioTranscriberWorker`, running as Windows `SYSTEM` |
+| Worker version | `1.3.1` |
 | Push library | `pywebpush` 2.4.0 |
 | Email transport | FluxPrompt Email Agent over outbound HTTPS |
 
@@ -44,12 +44,33 @@ Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase
 Get-ScheduledTask -TaskName AudioTranscriberWorker
 Get-ScheduledTaskInfo -TaskName AudioTranscriberWorker
 
+# Install or repair unattended startup (run once from Administrator PowerShell)
+.\install-worker-task.ps1
+
+# Apply the SYSTEM identity immediately, only when the queue is idle
+.\install-worker-task.ps1 -RestartRunning
+
 # Restart
 Stop-ScheduledTask -TaskName AudioTranscriberWorker
 Start-ScheduledTask -TaskName AudioTranscriberWorker
 ```
 
-The launcher starts Ollama in a hidden window if needed, waits for it, and starts the worker. A named Windows mutex causes a second launch to log a safe message and exit 0.
+The installer registers three independent triggers: Windows startup, user logon, and a five-minute repeating recovery trigger. It runs under the built-in `SYSTEM` service account, so no user sign-in or stored Windows password is required. The task starts missed runs when available, allows 999 one-minute Task Scheduler restarts, has no execution time limit, and ignores overlapping triggers. A normal repair preserves an already-running worker; use `-RestartRunning` only while the queue is idle when the new task identity must take effect immediately.
+
+The launcher is also a persistent supervisor. It starts Ollama in a hidden process if needed, waits for the local API, starts the queue worker, and relaunches it after any exit. Because `SYSTEM` has a different Windows profile, the launcher explicitly points Ollama at the owner's existing `.ollama\models` directory rather than downloading another model. A cross-process launcher lock, a global cross-session Windows worker mutex, and atomic database claiming prevent duplicate processing.
+
+Supervisor-only events and exit codes are written to ignored `.worker-state\worker-launcher.log`. The log does not contain credentials, transcript text, summaries, signed links, or authorization headers.
+
+For planned maintenance, disable the recurring task before stopping it; otherwise the five-minute recovery trigger will start it again:
+
+```powershell
+Disable-ScheduledTask -TaskName AudioTranscriberWorker
+Stop-ScheduledTask -TaskName AudioTranscriberWorker
+
+# Re-enable after maintenance
+Enable-ScheduledTask -TaskName AudioTranscriberWorker
+Start-ScheduledTask -TaskName AudioTranscriberWorker
+```
 
 ## Normal operation
 
@@ -68,6 +89,8 @@ The launcher starts Ollama in a hidden window if needed, waits for it, and start
 ## Troubleshooting
 
 - **Website says worker offline:** confirm the task is Running, Ollama responds at `127.0.0.1:11434`, and the computer is awake/online.
+- **Task is not using SYSTEM or has fewer than three triggers:** open Administrator PowerShell in the repository and rerun `.\install-worker-task.ps1`.
+- **Worker repeatedly exits:** inspect only `.worker-state\worker-launcher.log`, the task result, and safe worker error output. Do not redirect private transcript or credential data into persistent logs.
 - **Worker auth error:** verify the worker Auth user still exists, its `app_metadata.role` is `worker`, and local credentials match.
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
 - **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.

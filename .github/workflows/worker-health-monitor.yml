@@ -1,0 +1,125 @@
+name: Worker health monitor
+
+on:
+  schedule:
+    # Offset from the top of the hour to reduce GitHub scheduler congestion.
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+    # Keep public-repository activity below GitHub's 60-day schedule timeout.
+    - cron: "23 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: worker-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-worker:
+    if: github.event_name != 'schedule' || github.event.schedule != '23 4 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      HEALTH_URL: https://class-scribe-ruddy.vercel.app/api/worker-health
+    steps:
+      - name: Check worker health
+        id: health
+        shell: bash
+        run: |
+          online=false
+          for attempt in 1 2 3; do
+            status="$(curl --silent --show-error --max-time 20 \
+              --output /tmp/worker-health.json \
+              --write-out '%{http_code}' \
+              "$HEALTH_URL" || true)"
+            if [[ "$status" == "200" ]] && grep --quiet '"status":"online"' /tmp/worker-health.json; then
+              online=true
+              break
+            fi
+            sleep 10
+          done
+          echo "online=$online" >> "$GITHUB_OUTPUT"
+
+      - name: Open one outage issue
+        if: steps.health.outputs.online != 'true'
+        shell: bash
+        run: |
+          gh label create worker-offline \
+            --repo "$GH_REPO" \
+            --color D73A4A \
+            --description "Automated Class Scribe worker outage" \
+            --force
+          issue_number="$(gh issue list \
+            --repo "$GH_REPO" \
+            --state open \
+            --label worker-offline \
+            --limit 1 \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -z "$issue_number" ]]; then
+            gh issue create \
+              --repo "$GH_REPO" \
+              --title "Class Scribe worker is offline" \
+              --label worker-offline \
+              --assignee "${{ github.repository_owner }}" \
+              --body "The automated monitor could not confirm a fresh Class Scribe worker heartbeat after three attempts. Check the Windows computer and the AudioTranscriberWorker scheduled task. This alert contains no recording or account data. Detected at $(date -u +'%Y-%m-%d %H:%M:%S UTC')."
+          fi
+
+      - name: Close outage issue after recovery
+        if: steps.health.outputs.online == 'true'
+        shell: bash
+        run: |
+          issue_number="$(gh issue list \
+            --repo "$GH_REPO" \
+            --state open \
+            --label worker-offline \
+            --limit 1 \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -n "$issue_number" ]]; then
+            gh issue close "$issue_number" \
+              --repo "$GH_REPO" \
+              --reason completed \
+              --comment "A fresh worker heartbeat was detected at $(date -u +'%Y-%m-%d %H:%M:%S UTC'). Automated monitoring has recovered."
+          fi
+
+  keep-schedule-active:
+    if: github.event_name == 'schedule' && github.event.schedule == '23 4 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: none
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      KEEPALIVE_BRANCH: monitor-keepalive
+    steps:
+      - name: Record monthly monitor activity off main
+        shell: bash
+        run: |
+          if ! gh api "repos/$GH_REPO/git/ref/heads/$KEEPALIVE_BRANCH" >/dev/null 2>&1; then
+            main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/${{ github.event.repository.default_branch }}" --jq '.object.sha')"
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              --field ref="refs/heads/$KEEPALIVE_BRANCH" \
+              --field sha="$main_sha" >/dev/null
+          fi
+
+          current_sha="$(gh api "repos/$GH_REPO/contents/.github/worker-monitor-keepalive?ref=$KEEPALIVE_BRANCH" --jq '.sha' 2>/dev/null || true)"
+          content="$(date -u +'%Y-%m-%dT%H:%M:%SZ' | base64 -w 0)"
+          args=(
+            --method PUT
+            "repos/$GH_REPO/contents/.github/worker-monitor-keepalive"
+            --field message="chore: keep worker monitor active"
+            --field content="$content"
+            --field branch="$KEEPALIVE_BRANCH"
+          )
+          if [[ -n "$current_sha" ]]; then
+            args+=(--field sha="$current_sha")
+          fi
+          gh api "${args[@]}" >/dev/null

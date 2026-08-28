@@ -86,6 +86,14 @@ Start-ScheduledTask -TaskName AudioTranscriberWorker
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
 - Summary output: a brief overview (usually 2-4 sentences), up to 14 ordered concept/definition/process points without padding, selective examples, a final `Big takeaway`, and only genuine action items. Single-section recordings skip the consolidation pass.
 
+## Owner outage notification
+
+The external monitor is `.github/workflows/worker-health-monitor.yml`; it does not run on this computer and uses no AI. Every five minutes it checks `https://class-scribe-ruddy.vercel.app/api/worker-health`. A heartbeat older than 10 minutes makes the route unavailable. After three checks, the workflow opens one `worker-offline` GitHub issue assigned to `DrFunDip72`, and closes it when health returns.
+
+GitHub must be configured to email issue assignments for the owner account. Confirm the account's notification email is verified and repository issue notifications are enabled. Use the workflow's `Run workflow` control for a non-destructive live check; a real outage/recovery drill requires planned worker maintenance.
+
+The public route exposes only `online` or `offline`. It contains no filename, transcript, summary, account identifier, worker identifier, timestamp, queue count, or signed URL.
+
 ## Troubleshooting
 
 - **Website says worker offline:** confirm the task is Running, Ollama responds at `127.0.0.1:11434`, and the computer is awake/online.

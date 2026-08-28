@@ -1,5 +1,19 @@
 # Testing and Verification
 
+## External worker-outage monitor — IMPLEMENTED, PRODUCTION WORKFLOW PENDING
+
+**Date:** 2026-08-28
+
+1. Applied production migrations `public_worker_health_check` and `limit_worker_health_rpc_permissions`.
+2. Verified `worker_is_online()` returned `true`, `anon` could execute only the Boolean RPC, `authenticated` had no redundant grant, and `anon` still could not select `worker_heartbeats`.
+3. Supabase security advisors reported the expected intentionally public SECURITY DEFINER warning; performance advisors reported only existing/new-table unused-index informational notices.
+4. `npm run lint` and `npm run build` passed. The Next.js build included dynamic route `/api/worker-health`.
+5. A local production server connected to production Supabase returned HTTP 200, `Cache-Control: no-store, max-age=0`, and exactly `{"status":"online"}`.
+6. Prettier parsed the GitHub workflow successfully and `git diff --check` passed.
+7. The workflow uses a standard public-repository runner, no artifacts/caches, three health attempts, one deduplicated assigned outage issue, automatic recovery closure, and a monthly non-default-branch keepalive.
+
+**Result:** code, production database boundary, local API route, build, and static workflow checks pass. Production Vercel deployment, scheduled/manual GitHub run, owner email receipt, and a planned outage/recovery drill remain to be verified.
+
 ## Optional completion email — IMPLEMENTED, LIVE SEND PENDING
 
 **Environment:** local Next.js app, production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk`, production Supabase project, and local worker `1.3.0`.

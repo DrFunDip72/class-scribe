@@ -39,6 +39,22 @@ Update this list if the primary domain changes.
 
 Add a timestamped migration under `supabase/migrations/`, review grants/RLS, apply it to the selected project, then run both Supabase advisors. Use a forward corrective migration for rollback.
 
+## Worker-outage monitor
+
+The production health boundary is `GET /api/worker-health`. HTTP 200 with `{"status":"online"}` means a non-offline Supabase heartbeat is no more than 10 minutes old; HTTP 503 means offline or unknown. The response is deliberately public and Boolean-only so the GitHub monitor needs no Supabase or Vercel secret.
+
+`.github/workflows/worker-health-monitor.yml` checks it every five minutes using a standard public-repository runner. It opens one assigned `worker-offline` issue after three failed checks and closes it after recovery. A monthly `monitor-keepalive` branch update prevents the schedule from being disabled after 60 inactive days. Do not move the repository to private without first reviewing GitHub Actions minute billing, and do not change the workflow to a larger runner.
+
+Verify after deployment:
+
+```powershell
+Invoke-WebRequest https://class-scribe-ruddy.vercel.app/api/worker-health
+gh workflow run worker-health-monitor.yml
+gh run list --workflow worker-health-monitor.yml --limit 3
+```
+
+The owner must keep GitHub issue-assignment email notifications enabled. GitHub schedules are best-effort and may be delayed; this is an operational alert, not a real-time availability SLA.
+
 ## Recovery
 
 - Web: restore/promote the last verified Vercel deployment.

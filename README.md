@@ -18,6 +18,7 @@ Authenticated browser
   -> private saved result in Supabase
   -> privacy-safe Web Push completion alert
   -> optional privacy-safe FluxPrompt completion email
+  -> public Boolean health check -> GitHub outage issue/email
 ```
 
 The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the browser strips the video and creates compact speech audio on the user's device. The original video never uploads. Audio goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded audio is deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop pop-ups, completion email to the account address, or both. Result pages let the user copy just the study-guide summary, just the transcript, or everything together.
@@ -29,6 +30,7 @@ The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the bro
 - `worker.py` — sequential local processor
 - `worker-launcher.ps1` — persistent Windows worker/Ollama supervisor
 - `install-worker-task.ps1` — repeatable administrator installer for unattended startup and recovery triggers
+- `.github/workflows/worker-health-monitor.yml` — free external worker-outage monitor and recovery notifier
 - `docs/` — product, operations, security, deployment, and test handoff
 
 ## Start locally

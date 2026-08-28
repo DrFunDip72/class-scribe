@@ -25,10 +25,14 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 - A local-only FluxPrompt API key sent in the custom `api-key` header over outbound HTTPS; it never enters browser code, Vercel, or Supabase.
 - Privacy-safe HTML email bodies with only generic status, a public dashboard URL, and no class content or signed link.
 - Notification failure isolation: delivery retries cannot make a completed transcription fail.
+- Boolean-only public worker health RPC; anonymous callers cannot select heartbeat rows or see worker, queue, job, recording, or account metadata.
+- GitHub outage issues contain only generic operational status and never private educational data.
 
 ## Advisor notes
 
 Supabase reports warnings for the three authenticated SECURITY DEFINER functions. They are intentional narrow RPCs: anonymous execution is revoked, the user RPCs bind writes to `auth.uid()`, and the worker RPC checks protected JWT `app_metadata`.
+
+Supabase also reports one intentional anonymous SECURITY DEFINER warning for `worker_is_online()`. The function takes no input and returns one Boolean derived from heartbeat freshness. Anonymous table reads remain revoked; it exposes no row or timestamp. The permission is required for a credential-free external dead-man's-switch.
 
 Supabase also reports leaked-password protection disabled. That feature is not included on the Free plan. Use strong passwords; move to a plan that provides the feature before a high-risk/public launch.
 

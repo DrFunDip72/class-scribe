@@ -9,6 +9,9 @@
 - Moved the worker singleton mutex to the global Windows namespace so `SYSTEM` and interactive sessions cannot run separate queue workers.
 - Pointed unattended Ollama startup at the existing owner model store and added an ignored supervisor-state/log directory.
 - Documented installation, maintenance, recovery, privacy-safe logging, and the separate firmware requirement for automatic power restoration.
+- Added a zero-incremental-cost external outage monitor using a Boolean-only health route and standard GitHub Actions runner in the existing public repository.
+- Added deduplicated assigned GitHub outage issues, automatic recovery closure, three-attempt health checks, and a non-default monthly keepalive branch to prevent inactive-schedule shutdown.
+- Kept monitoring deterministic and free of AI, email APIs, private queue data, secrets, artifacts, caches, and paid/larger runners.
 
 ## 2026-08-24
 

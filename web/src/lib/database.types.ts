@@ -452,6 +452,10 @@ export type Database = {
         Args: { p_job_id: string }
         Returns: undefined
       }
+      worker_is_online: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       job_status:

@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-28
-**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
+**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, zero-incremental-cost external outage monitoring, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
 
 ## Live resources
 
@@ -24,6 +24,7 @@ No credentials are stored in this document.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
+- Boolean-only public worker health route plus a five-minute GitHub Actions monitor that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache.
 - Production Vercel deployment and production login/dashboard/result verification.
 - Production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk` includes optional email/browser channels, browser-side video extraction, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
@@ -42,6 +43,7 @@ No credentials are stored in this document.
 - A manual interactive `worker.py --once` launch while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, proving the global cross-session mutex blocks a second worker.
 - PowerShell parsing, Python compilation, and all 13 worker helper tests passed. The ignored `.worker-state`, `.worker-secrets`, and `.env.worker.local` paths remain untracked.
 - Worker heartbeat: online on version 1.3.1. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task.
+- Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
@@ -85,6 +87,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
+Confirm the GitHub health workflow runs on schedule, the owner receives assigned-issue email, and a planned outage opens one issue then closes it after recovery. Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

@@ -117,3 +117,11 @@ Run the local launcher as a Windows `SYSTEM` scheduled task with startup, logon,
 **Reason:** The prior interactive logon task stopped after its worker process was interrupted and its three automatic retries were exhausted. It also could not start after an unattended reboot until the owner signed in.
 
 **Consequence:** The task requires one administrator-approved installation but no stored Windows password or interactive login afterward. Because `SYSTEM` has a different profile, the launcher must use the owner's existing Ollama model directory explicitly. Planned maintenance must disable the task before stopping it, or the recurring trigger will restore it. The worker mutex uses the global Windows namespace so a manual user-session launch cannot overlap the `SYSTEM` worker; launcher locking and database claims add two more duplicate defenses. The worker remains outbound-only.
+
+## ADR-022 — Zero-Incremental-Cost External Worker Outage Alert
+
+Use a standard GitHub-hosted runner in the existing public repository to check a Boolean-only production health route every five minutes. After three unsuccessful checks, create one assigned GitHub issue; close it after recovery. Use the repository owner's normal GitHub issue email notification rather than an AI agent or email-delivery API.
+
+**Reason:** The local worker cannot report its own failure when its process, Task Scheduler, computer, power, or internet connection is down. GitHub runs outside that failure boundary, standard hosted runners are currently free and unlimited for public repositories, and issue notifications add no new vendor or billing account.
+
+**Consequence:** A public caller may learn only whether a worker heartbeat is currently fresh. Anonymous callers still cannot read the heartbeat table or any queue, recording, account, or result data. The intentionally anonymous `SECURITY DEFINER` RPC therefore produces an expected Supabase advisor warning. GitHub schedules can be delayed or dropped under load; the check is not a hard real-time guarantee. A monthly keepalive commit on a non-default branch prevents GitHub's documented 60-day inactive-public-repository schedule shutdown. Provider terms cannot be guaranteed forever, so this design must remain on standard public-repository runners with no artifacts, caches, larger runners, payment method, or new paid dependency.

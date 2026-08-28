@@ -15,6 +15,10 @@ Windows startup task -> worker.py
   -> Ollama qwen3:4b on 127.0.0.1
   -> signed Web Push -> browser service worker -> OS notification
   -> FluxPrompt Email Agent -> account email with dashboard link
+
+GitHub Actions schedule -> Vercel /api/worker-health
+  -> Boolean-only Supabase RPC
+  -> assigned GitHub outage issue -> owner email notification
 ```
 
 ## Web application
@@ -41,6 +45,14 @@ Supabase is the durable coordination layer:
 The Windows scheduled task starts Ollama if needed, then `worker.py`. The worker signs in as a dedicated Auth user tagged with `app_metadata.role=worker`, polls over outbound HTTPS, claims exactly one oldest job, downloads it, transcribes, summarizes, saves results, records a completion event, and deletes the source object.
 
 A global cross-session Windows named mutex prevents duplicate worker processes even when the scheduled task runs as `SYSTEM` and a manual launch runs in the owner's desktop session. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
+
+## External worker monitoring
+
+The public `GET /api/worker-health` route calls a narrow `worker_is_online()` RPC. The RPC returns only whether any non-offline heartbeat is at most 10 minutes old. Anonymous callers cannot select `worker_heartbeats`, and the response contains no worker identifier, timestamp, task state, queue count, job data, or user data.
+
+A standard GitHub-hosted runner checks this route every five minutes and retries three times. If it cannot confirm health, it opens one `worker-offline` issue assigned to the repository owner; GitHub delivers the owner's configured issue notification email. The workflow closes the same issue after recovery, preventing repeated outage mail every five minutes. A monthly commit on the separate `monitor-keepalive` branch prevents GitHub's 60-day inactive-public-repository schedule shutdown without changing or deploying `main`.
+
+This monitoring uses no AI, email API, workflow artifact, cache, paid runner, or new provider. It remains subject to GitHub scheduler delay/drop behavior and to the continuing availability of the project's existing public-repository GitHub Free, Vercel Hobby, and Supabase Free allowances.
 
 ## Browser notifications
 

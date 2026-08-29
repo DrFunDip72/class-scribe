@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Check, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, ArrowRight, Check, CheckCheck, ClipboardCheck, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
 import { NotificationSettings } from "@/components/notification-settings";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
 
+type RecordingState = Database["public"]["Tables"]["recording_user_states"]["Row"];
+type RecordingStateUpdate = Database["public"]["Tables"]["recording_user_states"]["Update"];
 type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
   transcription_results: { summary: string; key_points: string[] } | null;
+  recording_user_states: RecordingState | null;
+  upload_batches: { created_at: string; file_count: number; label: string | null } | null;
 };
 type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 type UploadState = "idle" | "preparing" | "uploading" | "creating";
+type HistoryFilter = "todo" | "done" | "archived" | "all";
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -49,6 +54,15 @@ function relativeTime(value: string) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function copiedLabel(state: RecordingState | null) {
+  if (!state) return null;
+  if (state.everything_copied_at) return "Everything copied";
+  if (state.summary_copied_at && state.transcript_copied_at) return "Summary + transcript copied";
+  if (state.summary_copied_at) return "Summary copied";
+  if (state.transcript_copied_at) return "Transcript copied";
+  return null;
+}
+
 export function DashboardClient({ userId, userEmail }: { userId: string; userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,14 +75,20 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [preparationProgress, setPreparationProgress] = useState(0);
   const [preparationIndex, setPreparationIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [checkedAt, setCheckedAt] = useState(0);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("todo");
+  const [savingJobIds, setSavingJobIds] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     const [jobResponse, workerResponse] = await Promise.all([
-      supabase.from("transcription_jobs").select("*, transcription_results(summary, key_points)").order("created_at", { ascending: false }),
+      supabase
+        .from("transcription_jobs")
+        .select("*, transcription_results(summary, key_points), recording_user_states(*), upload_batches(created_at, file_count, label)")
+        .order("created_at", { ascending: false }),
       supabase.from("worker_heartbeats").select("*").order("last_seen_at", { ascending: false }),
     ]);
     if (!jobResponse.error) setJobs(jobResponse.data as Job[]);
@@ -87,7 +107,8 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   }, [refresh]);
 
   function addFiles(incoming: File[]) {
-    setError(null); setSuccess(null);
+    setError(null);
+    setSuccess(null);
     const combined = [...files, ...incoming];
     if (combined.length > MAX_FILES) { setError(`You can upload a maximum of ${MAX_FILES} recordings at once.`); return; }
     for (const file of incoming) {
@@ -101,7 +122,10 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
 
   async function submitBatch() {
     if (!files.length || uploadState !== "idle") return;
-    setUploadState("uploading"); setUploadCount(0); setError(null); setSuccess(null);
+    setUploadState("uploading");
+    setUploadCount(0);
+    setError(null);
+    setSuccess(null);
     const uploaded: string[] = [];
     const records: Array<{ job_id: string; original_filename: string; storage_path: string; size_bytes: number; mime_type: string }> = [];
     try {
@@ -134,13 +158,19 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       const { error: queueError } = await supabase.rpc("create_upload_batch", { p_label: label.trim(), p_files: records as unknown as Json });
       if (queueError) throw queueError;
       setSuccess(`${files.length} recording${files.length === 1 ? "" : "s"} added to the queue.`);
-      setFiles([]); setLabel(""); setUploadCount(0); setPreparationProgress(0); setPreparationIndex(0);
+      setFiles([]);
+      setLabel("");
+      setUploadCount(0);
+      setPreparationProgress(0);
+      setPreparationIndex(0);
       if (inputRef.current) inputRef.current.value = "";
       await refresh();
     } catch (caught) {
       if (uploaded.length) await supabase.storage.from("recordings").remove(uploaded);
       setError(caught instanceof Error ? caught.message : "The upload could not be completed.");
-    } finally { setUploadState("idle"); }
+    } finally {
+      setUploadState("idle");
+    }
   }
 
   async function retry(jobId: string) {
@@ -149,10 +179,112 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
     if (retryError) setError(retryError.message); else await refresh();
   }
 
+  async function saveRecordingState(job: Job, update: RecordingStateUpdate) {
+    setHistoryError(null);
+    setSavingJobIds((current) => [...current, job.id]);
+    const { data, error: stateError } = await supabase
+      .from("recording_user_states")
+      .upsert({ job_id: job.id, user_id: userId, ...update }, { onConflict: "job_id" })
+      .select()
+      .single();
+    setSavingJobIds((current) => current.filter((id) => id !== job.id));
+    if (stateError) {
+      setHistoryError(`Could not save the status for ${job.original_filename}. ${stateError.message}`);
+      return;
+    }
+    setJobs((current) => current.map((item) => item.id === job.id ? { ...item, recording_user_states: data } : item));
+  }
+
+  async function toggleDone(job: Job) {
+    if (job.recording_user_states?.done_at) {
+      await saveRecordingState(job, { done_at: null, archived_at: null });
+    } else {
+      await saveRecordingState(job, { done_at: new Date().toISOString(), archived_at: null });
+    }
+  }
+
+  async function toggleArchive(job: Job) {
+    if (job.recording_user_states?.archived_at) {
+      await saveRecordingState(job, { archived_at: null });
+    } else {
+      await saveRecordingState(job, {
+        done_at: job.recording_user_states?.done_at ?? new Date().toISOString(),
+        archived_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  async function archiveDoneInBatch(batchId: string) {
+    const jobIds = jobs
+      .filter((job) => job.batch_id === batchId && job.recording_user_states?.done_at && !job.recording_user_states.archived_at)
+      .map((job) => job.id);
+    if (!jobIds.length) return;
+    setHistoryError(null);
+    setSavingJobIds((current) => [...new Set([...current, ...jobIds])]);
+    const archivedAt = new Date().toISOString();
+    const { data, error: archiveError } = await supabase
+      .from("recording_user_states")
+      .update({ archived_at: archivedAt })
+      .in("job_id", jobIds)
+      .select();
+    setSavingJobIds((current) => current.filter((id) => !jobIds.includes(id)));
+    if (archiveError) {
+      setHistoryError(`Could not archive this batch. ${archiveError.message}`);
+      return;
+    }
+    const states = new Map(data.map((item) => [item.job_id, item]));
+    setJobs((current) => current.map((job) => states.has(job.id) ? { ...job, recording_user_states: states.get(job.id) ?? job.recording_user_states } : job));
+  }
+
   const activeWorker = workers.find((worker) => checkedAt - new Date(worker.last_seen_at).getTime() < 45000);
   const queueCount = jobs.filter((job) => job.status === "queued").length;
   const completeCount = jobs.filter((job) => job.status === "completed").length;
   const selectedBytes = files.reduce((total, file) => total + file.size, 0);
+  const todoCount = jobs.filter((job) => !job.recording_user_states?.archived_at && (job.status !== "completed" || !job.recording_user_states?.done_at)).length;
+  const doneCount = jobs.filter((job) => job.recording_user_states?.done_at && !job.recording_user_states.archived_at).length;
+  const archivedCount = jobs.filter((job) => job.recording_user_states?.archived_at).length;
+
+  const visibleJobs = jobs.filter((job) => {
+    const state = job.recording_user_states;
+    if (historyFilter === "todo") return !state?.archived_at && (job.status !== "completed" || !state?.done_at);
+    if (historyFilter === "done") return Boolean(state?.done_at && !state.archived_at);
+    if (historyFilter === "archived") return Boolean(state?.archived_at);
+    return true;
+  });
+
+  const batchGroups = visibleJobs.reduce<Array<{
+    id: string;
+    label: string;
+    createdAt: string;
+    totalCount: number;
+    doneCount: number;
+    archiveableCount: number;
+    jobs: Job[];
+  }>>((groups, job) => {
+    let group = groups.find((item) => item.id === job.batch_id);
+    if (!group) {
+      const allBatchJobs = jobs.filter((item) => item.batch_id === job.batch_id);
+      group = {
+        id: job.batch_id,
+        label: job.upload_batches?.label || `Upload from ${new Date(job.upload_batches?.created_at ?? job.created_at).toLocaleDateString()}`,
+        createdAt: job.upload_batches?.created_at ?? job.created_at,
+        totalCount: job.upload_batches?.file_count ?? allBatchJobs.length,
+        doneCount: allBatchJobs.filter((item) => item.recording_user_states?.done_at).length,
+        archiveableCount: allBatchJobs.filter((item) => item.recording_user_states?.done_at && !item.recording_user_states.archived_at).length,
+        jobs: [],
+      };
+      groups.push(group);
+    }
+    group.jobs.push(job);
+    return groups;
+  }, []);
+
+  const filters: Array<{ value: HistoryFilter; label: string; count: number }> = [
+    { value: "todo", label: "To do", count: todoCount },
+    { value: "done", label: "Done", count: doneCount },
+    { value: "archived", label: "Archived", count: archivedCount },
+    { value: "all", label: "All", count: jobs.length },
+  ];
 
   return <div className="dashboard-grid">
     <section className="dashboard-main">
@@ -176,8 +308,43 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       <NotificationSettings userId={userId} accountEmail={userEmail} />
 
       <div className="history-section">
-        <div className="card-heading"><div><h2>Recent recordings</h2><p>{completeCount} complete · {queueCount} waiting</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>
-        {loading ? <div className="empty-state compact"><LoaderCircle className="spin" /><p>Loading your recordings…</p></div> : jobs.length === 0 ? <div className="empty-state"><FileAudio /><h3>No recordings yet</h3><p>Your first upload will appear here.</p></div> : <div className="job-list">{jobs.map((job) => <article className="job-row" key={job.id}><div className={`job-status-icon ${job.status}`}>{job.status === "completed" ? <Check size={18} /> : job.status === "failed" ? <AlertCircle size={18} /> : job.status === "queued" ? <Clock3 size={18} /> : <LoaderCircle className="spin" size={18} />}</div><div className="job-info"><div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{job.status}</span></div><small>{job.stage} · {relativeTime(job.created_at)} · {formatBytes(job.size_bytes)}</small>{job.status !== "completed" && job.status !== "failed" && <div className="progress-track slim"><span style={{ width: `${job.progress}%` }} /></div>}{job.error_message && <p className="job-error">{job.error_message}</p>}</div>{job.status === "completed" ? <Link className="row-action" href={`/jobs/${job.id}`}>View notes <ArrowRight size={15} /></Link> : job.status === "failed" && job.attempt_count < 3 ? <button className="row-action" onClick={() => void retry(job.id)}><RotateCcw size={14} /> Retry</button> : <span className="percent">{job.progress}%</span>}</article>)}</div>}
+        <div className="card-heading history-heading"><div><h2>Your recordings</h2><p>{completeCount} complete · {queueCount} waiting</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>
+        <div className="history-filters" aria-label="Recording history filters">
+          {filters.map((filter) => <button key={filter.value} type="button" aria-pressed={historyFilter === filter.value} className={historyFilter === filter.value ? "active" : ""} onClick={() => setHistoryFilter(filter.value)}>{filter.label}<span>{filter.count}</span></button>)}
+        </div>
+        {historyError && <p className="inline-alert error history-alert" role="alert"><AlertCircle size={16} />{historyError}</p>}
+        {loading
+          ? <div className="empty-state compact"><LoaderCircle className="spin" /><p>Loading your recordings…</p></div>
+          : jobs.length === 0
+            ? <div className="empty-state"><FileAudio /><h3>No recordings yet</h3><p>Your first upload will appear here.</p></div>
+            : batchGroups.length === 0
+              ? <div className="empty-state compact"><CheckCheck /><h3>Nothing in this view</h3><p>Choose another filter to see your recordings.</p></div>
+              : <div className="batch-list">{batchGroups.map((batch) => <section className="batch-group" key={batch.id}>
+                <header className="batch-heading">
+                  <div><strong>{batch.label}</strong><small>{batch.doneCount} of {batch.totalCount} done · {relativeTime(batch.createdAt)}</small></div>
+                  {batch.archiveableCount > 0 && historyFilter !== "archived" && <button className="ghost-button batch-archive" type="button" disabled={batch.jobs.some((job) => savingJobIds.includes(job.id))} onClick={() => void archiveDoneInBatch(batch.id)}><Archive size={14} /> Archive done</button>}
+                </header>
+                <div className="job-list">{batch.jobs.map((job) => {
+                  const recordingState = job.recording_user_states;
+                  const copyLabel = copiedLabel(recordingState);
+                  const busy = savingJobIds.includes(job.id);
+                  return <article className={`job-row ${recordingState?.done_at ? "done" : ""} ${recordingState?.archived_at ? "archived" : ""}`} key={job.id}>
+                    <div className={`job-status-icon ${job.status} ${recordingState?.done_at ? "handled" : ""}`}>{recordingState?.done_at ? <CheckCheck size={18} /> : job.status === "completed" ? <Check size={18} /> : job.status === "failed" ? <AlertCircle size={18} /> : job.status === "queued" ? <Clock3 size={18} /> : <LoaderCircle className="spin" size={18} />}</div>
+                    <div className="job-info">
+                      <div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{recordingState?.archived_at ? "archived" : recordingState?.done_at ? "done" : job.status}</span></div>
+                      <small>{job.stage} · {relativeTime(job.created_at)} · {formatBytes(job.size_bytes)}</small>
+                      {copyLabel && <span className="copy-status"><ClipboardCheck size={13} />{copyLabel}</span>}
+                      {job.status !== "completed" && job.status !== "failed" && <div className="progress-track slim"><span style={{ width: `${job.progress}%` }} /></div>}
+                      {job.error_message && <p className="job-error">{job.error_message}</p>}
+                    </div>
+                    {job.status === "completed" ? <div className="job-actions">
+                      <Link className="row-action" href={`/jobs/${job.id}`}>View notes <ArrowRight size={15} /></Link>
+                      <button className={`row-action state-action ${recordingState?.done_at ? "active" : ""}`} type="button" disabled={busy} onClick={() => void toggleDone(job)}>{recordingState?.done_at ? <RotateCcw size={14} /> : <CheckCheck size={14} />}{recordingState?.done_at ? "Undo" : "Done"}</button>
+                      {recordingState?.done_at && <button className="row-action state-action" type="button" disabled={busy} onClick={() => void toggleArchive(job)}>{recordingState.archived_at ? <ArchiveRestore size={14} /> : <Archive size={14} />}{recordingState.archived_at ? "Restore" : "Archive"}</button>}
+                    </div> : job.status === "failed" && job.attempt_count < 3 ? <button className="row-action" onClick={() => void retry(job.id)}><RotateCcw size={14} /> Retry</button> : <span className="percent">{job.progress}%</span>}
+                  </article>;
+                })}</div>
+              </section>)}</div>}
       </div>
     </section>
     <aside className="dashboard-aside">

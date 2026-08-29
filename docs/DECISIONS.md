@@ -125,3 +125,11 @@ Use a standard GitHub-hosted runner in the existing public repository to check a
 **Reason:** The local worker cannot report its own failure when its process, Task Scheduler, computer, power, or internet connection is down. GitHub runs outside that failure boundary, standard hosted runners are currently free and unlimited for public repositories, and issue notifications add no new vendor or billing account.
 
 **Consequence:** A public caller may learn only whether a worker heartbeat is currently fresh. Anonymous callers still cannot read the heartbeat table or any queue, recording, account, or result data. The intentionally anonymous `SECURITY DEFINER` RPC therefore produces an expected Supabase advisor warning. GitHub schedules can be delayed or dropped under load; the check is not a hard real-time guarantee. A monthly keepalive commit on a non-default branch prevents GitHub's documented 60-day inactive-public-repository schedule shutdown. Provider terms cannot be guaranteed forever, so this design must remain on standard public-repository runners with no artifacts, caches, larger runners, payment method, or new paid dependency.
+
+## ADR-023 — Persistent Copied, Done, and Archived Recording State
+
+Store per-recording workflow metadata in a separate `recording_user_states` table protected by account ownership RLS. Record Summary, Transcript, and Everything copy timestamps only after a successful clipboard write. Keep Done as an explicit reversible user action, and permit only done recordings to carry a reversible Archive timestamp.
+
+**Reason:** Opening a result does not mean it was copied, and copying one section does not prove the user finished pasting or handling the recording. Users working through 12-file batches need exact persistent copy indicators, a deliberate checklist, batch progress, and a way to hide completed work.
+
+**Consequence:** Existing results begin as untouched and remain visible in `To do` until explicitly marked done. Copying Everything is displayed as coverage of both Summary and Transcript but does not auto-complete the recording. Archive changes only the dashboard view and never deletes results. Keeping this metadata separate prevents browser update grants from reaching worker-controlled job status, progress, attempts, or leases. Batch archive is limited to the signed-in account's already-done rows.

@@ -216,6 +216,50 @@ export type Database = {
         }
         Relationships: []
       }
+      recording_user_states: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          done_at: string | null
+          everything_copied_at: string | null
+          job_id: string
+          summary_copied_at: string | null
+          transcript_copied_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          done_at?: string | null
+          everything_copied_at?: string | null
+          job_id: string
+          summary_copied_at?: string | null
+          transcript_copied_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          done_at?: string | null
+          everything_copied_at?: string | null
+          job_id?: string
+          summary_copied_at?: string | null
+          transcript_copied_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_user_states_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "transcription_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transcription_jobs: {
         Row: {
           attempt_count: number

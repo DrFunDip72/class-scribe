@@ -35,7 +35,7 @@ Supabase is the durable coordination layer:
 
 - Auth owns users and sessions.
 - The private `recordings` bucket stores queued source audio.
-- Postgres stores batches, queue jobs, results, worker heartbeat, and completion events.
+- Postgres stores batches, queue jobs, results, account-owned recording workflow state, worker heartbeat, and completion events.
 - Postgres stores account preferences, browser push subscriptions, public notification configuration, durable per-device push deliveries, and a durable email outbox.
 - RLS makes user ownership authoritative.
 - `claim_next_job` uses `FOR UPDATE SKIP LOCKED` and recovers expired leases.
@@ -67,6 +67,14 @@ Email is an independent account-level opt-in. The browser may write only the low
 After a qualifying completion or failure, the worker writes a generic event to `completion_events` and calls the FluxPrompt Email Agent over outbound HTTPS. The API key exists only in ignored `.env.worker.local`, is sent only in the `api-key` header, and never reaches Vercel, Supabase, or browser code. The four FluxPrompt variable inputs remain in the agent-required order: subject, HTML body, account recipient, and an empty attachment value. Calls use a unique session ID and retry up to three times with backoff.
 
 The responsive HTML email contains a Class Scribe heading, status text, and `https://class-scribe-ruddy.vercel.app/dashboard`. It intentionally excludes filenames, transcripts, summaries, and signed links. Users must authenticate at the dashboard to see private results.
+
+## Recording workflow state
+
+`recording_user_states` stores one account-owned row per transcription job. Separate timestamps record successful Summary, Transcript, and Everything clipboard actions, explicit Done state, and reversible Archive state. The table is intentionally separate from `transcription_jobs`: authenticated browsers can manage their own workflow metadata without receiving update permission on queue status, leases, attempts, progress, or other worker-controlled fields.
+
+The result page writes a copy timestamp only after `navigator.clipboard.writeText` succeeds. A tracking-write failure cannot undo a successful clipboard operation and is reported as a non-blocking warning. Done is always explicit because copying does not prove that the user pasted or finished handling the result. Archive is a view state only and never removes the transcript, summary, or result row.
+
+The dashboard joins the state and upload-batch metadata into its existing read. It defaults to unfinished, unarchived recordings; provides Done, Archived, and All filters; reports done progress against each batch's original file count; and can archive all currently done rows in one account-scoped update. All state reads and writes remain behind ownership RLS.
 
 ## Lifecycle
 

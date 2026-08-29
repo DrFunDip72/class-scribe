@@ -12,9 +12,10 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const [{ data: job }, { data: result }] = await Promise.all([
+  const [{ data: job }, { data: result }, { data: recordingState }] = await Promise.all([
     supabase.from("transcription_jobs").select("*").eq("id", id).maybeSingle(),
     supabase.from("transcription_results").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("recording_user_states").select("*").eq("job_id", id).maybeSingle(),
   ]);
   if (!job) notFound();
   if (!result) {
@@ -24,7 +25,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const transcriptNotes = `# ${job.original_filename}\n\n## Transcript\n\n${result.transcript}\n`;
   const notes = `${summaryNotes}\n## Transcript\n\n${result.transcript}\n`;
   return <main className="app-shell"><AppHeader email={user.email ?? "Account"} /><article className="result-shell">
-    <div className="result-topbar"><Link className="back-link" href="/dashboard"><ArrowLeft size={15} /> Dashboard</Link><ResultActions filename={job.original_filename} summaryContent={summaryNotes} transcriptContent={transcriptNotes} allContent={notes} /></div>
+    <div className="result-topbar"><Link className="back-link" href="/dashboard"><ArrowLeft size={15} /> Dashboard</Link><ResultActions filename={job.original_filename} jobId={job.id} userId={user.id} initialState={recordingState} summaryContent={summaryNotes} transcriptContent={transcriptNotes} allContent={notes} /></div>
     <header className="result-header"><span className="result-file-icon"><FileAudio /></span><div><span className="section-kicker">Completed lecture</span><h1>{job.original_filename}</h1><p><CheckCircle2 size={15} /> Processed {job.completed_at ? new Date(job.completed_at).toLocaleString() : "successfully"}{result.detected_language ? ` · ${result.detected_language.toUpperCase()}` : ""}</p></div></header>
     <section className="notes-section summary-section"><span className="section-number">01</span><div><h2>Summary</h2><p className="summary-copy">{result.summary}</p></div></section>
     <div className="notes-columns"><section className="notes-section"><span className="section-number">02</span><div><h2>Key points</h2><ul className="point-list">{result.key_points.map((point, index) => <li key={index}><CheckCircle2 size={17} />{point}</li>)}</ul></div></section><section className="notes-section"><span className="section-number">03</span><div><h2>Action items</h2>{result.action_items.length ? <ul className="point-list action-list">{result.action_items.map((item, index) => <li key={index}><Circle size={16} />{item}</li>)}</ul> : <p className="muted-copy">No action items were identified.</p>}</div></section></div>

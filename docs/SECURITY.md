@@ -8,6 +8,7 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 
 - Supabase email/password Auth and protected app routes.
 - RLS on all exposed project tables.
+- Account-owned copy/Done/Archive metadata lives in a separate RLS table; browser users retain no update permission on worker-controlled transcription jobs.
 - Private Storage with UUID-prefixed ownership policies.
 - Browser validation plus authoritative database/bucket limits.
 - Local video preprocessing: original MP4/WebM/MOV/M4V/MKV files never leave the user's device; only compact derived audio uploads.

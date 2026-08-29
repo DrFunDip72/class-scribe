@@ -12,7 +12,8 @@ Give students a simple account-based website that converts class recordings into
 4. The owner's Windows computer processes the oldest job one at a time.
 5. Return to a dashboard showing status and saved study notes.
 6. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
-7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown.
+7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
+8. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
 
 The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
 
@@ -45,6 +46,9 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - `Copy -> Transcript` copies only the title and full transcript.
 - `Copy -> Everything` copies the complete study notes and transcript.
 - `Download notes` continues to download everything as a Markdown file.
+- A successful clipboard write records which target was copied. Copying `Everything` counts as both the summary and transcript for display purposes, but copying never marks a recording done automatically.
+- `Mark done` is an explicit reversible check after the user has pasted or otherwise handled the recording. `Archive` hides a done recording from active work without deleting it; `Restore` and `Mark not done` are reversible.
+- The dashboard defaults to `To do` and also provides `Done`, `Archived`, and `All` filters. Upload-batch headings report progress such as `8 of 12 done`, and `Archive done` hides every handled recording in that batch at once.
 - On screens 640 CSS pixels wide or narrower, Copy choices open as a bottom action sheet that stays within the visible viewport and respects the device safe area. Tapping outside, the close control, or pressing Escape dismisses it.
 
 ## Completion notifications

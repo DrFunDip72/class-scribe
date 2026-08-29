@@ -2,6 +2,14 @@
 
 ## 2026-08-28
 
+### Recording workflow
+
+- Added persistent per-recording checkmarks for successful Summary, Transcript, and Everything copy actions.
+- Added explicit Done/Undo and reversible Archive/Restore actions without deleting saved notes.
+- Added To do, Done, Archived, and All dashboard filters plus per-batch `x of y done` progress.
+- Added one-click `Archive done` for each upload batch and persistent cross-device state behind account-isolated RLS.
+- Kept workflow metadata separate from worker-controlled queue jobs and preserved the 320-pixel mobile baseline.
+
 ### Reliability
 
 - Replaced the one-shot launcher with a persistent Ollama/worker supervisor that retries local-service startup and relaunches the queue worker after any exit.

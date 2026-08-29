@@ -59,4 +59,3 @@ using ((select auth.uid()) = user_id);
 
 revoke all on public.recording_user_states from anon, authenticated;
 grant select, insert, update, delete on public.recording_user_states to authenticated;
-

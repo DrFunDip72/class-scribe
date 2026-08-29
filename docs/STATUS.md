@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-08-28
-**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, zero-incremental-cost external outage monitoring, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, selective copy actions, and a mobile-first interface.
+**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, zero-incremental-cost external outage monitoring, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface.
 
 ## Live resources
 
@@ -32,6 +32,7 @@ No credentials are stored in this document.
 - Independent opt-in email controls using the signed-in account email, shared batch/per-recording/failure preferences, a branded privacy-safe HTML template, and durable FluxPrompt delivery retries from the outbound local worker.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
+- Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 - Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
 
@@ -72,7 +73,13 @@ No credentials are stored in this document.
 - Oversized-video path: a valid 57.3 MB MP4 was accepted, converted locally to a 55 KB M4A, uploaded, transcribed, summarized, rendered, and fully cleaned up.
 - Deployed browser boundary: the public production dashboard accepted a synthetic 57.3 MB MP4 and labeled it for local extraction without uploading it; the disposable account was then removed and Storage remained empty.
 - Vercel post-deployment health: no runtime errors or warning/error logs for the new deployment.
-- Supabase performance advisor: only one expected unused heartbeat-index informational notice after consolidating the duplicate read policy.
+- Recording workflow migration `recording_user_states`: applied to production with account-owner RLS and no browser write grant on worker-controlled jobs. Owner upsert passed; a simulated cross-account insert failed with PostgreSQL `42501`.
+- Twelve-recording workflow QA: initial To do state, persistent Summary copy, Done/Undo, Archive/Restore, bulk batch archive, filters, and `2 of 12 done` progress all passed locally and on the production database.
+- Recording workflow mobile QA: the new dashboard initially exposed a min-content overflow at 320 x 568; the corrected layout reports `scrollWidth === innerWidth`, no visible sub-44-pixel controls, a fully bounded Copy sheet, zero WCAG 2 A/AA violations, and no browser page errors.
+- Production deployment `dpl_3mV6YVvTVyYRCkjRqy68FyUCpQMs`: Ready on the public alias. Authenticated dashboard/result workflow passed at 320 pixels; the saved Summary check persisted across deployments; current-deployment warning/error/fatal runtime logs were empty.
+- Production availability after the workflow release: landing page HTTP 200 and worker-health HTTP 200 with `{"status":"online"}`. The disposable 12-recording account and all cascaded database rows were removed; zero QA Storage objects remain.
+- GitHub `main`: workflow implementation pushed in commit `a4b4ab6`.
+- Supabase performance advisor: only expected low-traffic unused-index informational notices for the heartbeat and pending-email indexes; no recording-state finding.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
 
 ## Supabase Auth policy

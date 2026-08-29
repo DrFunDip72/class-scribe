@@ -1,5 +1,24 @@
 # Testing and Verification
 
+## Persistent copied, Done, and Archive workflow — PASS
+
+**Date:** 2026-08-28
+**Environment:** local Next.js development app, production Supabase, production Vercel deployment `dpl_3mV6YVvTVyYRCkjRqy68FyUCpQMs`, Chromium automation, and a disposable immediate-session account with one synthetic 12-recording completed batch.
+
+1. Applied production migration `recording_user_states`. Generated project types matched the committed table shape, and the applied migration version matches the repository filename.
+2. An authenticated-owner simulation successfully upserted and selected only its own state row inside a rolled-back transaction. A simulated second account attempting to attach state to another user's job was rejected by RLS with PostgreSQL `42501`.
+3. Twelve completed synthetic recordings initially appeared as `To do 12`, `Done 0`, `Archived 0`, with batch progress `0 of 12 done`; historical results therefore require no inferred or destructive backfill.
+4. Copying Summary wrote the clipboard first, persisted `summary_copied_at`, rendered a saved checkmark after reopening the Copy menu, and displayed `Summary copied` on the dashboard. Summary, Transcript, and Everything remain independently tracked; Everything is interpreted as coverage of both sections without auto-marking Done.
+5. Dashboard and result actions exercised Mark done, Mark not done/Undo, Archive, Restore, and per-batch `Archive done`. Filters and counts changed correctly, and batch progress reached `2 of 12 done` while archived results remained retrievable.
+6. The first 320 x 568 dashboard pass exposed a 49-pixel min-content overflow in the new grid child. Adding `min-width: 0` to the dashboard main column reduced `body.scrollWidth` to exactly 320. The production dashboard and open result Copy sheet then had no horizontal overflow, no visible control smaller than 44 by 44 CSS pixels, and the 300-pixel sheet remained inside the viewport.
+7. Axe-core WCAG 2 A/AA reported zero violations on the open production Copy sheet. Browser page-error collection was empty, and the saved Summary check persisted from local testing to the public deployment.
+8. Final `npm run lint`, `npm run build`, and all 13 worker helper tests passed. `git diff --check` passed after normalizing the new migration ending.
+9. Supabase advisors reported no new recording-state security or performance issue. Existing intentional guarded SECURITY DEFINER warnings, unavailable Free-plan leaked-password protection, and low-traffic unused-index notices remain documented.
+10. The first file-based deployment candidate built successfully but lacked the two public Supabase build variables and returned a middleware 500. Runtime logs identified the exact cause; it was immediately replaced by `dpl_3mV6YVvTVyYRCkjRqy68FyUCpQMs`, which reached Ready on the public alias using only the browser-public Supabase URL and publishable key. The corrected deployment served the authenticated workflow and produced no warning/error/fatal runtime logs during the final check.
+11. The public site and Boolean worker-health endpoint both returned HTTP 200, with `{"status":"online"}` from the health route. The disposable Auth user and all 12 batches/jobs/results plus two state rows were cascade-deleted, and zero test Storage objects remained.
+
+**Result:** PASS.
+
 ## External worker-outage monitor — IMPLEMENTED, PRODUCTION WORKFLOW PENDING
 
 **Date:** 2026-08-28

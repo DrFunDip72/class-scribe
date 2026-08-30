@@ -45,7 +45,7 @@ Add a timestamped migration under `supabase/migrations/`, review grants/RLS, app
 
 The production health boundary is `GET /api/worker-health`. HTTP 200 with `{"status":"online"}` means a non-offline Supabase heartbeat is no more than 10 minutes old; HTTP 503 means offline or unknown. The response is deliberately public and Boolean-only so the GitHub monitor needs no Supabase or Vercel secret.
 
-`.github/workflows/worker-health-monitor.yml` checks it every five minutes using a standard public-repository runner. It opens one assigned `worker-offline` issue after three failed checks and closes it after recovery. A monthly `monitor-keepalive` branch update prevents the schedule from being disabled after 60 inactive days. Do not move the repository to private without first reviewing GitHub Actions minute billing, and do not change the workflow to a larger runner.
+`.github/workflows/worker-health-monitor.yml` requests a check every five minutes using a standard public-repository runner. It opens one assigned `worker-offline` issue after three failed checks and closes it after recovery. A monthly `monitor-keepalive` branch update prevents the schedule from being disabled after 60 inactive days. GitHub scheduled events are best-effort: production observation on 2026-08-30 found successful-run gaps up to about 6 hours 37 minutes, so this scheduler is not sufficient for a prompt-notification guarantee. Do not move the repository to private without first reviewing GitHub Actions minute billing, and do not change the workflow to a larger runner.
 
 Verify after deployment:
 

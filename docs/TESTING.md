@@ -19,9 +19,9 @@
 
 **Result:** PASS.
 
-## External worker-outage monitor — IMPLEMENTED, PRODUCTION WORKFLOW PENDING
+## External worker-outage monitor — PARTIALLY VERIFIED, SCHEDULER GAP
 
-**Date:** 2026-08-28
+**Date:** 2026-08-28 and 2026-08-30
 
 1. Applied production migrations `public_worker_health_check` and `limit_worker_health_rpc_permissions`.
 2. Verified `worker_is_online()` returned `true`, `anon` could execute only the Boolean RPC, `authenticated` had no redundant grant, and `anon` still could not select `worker_heartbeats`.
@@ -30,8 +30,12 @@
 5. A local production server connected to production Supabase returned HTTP 200, `Cache-Control: no-store, max-age=0`, and exactly `{"status":"online"}`.
 6. Prettier parsed the GitHub workflow successfully and `git diff --check` passed.
 7. The workflow uses a standard public-repository runner, no artifacts/caches, three health attempts, one deduplicated assigned outage issue, automatic recovery closure, and a monthly non-default-branch keepalive.
+8. The production Vercel route returned HTTP 200, `Cache-Control: no-store, max-age=0`, and exactly `{"status":"online"}` on 2026-08-30.
+9. GitHub reported the workflow active. Eight scheduled runs completed successfully, and the initial manual negative-path run opened issue `#1`, labeled it `worker-offline`, and assigned it to the repository owner. The next successful scheduled run closed the issue with the recovery comment.
+10. The scheduled runs did not occur near the configured five-minute interval. Observed gaps reached approximately 6 hours 37 minutes, consistent with GitHub's documented best-effort scheduled-event behavior. Receipt of the issue-assignment email remains owner-operated and unverified.
+11. Ignored `.env.worker.local`, `.worker-secrets`, and `web/.env.local` files remain untracked. Unrelated in-progress Auth page changes were left untouched.
 
-**Result:** code, production database boundary, local API route, build, and static workflow checks pass. Production Vercel deployment, scheduled/manual GitHub run, owner email receipt, and a planned outage/recovery drill remain to be verified.
+**Result:** health detection, production deployment, issue creation/deduplication, assignment, and recovery closure pass. Do not call the notification goal complete: the free GitHub schedule is materially less frequent than configured, owner email receipt is unverified, and a planned worker outage/recovery drill remains.
 
 ## Optional completion email — IMPLEMENTED, LIVE SEND PENDING
 

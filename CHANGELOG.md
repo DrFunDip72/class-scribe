@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-30
+
+### Verification
+
+- Verified the production Boolean health endpoint and GitHub outage issue open/assign/close lifecycle.
+- Recorded that GitHub's free best-effort scheduler produced multi-hour gaps despite a five-minute cron expression; dependable prompt notification and owner email receipt remain unfinished.
+
 ## 2026-08-28
 
 ### Recording workflow

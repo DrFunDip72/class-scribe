@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-08-28
-**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, zero-incremental-cost external outage monitoring, 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface.
+**Last updated:** 2026-08-30
+**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, and a functioning but not yet acceptance-complete zero-incremental-cost external outage monitor; the product also supports 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface.
 
 ## Live resources
 
@@ -24,7 +24,7 @@ No credentials are stored in this document.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
-- Boolean-only public worker health route plus a five-minute GitHub Actions monitor that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache.
+- Boolean-only public worker health route plus a GitHub Actions monitor configured every five minutes that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache. GitHub's free scheduled-event delivery is best-effort and has not met the configured interval reliably.
 - Production Vercel deployment and production login/dashboard/result verification.
 - Production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk` includes optional email/browser channels, browser-side video extraction, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
@@ -79,6 +79,9 @@ No credentials are stored in this document.
 - Production deployment `dpl_3mV6YVvTVyYRCkjRqy68FyUCpQMs`: Ready on the public alias. Authenticated dashboard/result workflow passed at 320 pixels; the saved Summary check persisted across deployments; current-deployment warning/error/fatal runtime logs were empty.
 - Production availability after the workflow release: landing page HTTP 200 and worker-health HTTP 200 with `{"status":"online"}`. The disposable 12-recording account and all cascaded database rows were removed; zero QA Storage objects remain.
 - GitHub `main`: workflow implementation pushed in commit `a4b4ab6`.
+- On 2026-08-30, the live health route again returned HTTP 200 with exactly `{"status":"online"}` and `Cache-Control: no-store, max-age=0`; the Windows task was Running.
+- The external monitor is active and completed eight scheduled checks successfully. Its first manual negative-path run opened one owner-assigned `worker-offline` issue, and the next successful scheduled check closed that issue after recovery, proving issue deduplication and recovery closure in production.
+- GitHub did not deliver the configured five-minute schedule reliably: observed successful runs had gaps up to about 6 hours 37 minutes. Owner email receipt is still unverified, so outage notification is not yet acceptance-complete.
 - Supabase performance advisor: only expected low-traffic unused-index informational notices for the heartbeat and pending-email indexes; no recording-state finding.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
 
@@ -94,6 +97,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Confirm the GitHub health workflow runs on schedule, the owner receives assigned-issue email, and a planned outage opens one issue then closes it after recovery. Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
+Replace or supplement the best-effort GitHub schedule with a genuinely dependable zero-cost external interval, then confirm the owner receives its email and run a planned worker outage/recovery drill. The GitHub issue open/close logic itself has passed. Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

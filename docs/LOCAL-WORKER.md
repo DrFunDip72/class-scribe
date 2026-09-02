@@ -12,7 +12,7 @@
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker`, running as Windows `SYSTEM` |
-| Worker version | `1.3.1` |
+| Worker version | `1.4.1` |
 | Push library | `pywebpush` 2.4.0 |
 | Email transport | FluxPrompt Email Agent over outbound HTTPS |
 
@@ -25,6 +25,8 @@ Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase
 `VAPID_SUBJECT` identifies the Web Push sender and defaults to the production site URL. On its first authenticated start, the worker creates `.worker-secrets/vapid_private_key.pem`, publishes only the corresponding public key to Supabase, and restricts the local file permissions where Windows permits. Back up this private key securely with the worker credentials. Losing or replacing it invalidates existing browser subscriptions; users must enable notifications again.
 
 `FLUXPROMPT_API_KEY` is the only required email secret. Add it to ignored `.env.worker.local`; never add it to Vercel, Supabase, a `NEXT_PUBLIC_` variable, Git, logs, or chat. `FLUXPROMPT_API_URL`, `FLUXPROMPT_FLOW_ID`, and `SITE_URL` have production defaults in `.env.worker.example`. Restart the startup task after changing the file. With no key, transcription and Web Push continue normally and opted-in email events wait durably.
+
+FFmpeg is required for worker-side decoding. The worker checks optional `FFMPEG_PATH`, the process PATH, the owner's standard WinGet FFmpeg package location, and common machine-wide locations. This works under the `SYSTEM` startup task even though that account has a different profile. The worker passes decoded NumPy audio to `faster-whisper`; it does not load PyAV, whose unsigned native extension is blocked by Windows Smart App Control on this computer.
 
 `bootstrap-worker-auth.py` creates local bootstrap material for an administrator to provision the dedicated Auth row with `app_metadata.role=worker`. Its generated JSON and local environment are ignored. Revoke the old Auth identity before provisioning a replacement computer.
 
@@ -79,8 +81,9 @@ Start-ScheduledTask -TaskName AudioTranscriberWorker
 - Heartbeat is sent while idle and at progress changes.
 - Lease: 20 minutes, refreshed during work.
 - Maximum attempts: 3.
-- Temporary audio: `.worker-temp`, removed in `finally`.
-- Completed source object: deleted only after result and completion event are saved.
+- Temporary downloaded/decoded audio: `.worker-temp`, removed in `finally`.
+- Multipart jobs: parts download and transcribe in order, timestamps are offset into one result, and only one part is processed locally at a time.
+- Completed source objects: every remote part is deleted only after the result and completion event are saved.
 - Push deliveries: durable, attempted separately after result commit, up to three attempts with exponential backoff.
 - Email deliveries: durable, recheck opt-in immediately before sending, then call FluxPrompt separately with up to three attempts and exponential backoff.
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
@@ -103,6 +106,7 @@ The public route exposes only `online` or `offline`. It contains no filename, tr
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
 - **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
 - **Model missing:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3:4b`.
+- **FFmpeg unavailable:** run `Get-Command ffmpeg`; if the `SYSTEM` task still cannot find it, set the exact executable path as `FFMPEG_PATH` in ignored `.env.worker.local`, then restart the task.
 - **No browser pop-up:** verify worker version `1.3.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.
 - **No completion email:** confirm the account enabled Email, verify `FLUXPROMPT_API_KEY` is set locally, restart the startup task, and inspect only the safe state/error metadata in `completion_events`. Do not log the recipient, HTML body, API key, or API response body.
 - **Private push key replaced:** restart the worker, then ask each user to disable and re-enable notifications on every desired device.

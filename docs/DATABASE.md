@@ -5,7 +5,8 @@ Committed migrations under `supabase/migrations/` are authoritative and have bee
 ## Tables
 
 - `upload_batches` — owner, label, file count, timestamps.
-- `transcription_jobs` — owner, storage path, display metadata, FIFO status, progress, attempts, claim/lease, and safe errors.
+- `transcription_jobs` — owner, first-part compatibility path, logical display metadata, FIFO status, progress, attempts, claim/lease, and safe errors.
+- `transcription_job_parts` — ordered private Storage-object manifest for a logical job; each object is at most 50 MB and owner/worker readable through RLS.
 - `transcription_results` — transcript, segments, summary, key points, action items, language, duration, and model metadata.
 - `recording_user_states` — one owner-controlled row per job with separate Summary/Transcript/Everything copy timestamps plus reversible Done and Archive timestamps.
 - `worker_heartbeats` — worker state, active job, version, and last seen.
@@ -20,7 +21,7 @@ Notification tables added by `web_push_notifications`:
 - `notification_preferences` — enabled email channel, JWT-locked account address, and shared batch/per-recording/failure settings for each account.
 - `push_notification_deliveries` — worker-only durable per-device delivery outbox with attempts, backoff, and sent state.
 
-- `create_upload_batch(label, files)` validates authentication, 1-20 items, supported media, 50 MB per item, user-prefixed paths, then creates the batch and jobs atomically.
+- `create_upload_batch(label, files)` validates authentication, 1-20 logical recordings, 1-32 ordered parts per recording, supported audio types, exact owner/job/part paths, 50 MB per object, and 1 GB per logical recording, then creates the batch, jobs, and manifests atomically. The legacy one-object payload remains temporarily accepted for already-open browser tabs.
 - `retry_transcription_job(job_id)` checks ownership, failed status, and remaining attempts.
 - `claim_next_job(worker_id)` requires the dedicated worker JWT role (or service role), recovers stale leases, and atomically claims the oldest eligible row with `SKIP LOCKED`.
 
@@ -32,7 +33,7 @@ Authenticated users can see only rows where `user_id = auth.uid()`. They cannot 
 
 ## Storage
 
-Bucket `recordings` is private, accepts the supported audio/video MIME types, and enforces a 50 MB object limit. Paths begin with the uploading user's UUID. User policies validate that first path segment. Worker policies permit authenticated read/delete only when `is_worker()` is true.
+Bucket `recordings` is private, accepts supported audio MIME types (plus legacy video types), and enforces a 50 MB object limit. Multipart paths are exactly `<user UUID>/<job UUID>/part-NNNN.<audio extension>`. User policies validate the owner prefix; the batch RPC validates the full ordered manifest. Worker policies permit authenticated read/delete only when `is_worker()` is true.
 
 ## Migration history
 
@@ -49,5 +50,7 @@ The timestamped `web_push_notifications` migration adds public-key configuration
 The timestamped `email_completion_notifications` migration adds account-email preferences, strengthens preference RLS, converts the original completion-event placeholder into the retryable email outbox, and marks pre-feature placeholder rows delivered so no historical job sends retroactively.
 
 The timestamped `recording_user_states` migration adds persistent account-scoped copy, Done, and Archive state without granting the browser any write access to worker-controlled queue rows.
+
+The timestamped `multipart_recordings` and `optimize_recording_parts_policies` migrations add ordered job parts, lift the logical job size to a 1 GB safety ceiling while retaining 50 MB per object, update the atomic batch RPC, combine owner/worker part reads, and add the part-owner index.
 
 Use forward migrations; never reset the production database.

@@ -3,8 +3,8 @@
 ```text
 Vercel-hosted Next.js browser
   |  Supabase Auth session
-  |  video input: local lazy read -> mono AAC/M4A
-  |  direct upload (private bucket)
+  |  video/oversized audio: local lazy read -> mono AAC/M4A parts
+  |  direct or resumable upload (private bucket; <=50 MB/object)
   v
 Supabase Auth + Postgres + Storage
   ^
@@ -23,9 +23,11 @@ GitHub Actions schedule -> Vercel /api/worker-health
 
 ## Web application
 
-The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refreshes sessions and protects `/dashboard` and `/jobs/*`. Direct audio uploads to Storage unchanged. Video input is dynamically handled by pinned Mediabunny packages: a lazy `BlobSource` uses an 8 MiB read cache, the video track is discarded, and the primary audio track is decoded and encoded as mono 16 kHz, 48 kbps AAC in M4A. Conversion and upload happen sequentially so a 20-file selection does not process every video in memory at once.
+The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refreshes sessions and protects `/dashboard` and `/jobs/*`. Audio at 50 MB or below uploads unchanged. Oversized audio and every video are dynamically handled by pinned Mediabunny packages: a lazy `BlobSource` uses an 8 MiB read cache, any video track is discarded, and the primary audio track is decoded and encoded as mono 16 kHz, 48 kbps AAC in M4A. Output is trimmed into 90-minute parts, capped at 32 parts, and yielded one at a time so a 20-file selection does not encode every source or retain every output part in memory at once.
 
-After every selected file has uploaded, the browser calls `create_upload_batch` once so all file metadata and jobs are inserted atomically. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
+Objects at or below 6 MB use the standard Storage upload. Larger objects use Supabase's TUS endpoint with 6 MB chunks, retry delays, and browser upload fingerprint resumption. TUS improves interrupted-transfer recovery but does not bypass the Free plan's 50 MB per-object cap; the multipart recording design handles that cap.
+
+After every selected file has uploaded, the browser calls `create_upload_batch` once so all part metadata and logical jobs are inserted atomically. One selected source always creates one job even when it has many parts. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
 
 Vercel serves the application code but does not receive media and performs no inference. The original video never leaves the browser; only derived audio is sent directly to Supabase. This avoids Vercel Function payload/duration limits and keeps the cloud portion inexpensive.
 
@@ -34,15 +36,17 @@ Vercel serves the application code but does not receive media and performs no in
 Supabase is the durable coordination layer:
 
 - Auth owns users and sessions.
-- The private `recordings` bucket stores queued source audio.
-- Postgres stores batches, queue jobs, results, account-owned recording workflow state, worker heartbeat, and completion events.
+- The private `recordings` bucket stores queued direct audio or prepared audio parts.
+- Postgres stores batches, queue jobs, ordered job-part manifests, results, account-owned recording workflow state, worker heartbeat, and completion events.
 - Postgres stores account preferences, browser push subscriptions, public notification configuration, durable per-device push deliveries, and a durable email outbox.
 - RLS makes user ownership authoritative.
 - `claim_next_job` uses `FOR UPDATE SKIP LOCKED` and recovers expired leases.
 
 ## Worker
 
-The Windows scheduled task starts Ollama if needed, then `worker.py`. The worker signs in as a dedicated Auth user tagged with `app_metadata.role=worker`, polls over outbound HTTPS, claims exactly one oldest job, downloads it, transcribes, summarizes, saves results, records a completion event, and deletes the source object.
+The Windows scheduled task starts Ollama if needed, then `worker.py`. The worker signs in as a dedicated Auth user tagged with `app_metadata.role=worker`, polls over outbound HTTPS, and claims exactly one oldest job. It downloads and transcribes that job's ordered parts sequentially, offsets timestamps into one continuous transcript, creates one summary/result, records a completion event, and deletes every remote part only after result commit. Legacy one-object jobs remain readable during rollout.
+
+System FFmpeg decodes each downloaded part to mono 16 kHz float audio before inference. `faster-whisper` still runs the pinned `small` model on CPU INT8; bypassing PyAV avoids an unsigned native extension blocked by Windows Smart App Control and uses the already installed FFmpeg runtime instead.
 
 A global cross-session Windows named mutex prevents duplicate worker processes even when the scheduled task runs as `SYSTEM` and a manual launch runs in the owner's desktop session. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
 
@@ -79,8 +83,8 @@ The dashboard joins the state and upload-batch metadata into its existing read. 
 ## Lifecycle
 
 ```text
-local video extraction (when needed) -> audio upload -> queued -> transcribing -> summarizing -> completed
-                         \-> failed -> user retry -> queued
+local preparation (when needed) -> part upload(s) -> one queued job -> sequential part transcription -> one summary -> completed
+                                             \-> failed -> user retry -> queued
 ```
 
 Claims have a 20-minute lease that the worker refreshes while processing. A stale in-progress job is returned to the queue if attempts remain. Attempts are capped at three.
@@ -95,4 +99,4 @@ The web UI is designed from a 320 CSS-pixel minimum viewport upward. Flex and gr
 
 ## Privacy boundary
 
-No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Original videos never upload. Derived audio and direct audio Storage objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.
+No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Original videos and oversized source audio never upload. Derived parts and direct audio objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.

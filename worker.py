@@ -15,17 +15,21 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import socket
+import subprocess
+import sys
 import tempfile
 import time
+import types
 import uuid
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 import httpx
+import numpy as np
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from faster_whisper import WhisperModel
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from postgrest.types import ReturnMethod
@@ -34,7 +38,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.3.1"
+VERSION = "1.4.1"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -82,19 +86,21 @@ class Settings(BaseSettings):
     fluxprompt_api_url: str = Field(default="https://api.fluxprompt.ai/flux/api-v2", alias="FLUXPROMPT_API_URL")
     fluxprompt_flow_id: str = Field(default="2000e2ec-450e-4da3-9d7f-0061adfe1c17", alias="FLUXPROMPT_FLOW_ID")
     site_url: str = Field(default="https://class-scribe-ruddy.vercel.app", alias="SITE_URL")
+    ffmpeg_path: str | None = Field(default=None, alias="FFMPEG_PATH")
 
 
 class Worker:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.db: Client = create_client(settings.supabase_url, settings.supabase_publishable_key)
-        self.model: WhisperModel | None = None
+        self.model: Any | None = None
         self.stopping = False
         self.temp_root = ROOT / ".worker-temp"
         self.temp_root.mkdir(exist_ok=True)
         self.secret_root = ROOT / ".worker-secrets"
         self.vapid_key_path = self.secret_root / "vapid_private_key.pem"
         self.vapid: Vapid01 | None = None
+        self.ffmpeg_path: Path | None = None
 
     def retry(self, operation: Callable[[], T], attempts: int = 4) -> T:
         delay = 1.0
@@ -436,21 +442,101 @@ class Worker:
                     }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
                 )
 
-    def ensure_model(self) -> WhisperModel:
+    def ensure_model(self) -> Any:
         if self.model is None:
+            # faster-whisper imports PyAV even when callers provide an already-decoded
+            # NumPy array. Smart App Control blocks PyAV's unsigned native extension on
+            # this Windows host, so provide an inert import shim and decode with the
+            # separately installed FFmpeg executable instead.
+            if "av" not in sys.modules:
+                sys.modules["av"] = types.ModuleType("av")
+            from faster_whisper import WhisperModel
+
             LOG.info("Loading Whisper model '%s' on CPU (INT8).", self.settings.whisper_model)
             self.model = WhisperModel(self.settings.whisper_model, device="cpu", compute_type="int8")
             LOG.info("Whisper model loaded.")
         return self.model
 
-    def download(self, job: dict[str, Any], target: Path) -> None:
-        content = self.retry(lambda: self.db.storage.from_("recordings").download(job["storage_path"]))
+    def ensure_ffmpeg(self) -> Path:
+        if self.ffmpeg_path is None:
+            self.ffmpeg_path = resolve_ffmpeg_path(self.settings.ffmpeg_path)
+            LOG.info("Using FFmpeg for local audio decoding.")
+        return self.ffmpeg_path
+
+    def decode_audio(self, audio_path: Path, sampling_rate: int = 16_000) -> np.ndarray:
+        raw_path = self.temp_root / f"{uuid.uuid4()}.f32"
+        command = [
+            str(self.ensure_ffmpeg()),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(audio_path),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            str(sampling_rate),
+            "-f",
+            "f32le",
+            str(raw_path),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=4 * 60 * 60,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError("FFmpeg could not decode this recording")
+            audio = np.fromfile(raw_path, dtype=np.float32)
+            if audio.size == 0:
+                raise RuntimeError("No audio stream was found in this recording")
+            return audio
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("FFmpeg timed out while decoding this recording") from error
+        finally:
+            raw_path.unlink(missing_ok=True)
+
+    def job_parts(self, job: dict[str, Any]) -> list[dict[str, Any]]:
+        parts = self.retry(
+            lambda: self.db.table("transcription_job_parts")
+            .select("part_index,storage_path,mime_type,size_bytes")
+            .eq("job_id", job["id"])
+            .order("part_index")
+            .execute()
+        ).data or []
+        if parts:
+            return parts
+        return [{
+            "part_index": 0,
+            "storage_path": job["storage_path"],
+            "mime_type": job["mime_type"],
+            "size_bytes": job["size_bytes"],
+        }]
+
+    def download(self, storage_path: str, target: Path) -> None:
+        content = self.retry(lambda: self.db.storage.from_("recordings").download(storage_path))
         target.write_bytes(content)
 
-    def transcribe(self, job: dict[str, Any], audio_path: Path) -> tuple[str, list[dict[str, Any]], str | None, float | None]:
+    def transcribe(
+        self,
+        job: dict[str, Any],
+        audio_path: Path,
+        *,
+        part_index: int = 0,
+        part_count: int = 1,
+        timestamp_offset: float = 0,
+    ) -> tuple[str, list[dict[str, Any]], str | None, float | None]:
         model = self.ensure_model()
+        audio = self.decode_audio(audio_path)
         segments_iter, info = model.transcribe(
-            str(audio_path),
+            audio,
             beam_size=1,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 500},
@@ -464,16 +550,31 @@ class Worker:
             text = segment.text.strip()
             if text:
                 transcript_parts.append(text)
-                segments.append({"start": round(float(segment.start), 2), "end": round(float(segment.end), 2), "text": text})
+                segments.append({
+                    "start": round(timestamp_offset + float(segment.start), 2),
+                    "end": round(timestamp_offset + float(segment.end), 2),
+                    "text": text,
+                })
             if time.monotonic() - last_touch > 45:
-                fraction = min(1.0, float(segment.end) / duration) if duration else 0.4
-                self.touch_job(job["id"], status="transcribing", progress=10 + int(fraction * 65), stage="Transcribing audio locally")
+                part_fraction = min(1.0, float(segment.end) / duration) if duration else 0.4
+                overall_fraction = (part_index + part_fraction) / max(1, part_count)
+                stage = "Transcribing audio locally"
+                if part_count > 1:
+                    stage = f"Transcribing part {part_index + 1} of {part_count}"
+                self.touch_job(
+                    job["id"],
+                    status="transcribing",
+                    progress=10 + int(overall_fraction * 65),
+                    stage=stage,
+                )
                 last_touch = time.monotonic()
             if self.stopping:
                 raise InterruptedError("Worker is shutting down")
         transcript = " ".join(transcript_parts).strip()
         if not transcript:
             raise RuntimeError("No speech was detected in this recording")
+        if duration is None and segments:
+            duration = max(0.0, float(segments[-1]["end"]) - timestamp_offset)
         return transcript, segments, getattr(info, "language", None), duration
 
     def ollama_json(self, prompt: str) -> dict[str, Any]:
@@ -541,7 +642,17 @@ class Worker:
         )
         return finalize_study_guide(combined_notes)
 
-    def complete(self, job: dict[str, Any], transcript: str, segments: list[dict[str, Any]], language: str | None, duration: float | None, notes: dict[str, Any], elapsed: float) -> None:
+    def complete(
+        self,
+        job: dict[str, Any],
+        transcript: str,
+        segments: list[dict[str, Any]],
+        language: str | None,
+        duration: float | None,
+        notes: dict[str, Any],
+        elapsed: float,
+        storage_paths: list[str],
+    ) -> None:
         result = {
             "job_id": job["id"],
             "user_id": job["user_id"],
@@ -580,9 +691,9 @@ class Worker:
             "error_message": None,
         }).eq("id", job["id"]).execute())
         try:
-            self.retry(lambda: self.db.storage.from_("recordings").remove([job["storage_path"]]), attempts=3)
+            self.retry(lambda: self.db.storage.from_("recordings").remove(storage_paths), attempts=3)
         except Exception:
-            LOG.warning("Job %s completed, but source audio cleanup needs attention.", short_id(job["id"]))
+            LOG.warning("Job %s completed, but source audio-part cleanup needs attention.", short_id(job["id"]))
         try:
             self.enqueue_push_deliveries(job)
             self.process_push_deliveries()
@@ -625,25 +736,80 @@ class Worker:
 
     def process(self, job: dict[str, Any]) -> None:
         started = time.monotonic()
-        suffix = safe_suffix(job.get("original_filename", "recording.mp3"))
-        fd, path_string = tempfile.mkstemp(prefix=f"{job['id']}-", suffix=suffix, dir=self.temp_root)
-        os.close(fd)
-        audio_path = Path(path_string)
+        temp_paths: list[Path] = []
         LOG.info("Starting job %s (%s).", short_id(job["id"]), safe_filename(job.get("original_filename", "")))
         try:
             self.heartbeat("processing", job["id"])
-            self.touch_job(job["id"], status="transcribing", progress=7, stage="Downloading private audio")
-            self.download(job, audio_path)
-            self.touch_job(job["id"], status="transcribing", progress=10, stage="Transcribing audio locally")
-            transcript, segments, language, duration = self.transcribe(job, audio_path)
+            parts = self.job_parts(job)
+            part_count = len(parts)
+            storage_paths = [str(part["storage_path"]) for part in parts]
+            transcripts: list[str] = []
+            segments: list[dict[str, Any]] = []
+            language: str | None = None
+            duration = 0.0
+
+            for part_index, part in enumerate(parts):
+                suffix = safe_suffix(str(part.get("storage_path", "recording.m4a")))
+                fd, path_string = tempfile.mkstemp(
+                    prefix=f"{job['id']}-part-{part_index + 1}-",
+                    suffix=suffix,
+                    dir=self.temp_root,
+                )
+                os.close(fd)
+                audio_path = Path(path_string)
+                temp_paths.append(audio_path)
+                download_stage = "Downloading private audio"
+                if part_count > 1:
+                    download_stage = f"Downloading part {part_index + 1} of {part_count}"
+                self.touch_job(
+                    job["id"],
+                    status="transcribing",
+                    progress=7 + int((part_index / part_count) * 3),
+                    stage=download_stage,
+                )
+                self.download(str(part["storage_path"]), audio_path)
+                transcribe_stage = "Transcribing audio locally"
+                if part_count > 1:
+                    transcribe_stage = f"Transcribing part {part_index + 1} of {part_count}"
+                self.touch_job(
+                    job["id"],
+                    status="transcribing",
+                    progress=10 + int((part_index / part_count) * 65),
+                    stage=transcribe_stage,
+                )
+                part_transcript, part_segments, part_language, part_duration = self.transcribe(
+                    job,
+                    audio_path,
+                    part_index=part_index,
+                    part_count=part_count,
+                    timestamp_offset=duration,
+                )
+                transcripts.append(part_transcript)
+                segments.extend(part_segments)
+                if language is None and part_language:
+                    language = part_language
+                duration += part_duration or 0
+                audio_path.unlink(missing_ok=True)
+
+            transcript = " ".join(transcripts).strip()
             self.touch_job(job["id"], status="summarizing", progress=78, stage="Preparing study notes")
             notes = self.summarize(job["id"], transcript)
-            self.complete(job, transcript, segments, language, duration, notes, time.monotonic() - started)
+            self.complete(
+                job,
+                transcript,
+                segments,
+                language,
+                duration or None,
+                notes,
+                time.monotonic() - started,
+                storage_paths,
+            )
             LOG.info("Completed job %s in %.1f seconds.", short_id(job["id"]), time.monotonic() - started)
         except Exception as error:
             self.fail(job, error)
         finally:
-            audio_path.unlink(missing_ok=True)
+            for audio_path in temp_paths:
+                audio_path.unlink(missing_ok=True)
             try:
                 self.heartbeat("idle")
             except Exception:
@@ -723,6 +889,32 @@ def safe_filename(value: str) -> str:
 def safe_suffix(filename: str) -> str:
     suffix = Path(filename).suffix.lower()
     return suffix if suffix in {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".webm", ".mp4"} else ".audio"
+
+
+def resolve_ffmpeg_path(configured_path: str | None = None) -> Path:
+    """Find the installed FFmpeg binary for both the owner and SYSTEM task."""
+    candidates: list[Path] = []
+    if configured_path:
+        candidates.append(Path(configured_path).expanduser())
+
+    on_path = shutil.which("ffmpeg")
+    if on_path:
+        candidates.append(Path(on_path))
+
+    owner_root = ROOT.parents[1] if len(ROOT.parents) > 1 else ROOT.parent
+    winget_root = owner_root / "AppData" / "Local" / "Microsoft" / "WinGet" / "Packages"
+    if winget_root.exists():
+        candidates.extend(winget_root.glob("Gyan.FFmpeg_*/*/bin/ffmpeg.exe"))
+        candidates.extend(winget_root.glob("Gyan.FFmpeg_*/ffmpeg-*/bin/ffmpeg.exe"))
+    candidates.extend([
+        Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
+        Path("C:/ffmpeg/bin/ffmpeg.exe"),
+    ])
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise RuntimeError("FFmpeg is not installed or FFMPEG_PATH is invalid")
 
 
 def vapid_public_key(vapid: Vapid01) -> str:

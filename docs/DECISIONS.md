@@ -72,11 +72,13 @@ Allow one to 20 files in a single batch while preserving one-at-a-time FIFO proc
 
 ## ADR-016 — Local Streaming Video-to-Audio Preparation
 
+**Superseded for output sizing and memory behavior by ADR-024.** The local privacy boundary and accepted video formats remain in force.
+
 For MP4, WebM, MOV, M4V, and MKV input, use pinned Mediabunny packages in the authenticated browser to read the source lazily, discard video, and produce mono 16 kHz, 48 kbps AAC/M4A. Prepare and upload selected files sequentially. Only the derived audio may cross the network.
 
 **Reason:** Source class videos can exceed the Supabase Free 50 MB object limit even when their speech audio is small. Local extraction preserves the $0 stack, avoids Vercel media limits, reduces Storage/egress use, and keeps the original video private.
 
-**Consequence:** An up-to-date browser must be able to decode the source audio codec; preparation uses the user's CPU and holds the completed M4A in browser memory. The derived output remains subject to the 50 MB Storage limit. Do not switch to whole-file FFmpeg/WASM buffering without measuring memory behavior on long class videos.
+**Consequence:** An up-to-date browser must be able to decode the source audio codec and preparation uses the user's CPU. ADR-024 replaces the single completed M4A with one-at-a-time 90-minute parts while retaining the lazy source read.
 
 ## ADR-017 — Local-Worker Web Push Completion Alerts
 
@@ -133,3 +135,11 @@ Store per-recording workflow metadata in a separate `recording_user_states` tabl
 **Reason:** Opening a result does not mean it was copied, and copying one section does not prove the user finished pasting or handling the recording. Users working through 12-file batches need exact persistent copy indicators, a deliberate checklist, batch progress, and a way to hide completed work.
 
 **Consequence:** Existing results begin as untouched and remain visible in `To do` until explicitly marked done. Copying Everything is displayed as coverage of both Summary and Transcript but does not auto-complete the recording. Archive changes only the dashboard view and never deletes results. Keeping this metadata separate prevents browser update grants from reaching worker-controlled job status, progress, attempts, or leases. Batch archive is limited to the signed-in account's already-done rows.
+
+## ADR-024 — Local Preparation, Multipart Manifests, and Resumable Uploads
+
+Treat 50 MB as a Supabase Storage object limit, not a source-recording limit. Upload audio at or below 50 MB unchanged. For oversized audio and every supported video, use the existing lazy Mediabunny browser pipeline to produce mono 16 kHz, 48 kbps AAC/M4A in 90-minute parts. Yield, upload, and release one part at a time. Use standard Storage upload through 6 MB and authenticated TUS upload above 6 MB. Store each ordered part in `transcription_job_parts`, but preserve one `transcription_jobs` row and one result per selected source.
+
+**Reason:** Long classes and uncompressed M4A/WAV sources can exceed the Supabase Free 50 MB per-object limit even when compact speech audio fits the overall free Storage allowance. Local preparation avoids Vercel payload/runtime limits and prevents the original large recording from leaving the user's device. Multipart objects retain the $0 stack; resumable transfer avoids restarting a large part after a brief connection failure.
+
+**Consequence:** Every object remains at most 50 MB, every logical recording is limited to 32 parts and 1 GB of prepared audio, and the project-wide 1 GB free Storage quota still applies. Browser/device resources and source codec support remain practical limits. The batch RPC validates exact owner/job/part paths and creates manifests atomically. The outbound worker downloads and transcribes parts sequentially, offsets timestamps, commits one result, and deletes all remote parts only after success. System FFmpeg decodes parts to NumPy for the unchanged faster-whisper `small` CPU/INT8 model, avoiding the PyAV native extension blocked by Windows Smart App Control.

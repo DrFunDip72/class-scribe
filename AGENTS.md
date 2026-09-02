@@ -20,8 +20,8 @@ Repository documentation is authoritative over conversation history.
 
 - Vercel Hobby, Supabase Free, GitHub Free, and local inference.
 - Next.js/TypeScript, Supabase Auth/Postgres/private Storage.
-- One to 20 files per batch. Direct audio is limited to 50 MB; video is converted locally and its derived audio must be 50 MB or less.
-- MP4, WebM, MOV, M4V, and MKV sources are converted sequentially in the browser to mono 16 kHz, 48 kbps AAC/M4A. Original videos must never upload.
+- One to 20 logical recordings per batch. Every Storage object remains limited to 50 MB, while an oversized source recording is prepared into multiple private audio parts and returns one logical result.
+- Oversized audio plus MP4, WebM, MOV, M4V, and MKV sources are converted sequentially in the browser to mono 16 kHz, 48 kbps AAC/M4A. Original oversized audio and original videos must never upload.
 - FIFO, one active inference job on the Windows computer.
 - `faster-whisper` small, CPU, INT8; Ollama `qwen3:4b`.
 - Outbound worker traffic only. Never expose the computer, Ollama, or router ports.
@@ -32,7 +32,7 @@ Repository documentation is authoritative over conversation history.
 
 ## Current state
 
-The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side extraction has also passed with an original video larger than the Supabase 50 MB file limit. Persistent Web Push and optional FluxPrompt completion email are implemented through the local worker. The FluxPrompt key is configured locally and loaded by worker 1.3.1; an owner-approved branded sample received HTTP 200 and a valid success response from FluxPrompt. The worker is supervised by a pre-login Windows `SYSTEM` task with startup and recurring recovery triggers. Completed results use streamlined study-guide notes and let users copy the summary, transcript, or everything independently. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
+The complete system is built and deployed. The public app, production sign-in, browser upload, durable queue, local inference, result display, and audio deletion have passed an end-to-end test. Browser-side preparation supports oversized audio and video, 90-minute multipart Storage objects, and resumable uploads while preserving one result per source recording. Persistent Web Push and optional FluxPrompt completion email are implemented through the local worker. The FluxPrompt key is configured locally; an owner-approved branded sample received HTTP 200 and a valid success response from FluxPrompt. The worker is supervised by a pre-login Windows `SYSTEM` task with startup and recurring recovery triggers. Completed results use streamlined study-guide notes and let users copy the summary, transcript, or everything independently. See `docs/STATUS.md` for current verification and remaining owner-operated tests.
 
 ## Security rules
 

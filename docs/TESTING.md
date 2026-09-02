@@ -1,5 +1,22 @@
 # Testing and Verification
 
+## Oversized audio, multipart queue, and FFmpeg decode — PASS
+
+**Date:** 2026-09-02
+**Environment:** local Next.js development app, Chromium automation, production Supabase, Windows `SYSTEM` task, local FFmpeg/Ollama, and worker `1.4.1`.
+
+1. Applied production migrations `multipart_recordings` and `optimize_recording_parts_policies`. A rolled-back authenticated transaction created one logical 70,000,000-byte job from ordered 40 MB and 30 MB part metadata, then confirmed two manifest rows with indexes 0 and 1.
+2. Browser conversion used the real Mediabunny/AAC path and forced the 9.63-second verification sample across three-second boundaries. It yielded four valid `audio/mp4` files in order, proving one `Input` can drive repeated trimmed conversions and that the generator releases control after each part. Chromium reported no page or console error.
+3. An authenticated TUS integration uploaded a 7,340,032-byte object through the direct Supabase resumable endpoint using a 6 MB chunk size, then listed exactly one private object and removed it. Both disposable TUS users were deleted and their prefixes contained zero remaining objects.
+4. `faster-whisper` model initialization initially exposed a Windows Smart App Control block on PyAV's unsigned `frame.pyd` after the scheduled worker restarted. Worker 1.4.1 now decodes through the installed FFmpeg executable and passes a mono 16 kHz float32 NumPy array to the unchanged `small` CPU/INT8 model. A local 9.63-second MP3 decoded to 154,121 samples and transcribed into two segments in English.
+5. Restarted `AudioTranscriberWorker` while the queue was idle. The task returned to Running under `SYSTEM`, and Supabase published an idle heartbeat from worker `1.4.1`.
+6. A disposable production account uploaded the same verification recording as two private objects and created one logical multipart job. The worker claimed it once, transcribed the parts sequentially, offset the timestamps, and completed on attempt 1 with one 19.265-second result, 289 transcript characters, four segments, and a non-empty summary.
+7. The worker removed both remote objects after result commit; listing the job prefix returned zero objects. Both disposable accounts from the failed PyAV diagnostic and successful regression were cascade-deleted after their sessions were signed out, leaving no QA account or media behind.
+8. Final `npm run lint`, `npm run build`, Python compilation, all 13 worker helper tests, and `git diff --check` passed.
+9. Supabase advisors reported no new multipart finding. Security output contains only the documented guarded SECURITY DEFINER RPC warnings and unavailable Free-plan leaked-password warning; performance output contains only the two pre-existing low-traffic unused-index notices.
+
+**Result:** PASS. The 50 MB ceiling now applies per private Storage object rather than per source recording, and multipart processing still produces one saved result.
+
 ## Persistent copied, Done, and Archive workflow — PASS
 
 **Date:** 2026-08-28
@@ -182,9 +199,9 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 
 ## Validation checks exercised
 
-- One-to-20 UI limit and 50 MB client validation are implemented.
-- The 50 MB pre-selection limit applies only to direct audio. Video is validated after local extraction because the original never uploads.
-- Database RPC independently enforces 1-20, 50 MB, MIME type, and owner path.
+- One-to-20 logical-recording selection is enforced; source audio/video above 50 MB is accepted for local preparation.
+- The browser enforces 50 MB per uploaded object, 90-minute prepared parts, and at most 32 parts per source.
+- Database RPC independently enforces 1-20 logical recordings, 1-32 parts, 50 MB per object, 1 GB per logical recording, supported MIME/extension pairs, and exact owner/job/part paths.
 - Storage bucket independently enforces 50 MB and allowed content types.
 - Queue claim requires the dedicated worker JWT role.
 - A normal signed-in test account could not act as the worker during authorization checks.

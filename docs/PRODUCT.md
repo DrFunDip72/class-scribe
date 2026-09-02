@@ -8,7 +8,7 @@ Give students a simple account-based website that converts class recordings into
 
 1. Create an email/password account and enter the dashboard immediately; sign-up confirmation email is disabled.
 2. Drag or select one to 20 audio or video class recordings.
-3. Let the browser strip video locally when needed, then upload only the compact audio privately and leave it queued.
+3. Let the browser compress oversized audio or strip video locally, divide very long output into upload-safe parts, then upload only compact audio privately and leave one logical recording queued.
 4. The owner's Windows computer processes the oldest job one at a time.
 5. Return to a dashboard showing status and saved study notes.
 6. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
@@ -20,10 +20,11 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 ## Constraints
 
 - Typical recording: 30-60 minutes.
-- Direct audio maximum: 50 MB per file on Supabase Free.
-- Video input: MP4, WebM, MOV, M4V, and MKV. The original source may exceed 50 MB because it stays on the device; its extracted audio must be 50 MB or less.
+- Audio/video source size: may exceed 50 MB. Any source above 50 MB is prepared locally; practical limits are the device's browser, memory, disk, and available Supabase quota.
+- Storage object maximum: 50 MB on Supabase Free. Prepared output is divided into 90-minute M4A parts, up to 32 parts and 1 GB total per logical recording.
+- Video input: MP4, WebM, MOV, M4V, and MKV. The original source stays on the device; only derived audio parts upload.
 - Direct audio input: MP3, M4A, WAV, FLAC, and OGG.
-- Video output: mono 16 kHz AAC at 48 kbps in an M4A container, processed one source at a time.
+- Prepared output: mono 16 kHz AAC at 48 kbps in an M4A container, processed and uploaded one source/part at a time.
 - Current browser recommendation: an up-to-date Chrome or Edge, especially for less common source codecs.
 - Audio is private and deleted after successful processing.
 - Text results remain associated with the user.
@@ -69,4 +70,4 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 
 ## Acceptance
 
-The initial release is accepted when an authenticated production user can upload up to 20 recordings, locally reduce video to audio without uploading the original, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results. Landing, authentication, dashboard, and result screens must also work at 320 CSS pixels without horizontal overflow or requiring the user to zoom out.
+The initial release is accepted when an authenticated production user can upload up to 20 recordings, locally reduce video or oversized audio without uploading the original, preserve one result across multipart processing, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results. Landing, authentication, dashboard, and result screens must also work at 320 CSS pixels without horizontal overflow or requiring the user to zoom out.

@@ -10,8 +10,8 @@ Class Scribe is a deployed, account-based web app for turning class recordings i
 
 ```text
 Authenticated browser
-  -> local video-to-audio extraction when needed
-  -> private Supabase Storage + durable Postgres queue
+  -> local compression/extraction for video or oversized audio
+  -> resumable private Supabase Storage parts + durable Postgres queue
   -> outbound-only Windows worker
   -> faster-whisper small (CPU INT8)
   -> Ollama qwen3:4b
@@ -21,7 +21,7 @@ Authenticated browser
   -> public Boolean health check -> GitHub outage issue/email
 ```
 
-The Next.js site runs on Vercel. For MP4, WebM, MOV, M4V, and MKV input, the browser strips the video and creates compact speech audio on the user's device. The original video never uploads. Audio goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded audio is deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop pop-ups, completion email to the account address, or both. Result pages let the user copy just the study-guide summary, just the transcript, or everything together. Successful copy choices remain checked, and the dashboard provides explicit Done and reversible Archive states with progress for each upload batch.
+The Next.js site runs on Vercel. Oversized audio and MP4, WebM, MOV, M4V, or MKV input become compact speech audio on the user's device. The browser divides long output into 90-minute parts, uploads parts larger than 6 MB resumably, and still creates one queue job and one result for the original recording. Original videos and oversized source audio never upload. Media goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded parts are deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop pop-ups, completion email to the account address, or both. Result pages let the user copy just the study-guide summary, just the transcript, or everything together. Successful copy choices remain checked, and the dashboard provides explicit Done and reversible Archive states with progress for each upload batch.
 
 ## Repository map
 

@@ -1,6 +1,6 @@
 # Costs and Limits
 
-**Checked:** 2026-08-24. Platform limits can change; verify official pricing before expanding use.
+**Checked:** 2026-09-02. Platform limits can change; verify official pricing before expanding use.
 
 ## Current monthly cost
 
@@ -30,14 +30,14 @@ Class Scribe does not provision a separate email provider and makes one FluxProm
 - 500 MB database-size quota (read-only behavior above quota).
 - 1 GB file Storage.
 - 5 GB egress and 5 GB cached egress per month.
-- 50 MB maximum upload on Free; the app and bucket both enforce this.
+- 50 MB maximum per Storage object on Free; the bucket and multipart RPC both enforce this.
 - Two active free projects per eligible account/organization context.
 - Low-activity free projects may be paused after about seven days and can be restored from the dashboard.
 - Leaked-password protection is not included on Free.
 
-Direct audio files remain limited to 50 MB. A source video may be larger because the browser reads it from the local device, strips the video track, and uploads only 16 kHz mono AAC at 48 kbps. That rate is roughly 22 MB of codec data per hour plus small container overhead, so a typical 30-60 minute class should fit comfortably. The derived M4A is still rejected if it exceeds 50 MB; as a conservative rule, split unusually long recordings around two hours or more.
+Audio and video source files may exceed 50 MB because the browser reads them locally and uploads only 16 kHz mono AAC at 48 kbps. That rate is roughly 22 MB of codec data per hour plus small container overhead. The app creates 90-minute M4A parts (normally about 32 MB), keeps every object under 50 MB, and associates up to 32 ordered parts with one logical recording/result. The database also caps the prepared total at 1 GB. Very long or unusual inputs can still exceed device resources or these safety ceilings.
 
-Because processed audio is deleted, storage capacity is primarily the live queue. A worst-case 20-file batch can still approach the full 1 GB Storage quota if every derived/direct audio file is near 50 MB, but ordinary class video now consumes audio-sized storage rather than video-sized storage. Upload and Supabase egress still count against the Free quotas.
+Because processed audio is deleted, storage capacity is primarily the live queue. Multipart support does not expand the project-wide 1 GB Storage quota: one very long prepared recording could consume most of it, and a 20-recording batch can fail if its live parts collectively exceed available Storage. Ordinary 30-60 minute classes consume roughly 11-22 MB each at the prepared bitrate. Upload and worker downloads still count against Storage/egress quotas.
 
 ### Vercel Hobby
 
@@ -65,10 +65,11 @@ This project does not require GitHub Actions to operate.
 - Queue durability is cloud-hosted, so work waits safely.
 - CPU inference duration depends on recording length/audio quality; benchmark real 30- and 60-minute classes before estimating completion times.
 
-### Browser video preparation
+### Browser recording preparation
 
-- Video sources are processed one at a time before upload; queue submission waits for all selected files to prepare and upload.
-- Source data is read lazily with an 8 MiB cache, but the finished M4A output is held in browser memory before upload.
+- Oversized audio and video sources are processed one at a time before upload; queue submission waits for all selected files to prepare and upload.
+- Source data is read lazily with an 8 MiB cache. One finished 90-minute M4A part is held in browser memory, uploaded, and released before the next part is encoded.
+- Objects above 6 MB use TUS resumable upload with 6 MB chunks and retries. Resumption reduces retransmission after brief network loss but still requires the user to keep/reselect the local source as the browser permits.
 - Encoding time depends on the user's CPU, browser codec support, source resolution/codec, and recording length.
 - MP4, WebM, MOV, M4V, and MKV containers are accepted, but an unsupported audio codec or a video with no audio track is rejected with a browser-side error.
 - The open-source Mediabunny and AAC encoder packages add no usage fee.

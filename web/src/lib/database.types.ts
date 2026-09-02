@@ -260,6 +260,47 @@ export type Database = {
           },
         ]
       }
+      transcription_job_parts: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          mime_type: string
+          part_index: number
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          mime_type: string
+          part_index: number
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          mime_type?: string
+          part_index?: number
+          size_bytes?: number
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcription_job_parts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "transcription_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transcription_jobs: {
         Row: {
           attempt_count: number

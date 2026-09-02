@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-02
+
+### Oversized audio and durable multipart uploads
+
+- Removed the 50 MB source-audio rejection. Oversized audio and all supported video now become local mono 16 kHz, 48 kbps AAC/M4A before any upload.
+- Added 90-minute output parts, up to 32 parts and 1 GB of prepared audio per logical recording, while preserving Supabase Free's 50 MB per-object limit.
+- Added authenticated TUS resumable uploads with 6 MB chunks, retry delays, and prior-upload resumption for objects over 6 MB.
+- Added `transcription_job_parts`, owner/worker RLS, exact multipart path validation, narrow grants, and an atomic multipart batch RPC through committed production migrations.
+- Updated worker 1.4.1 to download/transcribe parts sequentially, maintain continuous timestamps, produce one transcript/summary/result, and delete every part after commit.
+- Replaced the blocked PyAV decode path with installed system FFmpeg while preserving faster-whisper `small`, CPU, and INT8 inference.
+- Verified four-part browser conversion and a real two-part production queue job through combined result and complete Storage cleanup.
+
 ## 2026-08-30
 
 ### Verification

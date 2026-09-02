@@ -11,8 +11,9 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 - Account-owned copy/Done/Archive metadata lives in a separate RLS table; browser users retain no update permission on worker-controlled transcription jobs.
 - Private Storage with UUID-prefixed ownership policies.
 - Browser validation plus authoritative database/bucket limits.
-- Local video preprocessing: original MP4/WebM/MOV/M4V/MKV files never leave the user's device; only compact derived audio uploads.
-- Lazy source reads and one-at-a-time conversion reduce browser memory pressure for large videos.
+- Local preprocessing: original MP4/WebM/MOV/M4V/MKV files and oversized source audio never leave the user's device; only compact derived audio parts upload.
+- Lazy source reads plus one-at-a-time conversion/upload reduce browser memory pressure for large recordings.
+- Resumable uploads use the signed-in user's short-lived access token directly with Supabase Storage; the token is never persisted by application code or sent to Vercel.
 - Dedicated worker Auth role instead of a broad service-role key.
 - Atomic queue claims, leases, capped retries, and duplicate-worker protection.
 - Outbound-only local network design; Ollama stays on localhost.

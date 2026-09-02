@@ -17,6 +17,8 @@ type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
 type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 type UploadState = "idle" | "preparing" | "uploading" | "creating";
 type HistoryFilter = "todo" | "done" | "archived" | "all";
+type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
+type UploadRecordingRecord = { job_id: string; original_filename: string; parts: UploadPartRecord[] };
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -46,6 +48,10 @@ function isVideo(file: File) {
   return file.type.startsWith("video/") || videoExtensions.has(extensionOf(file));
 }
 
+function needsLocalPreparation(file: File) {
+  return isVideo(file) || file.size > MAX_BYTES;
+}
+
 function relativeTime(value: string) {
   const seconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return "just now";
@@ -72,6 +78,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [label, setLabel] = useState("");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadCount, setUploadCount] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [preparationProgress, setPreparationProgress] = useState(0);
   const [preparationIndex, setPreparationIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +121,6 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
     for (const file of incoming) {
       const ext = extensionOf(file);
       if (!acceptedExtensions.has(ext)) { setError(`${file.name} is not a supported recording format.`); return; }
-      if (!isVideo(file) && file.size > MAX_BYTES) { setError(`${file.name} is larger than the free 50 MB audio-file limit.`); return; }
       if (file.size === 0) { setError(`${file.name} is empty.`); return; }
     }
     setFiles(combined);
@@ -124,34 +130,60 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
     if (!files.length || uploadState !== "idle") return;
     setUploadState("uploading");
     setUploadCount(0);
+    setUploadProgress(0);
     setError(null);
     setSuccess(null);
     const uploaded: string[] = [];
-    const records: Array<{ job_id: string; original_filename: string; storage_path: string; size_bytes: number; mime_type: string }> = [];
+    const records: UploadRecordingRecord[] = [];
     try {
+      const { uploadRecordingPart } = await import("@/lib/storage/upload-recording");
       for (let index = 0; index < files.length; index += 1) {
         const sourceFile = files[index];
-        let file = sourceFile;
-        if (isVideo(sourceFile)) {
+        const jobId = crypto.randomUUID();
+        const parts: UploadPartRecord[] = [];
+
+        const uploadPart = async (file: File, partIndex: number) => {
+          if (file.size > MAX_BYTES) {
+            throw new Error(`${sourceFile.name} produced an audio part larger than 50 MB.`);
+          }
+          const filename = safeName(file.name);
+          const extension = filename.split(".").pop()?.toLowerCase() ?? "";
+          const storageFilename = `part-${String(partIndex + 1).padStart(4, "0")}.${extension}`;
+          const path = `${userId}/${jobId}/${storageFilename}`;
+          const mimeType = file.type && file.type !== "application/octet-stream"
+            ? file.type
+            : mimeByExtension[extension];
+          if (!mimeType) throw new Error(`${sourceFile.name} has an unsupported audio type.`);
+
+          setUploadState("uploading");
+          setUploadProgress(0);
+          await uploadRecordingPart({
+            supabase,
+            path,
+            file,
+            contentType: mimeType,
+            onProgress: setUploadProgress,
+          });
+          uploaded.push(path);
+          parts.push({ storage_path: path, size_bytes: file.size, mime_type: mimeType, extension });
+        };
+
+        if (needsLocalPreparation(sourceFile)) {
           setUploadState("preparing");
           setPreparationIndex(index + 1);
           setPreparationProgress(0);
-          const { extractAudioForUpload } = await import("@/lib/media/extract-audio");
-          file = await extractAudioForUpload(sourceFile, setPreparationProgress);
-          if (file.size > MAX_BYTES) {
-            throw new Error(`${sourceFile.name} produced more than 50 MB of audio. Split the recording into shorter parts and try again.`);
+          const { extractAudioPartsForUpload } = await import("@/lib/media/extract-audio");
+          for await (const part of extractAudioPartsForUpload(sourceFile, (progress) => {
+            setUploadState("preparing");
+            setPreparationProgress(progress);
+          })) {
+            await uploadPart(part.file, part.partIndex);
           }
+        } else {
+          await uploadPart(sourceFile, 0);
         }
-        setUploadState("uploading");
-        const jobId = crypto.randomUUID();
-        const filename = safeName(file.name);
-        const extension = filename.split(".").pop()?.toLowerCase() ?? "";
-        const path = `${userId}/${jobId}/${filename}`;
-        const mimeType = file.type && file.type !== "application/octet-stream" ? file.type : mimeByExtension[extension];
-        const { error: uploadError } = await supabase.storage.from("recordings").upload(path, file, { contentType: mimeType, upsert: false });
-        if (uploadError) throw uploadError;
-        uploaded.push(path);
-        records.push({ job_id: jobId, original_filename: filename, storage_path: path, size_bytes: file.size, mime_type: mimeType });
+
+        records.push({ job_id: jobId, original_filename: safeName(sourceFile.name), parts });
         setUploadCount(index + 1);
       }
       setUploadState("creating");
@@ -161,6 +193,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       setFiles([]);
       setLabel("");
       setUploadCount(0);
+      setUploadProgress(0);
       setPreparationProgress(0);
       setPreparationIndex(0);
       if (inputRef.current) inputRef.current.value = "";
@@ -293,13 +326,14 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       </div>
 
       <div className="upload-card">
-        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Videos become compact audio on this device before upload.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
+        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Large audio and video become compact speech audio on this device before upload.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
         <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple disabled={uploadState !== "idle"} accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,.mov,.m4v,.mkv,audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/x-matroska" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
         <label htmlFor="audio-input" aria-disabled={uploadState !== "idle"} className={`drop-zone ${dragging ? "dragging" : ""} ${uploadState !== "idle" ? "disabled" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (uploadState === "idle") setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); if (uploadState === "idle") addFiles(Array.from(event.dataTransfer.files)); }}>
           <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop recordings here</strong><small>Audio plus MP4, WebM, MOV, M4V, and MKV video</small>
         </label>
-        {files.length > 0 && <div className="selected-files">{files.map((file, index) => <div className="selected-file" key={`${file.name}-${file.lastModified}`}>{isVideo(file) ? <FileVideo size={17} /> : <FileAudio size={17} />}<div><strong>{file.name}</strong><small>{formatBytes(file.size)}{isVideo(file) ? " · audio extracts locally" : ""}</small></div><button aria-label={`Remove ${file.name}`} disabled={uploadState !== "idle"} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div>)}</div>}
-        {uploadState === "preparing" && <div className="preparation-status" role="status"><div><span>Extracting audio locally from file {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>The original video stays on this device.</small></div>}
+        {files.length > 0 && <div className="selected-files">{files.map((file, index) => <div className="selected-file" key={`${file.name}-${file.lastModified}`}>{isVideo(file) ? <FileVideo size={17} /> : <FileAudio size={17} />}<div><strong>{file.name}</strong><small>{formatBytes(file.size)}{needsLocalPreparation(file) ? " · compresses locally" : ""}</small></div><button aria-label={`Remove ${file.name}`} disabled={uploadState !== "idle"} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div>)}</div>}
+        {uploadState === "preparing" && <div className="preparation-status" role="status"><div><span>Preparing compact audio from recording {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>The original recording stays on this device. Very long classes are divided automatically.</small></div>}
+        {uploadState === "uploading" && <div className="preparation-status" role="status"><div><span>Uploading recording {Math.min(uploadCount + 1, files.length)} of {files.length}</span><strong>{Math.round(uploadProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${uploadProgress * 100}%` }} /></div><small>Large uploads resume automatically after brief connection interruptions.</small></div>}
         {files.length > 0 && <div className="upload-footer"><label>Batch label <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Add to queue</> : <><LoaderCircle className="spin" size={17} />{uploadState === "preparing" ? `Preparing ${preparationIndex}/${files.length}` : uploadState === "uploading" ? `Uploading ${Math.min(uploadCount + 1, files.length)}/${files.length}` : "Creating jobs…"}</>}</button></div>}
         {error && <p className="inline-alert error" role="alert"><AlertCircle size={16} />{error}</p>}
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}

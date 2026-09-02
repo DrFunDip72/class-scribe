@@ -11,6 +11,7 @@
 - Updated worker 1.4.1 to download/transcribe parts sequentially, maintain continuous timestamps, produce one transcript/summary/result, and delete every part after commit.
 - Replaced the blocked PyAV decode path with installed system FFmpeg while preserving faster-whisper `small`, CPU, and INT8 inference.
 - Verified four-part browser conversion and a real two-part production queue job through combined result and complete Storage cleanup.
+- Deployed the web release to production, confirmed a 51.0 MB M4A is accepted for local compression, and found no current-deployment runtime errors or warning/error/fatal logs.
 
 ## 2026-08-30
 

@@ -14,6 +14,9 @@
 7. The worker removed both remote objects after result commit; listing the job prefix returned zero objects. Both disposable accounts from the failed PyAV diagnostic and successful regression were cascade-deleted after their sessions were signed out, leaving no QA account or media behind.
 8. Final `npm run lint`, `npm run build`, Python compilation, all 13 worker helper tests, and `git diff --check` passed.
 9. Supabase advisors reported no new multipart finding. Security output contains only the documented guarded SECURITY DEFINER RPC warnings and unavailable Free-plan leaked-password warning; performance output contains only the two pre-existing low-traffic unused-index notices.
+10. Production deployment `dpl_ABTjPTzeqe5RfhH3ZBK4dTsPYwv8` reached Ready and moved both public aliases. The live sign-up/dashboard accepted a synthetic 51.0 MB M4A and labeled it `compresses locally` instead of showing the former limit error. Submission was intentionally not started, so no invalid audio entered the queue.
+11. The deployed dashboard reported worker online with no horizontal overflow at the 1264-pixel verification viewport. `/login` and `/api/worker-health` returned HTTP 200; health returned exactly `{"status":"online"}` with `Cache-Control: no-store, max-age=0`. Vercel reported no current-deployment runtime error cluster and no warning/error/fatal runtime logs.
+12. The disposable live account signed out and was cascade-deleted. The synthetic local source was removed, and no Storage object or queue job was created.
 
 **Result:** PASS. The 50 MB ceiling now applies per private Storage object rather than per source recording, and multipart processing still produces one saved result.
 

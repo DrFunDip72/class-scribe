@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-08-30
-**Phase:** Built and deployed with unattended pre-login worker startup, layered process recovery, and a functioning but not yet acceptance-complete zero-incremental-cost external outage monitor; the product also supports 20-file batches, local video-to-audio extraction, optional browser/email completion notifications, streamlined study guides, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface.
+**Last updated:** 2026-09-02
+**Phase:** Built and deployed with source recordings larger than 50 MB, local audio/video preparation, resumable multipart uploads, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
 
@@ -17,8 +17,10 @@ No credentials are stored in this document.
 ## Completed
 
 - Responsive production web app with sign-up, sign-in, sign-out, confirmation callback, forgot/reset password, protected dashboard, job history, retry, selective summary/transcript/everything copy, and complete Markdown download.
-- Direct private uploads for one to 20 supported recordings. Direct audio is capped at 50 MB; MP4/WebM/MOV/M4V/MKV video is converted locally and only its derived audio must fit the 50 MB limit.
-- Sequential browser-side video conversion to mono 16 kHz, 48 kbps AAC/M4A; original video never uploads.
+- Direct private uploads for one to 20 logical recordings. Audio at 50 MB or below uploads unchanged; oversized audio and MP4/WebM/MOV/M4V/MKV video are prepared locally.
+- Sequential browser-side conversion to mono 16 kHz, 48 kbps AAC/M4A in 90-minute parts. Original oversized audio/video never uploads; each private object remains at most 50 MB.
+- Authenticated TUS resumable transfer for objects above 6 MB, with 6 MB chunks, retry delays, and prior-upload resumption.
+- Ordered multipart manifests with up to 32 parts and a 1 GB prepared-recording safety ceiling; one selected source remains one FIFO job and one result.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
 - Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
@@ -26,7 +28,7 @@ No credentials are stored in this document.
 - Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
 - Boolean-only public worker health route plus a GitHub Actions monitor configured every five minutes that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache. GitHub's free scheduled-event delivery is best-effort and has not met the configured interval reliably.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_ZCoznuhNdzRQaTB2roWvv14dPgPk` includes optional email/browser channels, browser-side video extraction, selective copy actions, and the mobile-first layout and is Ready on the public alias.
+- Production deployment `dpl_ABTjPTzeqe5RfhH3ZBK4dTsPYwv8` includes oversized-audio preparation, resumable multipart upload, optional email/browser channels, selective copy actions, and the mobile-first layout and is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Independent opt-in email controls using the signed-in account email, shared batch/per-recording/failure preferences, a branded privacy-safe HTML template, and durable FluxPrompt delivery retries from the outbound local worker.
@@ -43,13 +45,13 @@ No credentials are stored in this document.
 - The old interactive worker was stopped only during an observed idle boundary. The five-minute recovery trigger started the task under `SYSTEM`; Supabase then reported a fresh processing heartbeat from worker `1.3.1` and the durable queue resumed with zero failed jobs.
 - A manual interactive `worker.py --once` launch while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, proving the global cross-session mutex blocks a second worker.
 - PowerShell parsing, Python compilation, and all 13 worker helper tests passed. The ignored `.worker-state`, `.worker-secrets`, and `.env.worker.local` paths remain untracked.
-- Worker heartbeat: online on version 1.3.1. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task.
+- Worker heartbeat: online on version 1.4.1. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task. FFmpeg decoding bypasses the PyAV native extension blocked by Windows Smart App Control while retaining faster-whisper `small` CPU/INT8.
 - Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
 - Next.js lint/build: pass.
-- Python compile and six helper tests: pass.
+- Python compile and all 13 helper tests: pass.
 - Notification migration: applied; VAPID public key published and private key retained locally.
 - Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
 - Production selective-copy test: Summary excluded the transcript, Transcript excluded study-note sections, and Everything contained summary, key points, action items, and transcript.
@@ -84,6 +86,12 @@ No credentials are stored in this document.
 - GitHub did not deliver the configured five-minute schedule reliably: observed successful runs had gaps up to about 6 hours 37 minutes. Owner email receipt is still unverified, so outage notification is not yet acceptance-complete.
 - Supabase performance advisor: only expected low-traffic unused-index informational notices for the heartbeat and pending-email indexes; no recording-state finding.
 - Supabase security advisor: expected warnings for intentionally callable, guarded SECURITY DEFINER RPCs. Leaked-password protection is unavailable on the Free plan.
+- Multipart migrations: applied to production. A rolled-back 70 MB logical-job simulation confirmed ordered manifest validation; security/performance advisors reported no new multipart finding.
+- Browser multipart conversion: pass. The real local encoder split a 9.63-second sample at forced three-second boundaries into four valid M4A parts with no browser error.
+- Resumable upload: pass. An authenticated 7 MiB TUS upload used the production endpoint, listed one private object, and was fully removed.
+- Production multipart result: pass. Two private audio parts became one 19.265-second completed result on attempt 1 with continuous segment timestamps, a non-empty summary, and zero remaining Storage objects.
+- Production oversized-audio selector: pass. The deployed dashboard accepted a synthetic 51.0 MB M4A, labeled it `compresses locally`, created no job because submission was intentionally not started, and retained no test media/account.
+- Production release health: login and worker-health returned HTTP 200; health returned exactly `{"status":"online"}` with `no-store`; current-deployment runtime error and warning/error/fatal log scans were empty.
 
 ## Supabase Auth policy
 
@@ -97,6 +105,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Replace or supplement the best-effort GitHub schedule with a genuinely dependable zero-cost external interval, then confirm the owner receives its email and run a planned worker outage/recovery drill. The GitHub issue open/close logic itself has passed. Allow the restarted worker to finish the current real queue and confirm that all remaining recordings complete with no failures. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Separately, confirm the sample arrived in the owner's inbox and verify one opted-in automatic completion email plus its `completion_events` delivery state.
+Upload the real `hrm 391 9-2.m4a` from the owner's normal browser and record preparation time, peak browser memory, uploaded-part count, and completed result quality. Then test five real 30-60 minute recordings as one batch to confirm practical FIFO timing and live Storage headroom. Separately, replace or supplement the best-effort GitHub schedule with a genuinely dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Also verify one opted-in automatic completion email plus its `completion_events` delivery state.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

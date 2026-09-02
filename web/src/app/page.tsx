@@ -25,7 +25,7 @@ export default async function Home() {
       <section className="hero">
         <div className="eyebrow"><Sparkles size={14} /> Your private study assistant</div>
         <h1>Turn every lecture into<br /><span>notes you can use.</span></h1>
-        <p className="hero-copy">Upload up to 20 audio or video class recordings at once. Video is reduced to compact audio on your device, then your own computer transcribes and summarizes each recording.</p>
+        <p className="hero-copy">Upload up to 20 audio or video class recordings at once. Large recordings become compact, upload-safe audio on your device, then your own computer transcribes and summarizes each one.</p>
         <div className="hero-actions">
           <Link className="button button-primary" href={user ? "/dashboard" : "/signup"}>
             {user ? "Open your dashboard" : "Start transcribing free"} <ArrowRight size={17} />
@@ -40,7 +40,7 @@ export default async function Home() {
         </div>
       </section>
       <section className="feature-grid">
-        <article><LockKeyhole /><h2>Private by design</h2><p>Original videos never upload. Compact audio lives in private storage, is removed after processing, and is transcribed on your Windows computer.</p></article>
+        <article><LockKeyhole /><h2>Private by design</h2><p>Original videos and oversized audio never upload. Compact audio parts live in private storage, are removed after processing, and are transcribed on your Windows computer.</p></article>
         <article><ListChecks /><h2>Study-ready results</h2><p>Get a full transcript, concise summary, key points, and action items for every recording.</p></article>
         <article><Sparkles /><h2>Built for class days</h2><p>Send up to 20 recordings together. Videos prepare locally and the worker processes the queue sequentially.</p></article>
       </section>

@@ -382,8 +382,8 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       </div>
     </section>
     <aside className="dashboard-aside">
-      <div className="aside-card"><Server size={19} /><h3>How processing works</h3><ol><li><span>1</span>Video becomes compact audio locally.</li><li><span>2</span>Only audio uploads privately.</li><li><span>3</span>Your computer creates the notes.</li><li><span>4</span>The uploaded audio is deleted.</li></ol></div>
-      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Media retention</h3><p>Original videos never upload. Temporary audio is kept only until a job succeeds; transcripts and notes remain in your account.</p></div>
+      <div className="aside-card"><Server size={19} /><h3>How processing works</h3><ol><li><span>1</span>Large recordings become compact audio locally.</li><li><span>2</span>Audio uploads privately in safe-size parts.</li><li><span>3</span>Your computer creates one set of notes.</li><li><span>4</span>The uploaded audio is deleted.</li></ol></div>
+      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Media retention</h3><p>Original videos and oversized audio never upload. Temporary audio parts are kept only until a job succeeds; transcripts and notes remain in your account.</p></div>
     </aside>
   </div>;
 }

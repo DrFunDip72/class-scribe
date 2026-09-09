@@ -21,11 +21,50 @@ from worker import (
     safe_suffix,
     send_fluxprompt_email,
     strip_thinking,
+    transcription_profile,
     vapid_public_key,
+    Worker,
 )
 
 
 class WorkerHelperTests(unittest.TestCase):
+    def test_transcription_profiles_map_all_user_tiers(self) -> None:
+        fast = transcription_profile(None)
+        balanced = transcription_profile("balanced")
+        high = transcription_profile("high")
+        self.assertEqual((fast.model, fast.beam_size), ("small", 1))
+        self.assertEqual((balanced.model, balanced.beam_size), ("distil-large-v3", 5))
+        self.assertFalse(balanced.condition_on_previous_text)
+        self.assertEqual((high.model, high.beam_size), ("medium.en", 5))
+        with self.assertRaises(RuntimeError):
+            transcription_profile("turbo")
+
+    def test_worker_transcribe_honors_balanced_profile(self) -> None:
+        model = MagicMock()
+        model.transcribe.return_value = (
+            iter([SimpleNamespace(start=0.0, end=1.5, text=" Lecture text")]),
+            SimpleNamespace(duration=1.5, language="en"),
+        )
+        worker = Worker.__new__(Worker)
+        worker.ensure_model = MagicMock(return_value=model)
+        worker.decode_audio = MagicMock(return_value=[0.0])
+        worker.touch_job = MagicMock()
+        worker.stopping = False
+
+        transcript, segments, language, duration = worker.transcribe(
+            {"id": "job-id", "transcription_tier": "balanced"},
+            SimpleNamespace(),
+        )
+
+        profile = worker.ensure_model.call_args.args[0]
+        self.assertEqual(profile.model, "distil-large-v3")
+        _, options = model.transcribe.call_args
+        self.assertEqual(options["beam_size"], 5)
+        self.assertEqual(options["language"], "en")
+        self.assertFalse(options["condition_on_previous_text"])
+        self.assertEqual((transcript, language, duration), ("Lecture text", "en", 1.5))
+        self.assertEqual(segments[0]["end"], 1.5)
+
     @patch("worker.ctypes.get_last_error", return_value=5)
     @patch("worker.ctypes.WinDLL")
     def test_global_mutex_access_denied_means_worker_already_running(

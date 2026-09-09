@@ -34,7 +34,6 @@ def main() -> None:
             f"WORKER_EMAIL={EMAIL}",
             f"WORKER_PASSWORD={password}",
             "WORKER_ID=class-scribe-home",
-            "WHISPER_MODEL=small",
             "OLLAMA_MODEL=qwen3:4b",
             "OLLAMA_URL=http://127.0.0.1:11434",
             "POLL_SECONDS=8",

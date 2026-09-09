@@ -8,12 +8,13 @@ Give students a simple account-based website that converts class recordings into
 
 1. Create an email/password account and enter the dashboard immediately; sign-up confirmation email is disabled.
 2. Drag or select one to 20 audio or video class recordings.
-3. Let the browser compress oversized audio or strip video locally, divide very long output into upload-safe parts, then upload only compact audio privately and leave one logical recording queued.
-4. The owner's Windows computer processes the oldest job one at a time.
-5. Return to a dashboard showing status and saved study notes.
-6. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
-7. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
-8. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
+3. Choose Fast, Balanced, or High transcription for the upload; the choice applies to every selected recording and shows a measured per-hour estimate.
+4. Let the browser compress oversized audio or strip video locally, divide very long output into upload-safe parts, then upload only compact audio privately and leave one logical recording queued.
+5. The owner's Windows computer processes the oldest job one at a time with the selected model.
+6. Return to a dashboard showing status, selected tier, and saved study notes.
+7. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
+8. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
+9. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
 
 The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
 
@@ -29,6 +30,8 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - Audio is private and deleted after successful processing.
 - Text results remain associated with the user.
 - Processing pauses while the Windows computer is unavailable; queued work remains durable.
+- Transcription tiers: Fast uses `small`/beam 1; Balanced uses `distil-large-v3`/beam 5 with previous-text conditioning disabled; High uses `medium.en`/beam 5. All run locally on CPU INT8, and Fast remains the default for old clients and existing jobs.
+- Displayed estimates are rounded from this computer's PHIL 201 benchmark: about 10, 20, and 55 transcription minutes per recorded hour. Queue wait and summarization are additional and actual time varies.
 - Email and browser notifications are independent opt-in channels. Browser pop-ups require browser plus operating-system permission. Completion is never coupled to successful notification delivery.
 
 ## Required result
@@ -70,4 +73,4 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 
 ## Acceptance
 
-The initial release is accepted when an authenticated production user can upload up to 20 recordings, locally reduce video or oversized audio without uploading the original, preserve one result across multipart processing, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results. Landing, authentication, dashboard, and result screens must also work at 320 CSS pixels without horizontal overflow or requiring the user to zoom out.
+The initial release is accepted when an authenticated production user can upload up to 20 recordings, select and later identify one of the three validated transcription tiers, locally reduce video or oversized audio without uploading the original, preserve one result across multipart processing, observe durable sequential processing, survive worker interruption through lease recovery, receive an opted-in completion alert, and privately retrieve saved results. Landing, authentication, dashboard, and result screens must also work at 320 CSS pixels without horizontal overflow or requiring the user to zoom out.

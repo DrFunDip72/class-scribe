@@ -4,6 +4,7 @@ $workerRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ownerProfile = Split-Path -Parent (Split-Path -Parent $workerRoot)
 $ollamaExe = Join-Path $ownerProfile "AppData\Local\Programs\Ollama\ollama.exe"
 $ollamaModels = Join-Path $ownerProfile ".ollama\models"
+$huggingFaceHome = Join-Path $ownerProfile ".cache\huggingface"
 $workerPython = Join-Path $workerRoot ".venv-worker\Scripts\python.exe"
 $workerScript = Join-Path $workerRoot "worker.py"
 $stateRoot = Join-Path $workerRoot ".worker-state"
@@ -63,6 +64,11 @@ try {
     # existing local model store so an unattended boot does not redownload it.
     if (Test-Path -LiteralPath $ollamaModels) {
         $env:OLLAMA_MODELS = $ollamaModels
+    }
+    # Reuse the owner's verified faster-whisper caches under the SYSTEM task.
+    # This prevents unattended jobs from downloading duplicate multi-gigabyte models.
+    if (Test-Path -LiteralPath $huggingFaceHome) {
+        $env:HF_HOME = $huggingFaceHome
     }
     $env:OLLAMA_HOST = "127.0.0.1:11434"
     Set-Location -LiteralPath $workerRoot

@@ -1,5 +1,20 @@
 # Testing and Verification
 
+## Selectable Fast, Balanced, and High tiers — PASS
+
+**Date:** 2026-09-09
+**Environment:** production Supabase, Next.js 16.3.2 build, Windows `SYSTEM` task, Intel i7-10700 CPU, faster-whisper CPU INT8, and cached `small`, `distil-large-v3`, and `medium.en` models.
+
+1. Created and applied migration `20260909181020_transcription_tiers.sql`. Production exposes a non-null text column with default `fast`; the validated check accepts only `fast`, `balanced`, and `high`. All 35 historical jobs were backfilled/defaulted to Fast, and no queued or active job existed during rollout.
+2. The unchanged two-argument `create_upload_batch` signature now reads and validates each file record's tier, defaults a missing legacy value to Fast, and preserves its authenticated-only execution grant. No RLS policy or browser write grant was broadened.
+3. Worker `1.5.0` maps Fast to `small`/beam 1/automatic language/previous-text conditioning, Balanced to `distil-large-v3`/beam 5/English/no previous-text conditioning, and High to `medium.en`/beam 5/English/previous-text conditioning. Unit coverage rejects unsupported values including Turbo and confirms the Balanced transcribe call receives the exact options.
+4. An actual worker-code smoke run transcribed the same 9.633-second local verification sample through all three profiles, switching models in one process: Fast returned 23 words in 6.781 seconds, Balanced returned 23 words in 15.328 seconds, and High returned 23 words in 11.985 seconds. These short timings include model load/switch overhead and are functional smoke evidence, not replacements for the ten-minute benchmark.
+5. The pre-login launcher now sets `HF_HOME` to the owner's existing verified cache so the `SYSTEM` worker does not download duplicate models. The scheduled task was disabled only while the queue was confirmed idle, then re-enabled and started. Supabase reported worker `1.5.0` online and idle with no active job.
+6. Python compilation and all 21 worker/comparison tests passed. `npm run lint`, TypeScript checking, optimized `npm run build`, and `git diff --check` passed.
+7. Supabase security advisors reported only the intentionally documented guarded SECURITY DEFINER RPC warnings plus Free-plan leaked-password protection; performance advisors reported only the two pre-existing low-traffic unused indexes. No new tier-related advisory appeared.
+
+**Result:** database persistence, defensive validation, exact model-option mapping, real local inference, one-model memory switching, generated TypeScript shape, and the production worker restart pass. Final deployed browser verification is recorded after the production alias moves.
+
 ## Next-generation local transcription benchmark — PASS WITH FINDINGS
 
 **Date:** 2026-09-09

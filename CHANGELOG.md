@@ -2,6 +2,14 @@
 
 ## 2026-09-09
 
+### Selectable transcription tiers
+
+- Added Fast (`small`), Balanced (`distil-large-v3`), and High (`medium.en`) choices to the upload dashboard with measured per-hour estimates and a mobile-first radio-card layout.
+- Persisted the selected tier on every logical job through a checked, non-null Supabase column and the existing atomically validated upload RPC; all historical jobs remain Fast.
+- Updated worker `1.5.0` to honor each job's exact model, beam, language, and previous-text-conditioning profile while preserving FIFO processing and recording the actual model in results.
+- Kept only one Whisper model in memory at a time and configured the pre-login `SYSTEM` launcher to reuse the owner's verified Hugging Face cache.
+- Displayed the tier/model on dashboard rows, in-progress pages, and completed result pages. Turbo remains unavailable because its benchmark fabricated post-audio speech.
+
 ### Summary repair and transcription comparison
 
 - Fixed the deterministic `Big takeaway` fallback so a first sentence containing titles such as `Dr.` is not truncated at the abbreviation.

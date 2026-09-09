@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-09-09
-**Phase:** Built and deployed with source recordings larger than 50 MB, local audio/video preparation, resumable multipart uploads, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
+**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
 
@@ -23,7 +23,7 @@ No credentials are stored in this document.
 - Ordered multipart manifests with up to 32 parts and a 1 GB prepared-recording safety ceiling; one selected source remains one FIFO job and one result.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
-- Sequential Windows worker using faster-whisper small CPU INT8 and Ollama qwen3:4b.
+- Sequential Windows worker using user-selected faster-whisper Fast `small`, Balanced `distil-large-v3`, or High `medium.en` on CPU INT8 plus Ollama `qwen3:4b`.
 - Automatic audio deletion after success and safe local temporary-file cleanup.
 - Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
 - Boolean-only public worker health route plus a GitHub Actions monitor configured every five minutes that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache. GitHub's free scheduled-event delivery is best-effort and has not met the configured interval reliably.
@@ -36,6 +36,7 @@ No credentials are stored in this document.
 - Abbreviation-aware fallback summary processing so a first sentence containing a title such as `Dr.` produces a complete `Big takeaway`.
 - Local-only three-configuration transcription comparison for production `small`/beam 1, English `small.en`/beam 5, and English `medium.en`/beam 5, with ignored transcript, segment, timing, and agreement reports.
 - Optional `next-gen` benchmark suite for `medium.en`, `distil-large-v3`, and `turbo`, including automatic timestamp-overrun/post-audio-word detection; it is an operator experiment and does not alter production jobs.
+- Mobile-first upload tier selector with measured per-hour estimates, database-enforced tier persistence, dashboard/result tier labels, and one-model-at-a-time worker switching. Fast is the backward-compatible default and Turbo is unavailable.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 - Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
@@ -49,13 +50,13 @@ No credentials are stored in this document.
 - The old interactive worker was stopped only during an observed idle boundary. The five-minute recovery trigger started the task under `SYSTEM`; Supabase then reported a fresh processing heartbeat from worker `1.3.1` and the durable queue resumed with zero failed jobs.
 - A manual interactive `worker.py --once` launch while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, proving the global cross-session mutex blocks a second worker.
 - PowerShell parsing, Python compilation, and all 13 worker helper tests passed. The ignored `.worker-state`, `.worker-secrets`, and `.env.worker.local` paths remain untracked.
-- Worker heartbeat: online and idle on version 1.4.2 after an idle-queue scheduled-task restart. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task. FFmpeg decoding bypasses the PyAV native extension blocked by Windows Smart App Control while retaining faster-whisper `small` CPU/INT8.
+- Worker heartbeat: online and idle on version 1.5.0 after an idle-queue scheduled-task restart. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task. FFmpeg decoding bypasses the PyAV native extension blocked by Windows Smart App Control; the launcher reuses the owner's cached Fast, Balanced, and High models.
 - Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
 - Next.js lint/build: pass.
-- Python compile and all 19 helper/comparison tests: pass.
+- Python compile and all 21 helper/comparison tests: pass.
 - Notification migration: applied; VAPID public key published and private key retained locally.
 - Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
 - Production selective-copy test: Summary excluded the transcript, Transcript excluded study-note sections, and Everything contained summary, key points, action items, and transcript.
@@ -106,6 +107,8 @@ No credentials are stored in this document.
 - The one affected stored HRM result was corrected in Supabase, and the matching public `HRM-391` Markdown note was corrected in commit `dcc94c6c7f23be497a2d9b1e607e6e26d72344ab`. A post-write read returned the complete takeaway.
 - A cached next-generation run on the same ten-minute PHIL excerpt measured `medium.en` at 554.953 seconds, Distil at 204.844 seconds, and Turbo at 331.250 seconds. Distil was 63.09% faster than current High. On the bounded 107-word published-text reference, WER was 3.74%, 6.54%, and 2.80% respectively.
 - Turbo is not safe to promote under the tested settings: it invented 37 words in 11 segments wholly after the audio ended and extended its timestamps 26.916 seconds past the source. Distil had no post-audio hallucination and is the leading balanced candidate; current `medium.en` remains the more exact non-hallucinating option. Production `small` is unchanged.
+- Production migration `transcription_tiers` is applied. The column is non-null with default `fast`, its three-value check is validated, all 35 historical jobs are Fast, and the two-argument upload RPC validates or defaults every per-file tier without changing its grants.
+- Actual worker-code smoke transcription passed for all three profiles on the 9.63-second verification source: Fast returned 23 words in 6.781 seconds, Balanced returned 23 words in 15.328 seconds, and High returned 23 words in 11.985 seconds including model-load/switch time. Worker `1.5.0` then returned online and idle.
 
 ## Supabase Auth policy
 
@@ -119,6 +122,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Keep `tyler_eager.m4a` out of every course repository. Decide whether routine uploads should gain an explicit Distil Balanced tier (about 21 minutes projected for this 61:33 source) alongside `medium.en` High (about 57 minutes); do not enable Turbo without a separate hallucination-control benchmark, and keep production `small` as the default unless a product change is approved. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, test five real 30-60 minute recordings as one batch, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
+Keep `tyler_eager.m4a` out of every course repository. Run one short disposable production upload through each selectable tier and verify the persisted tier, actual result model, completed UI label, audio cleanup, and queue continuity; then test five real 30-60 minute recordings as one mixed-tier batch. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

@@ -61,6 +61,8 @@ This project does not require GitHub Actions to operate.
 ### Local worker
 
 - One recording at a time by design.
+- All three transcription tiers remain $0 local inference. Cached faster-whisper model files occupy approximately 0.45 GB for Fast, 1.41 GB for Balanced, and 1.43 GB for High (about 3.29 GB total before normal cache overhead).
+- Measured transcription-only estimates on this i7-10700 are approximately 10 minutes per recorded hour for Fast, 20 minutes for Balanced, and 55 minutes for High. Model switching adds loading time, summaries add Ollama time, and queued recordings wait for earlier FIFO work.
 - Processing stops while the computer is off, asleep, offline, or signed out before the task starts.
 - Queue durability is cloud-hosted, so work waits safely.
 - CPU inference duration depends on recording length/audio quality; benchmark real 30- and 60-minute classes before estimating completion times.

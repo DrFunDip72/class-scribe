@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import base64
 import ctypes
+import gc
 import html
 import json
 import logging
@@ -24,6 +25,7 @@ import tempfile
 import time
 import types
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -38,9 +40,41 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.4.2"
+VERSION = "1.5.0"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class TranscriptionProfile:
+    tier: str
+    label: str
+    model: str
+    beam_size: int
+    language: str | None
+    condition_on_previous_text: bool
+
+
+TRANSCRIPTION_PROFILES = {
+    "fast": TranscriptionProfile("fast", "Fast", "small", 1, None, True),
+    "balanced": TranscriptionProfile(
+        "balanced",
+        "Balanced",
+        "distil-large-v3",
+        5,
+        "en",
+        False,
+    ),
+    "high": TranscriptionProfile("high", "High", "medium.en", 5, "en", True),
+}
+
+
+def transcription_profile(value: object) -> TranscriptionProfile:
+    tier = str(value or "fast").strip().lower()
+    profile = TRANSCRIPTION_PROFILES.get(tier)
+    if profile is None:
+        raise RuntimeError("This recording has an unsupported transcription tier")
+    return profile
 
 
 def acquire_single_instance() -> object | None:
@@ -77,7 +111,6 @@ class Settings(BaseSettings):
     worker_email: str = Field(alias="WORKER_EMAIL")
     worker_password: str = Field(alias="WORKER_PASSWORD")
     worker_id: str = Field(default_factory=lambda: f"{socket.gethostname().lower()}-cpu", alias="WORKER_ID")
-    whisper_model: str = Field(default="small", alias="WHISPER_MODEL")
     ollama_model: str = Field(default="qwen3:4b", alias="OLLAMA_MODEL")
     ollama_url: str = Field(default="http://127.0.0.1:11434", alias="OLLAMA_URL")
     poll_seconds: float = Field(default=8, ge=2, le=60, alias="POLL_SECONDS")
@@ -94,6 +127,7 @@ class Worker:
         self.settings = settings
         self.db: Client = create_client(settings.supabase_url, settings.supabase_publishable_key)
         self.model: Any | None = None
+        self.loaded_model_name: str | None = None
         self.stopping = False
         self.temp_root = ROOT / ".worker-temp"
         self.temp_root.mkdir(exist_ok=True)
@@ -442,7 +476,16 @@ class Worker:
                     }, returning=ReturnMethod.minimal).eq("id", delivery["id"]).execute()
                 )
 
-    def ensure_model(self) -> Any:
+    def ensure_model(self, profile: TranscriptionProfile) -> Any:
+        if self.model is not None and self.loaded_model_name != profile.model:
+            LOG.info(
+                "Switching Whisper model from '%s' to '%s'.",
+                self.loaded_model_name,
+                profile.model,
+            )
+            self.model = None
+            self.loaded_model_name = None
+            gc.collect()
         if self.model is None:
             # faster-whisper imports PyAV even when callers provide an already-decoded
             # NumPy array. Smart App Control blocks PyAV's unsigned native extension on
@@ -452,8 +495,13 @@ class Worker:
                 sys.modules["av"] = types.ModuleType("av")
             from faster_whisper import WhisperModel
 
-            LOG.info("Loading Whisper model '%s' on CPU (INT8).", self.settings.whisper_model)
-            self.model = WhisperModel(self.settings.whisper_model, device="cpu", compute_type="int8")
+            LOG.info(
+                "Loading Whisper model '%s' for the %s tier on CPU (INT8).",
+                profile.model,
+                profile.label,
+            )
+            self.model = WhisperModel(profile.model, device="cpu", compute_type="int8")
+            self.loaded_model_name = profile.model
             LOG.info("Whisper model loaded.")
         return self.model
 
@@ -533,15 +581,18 @@ class Worker:
         part_count: int = 1,
         timestamp_offset: float = 0,
     ) -> tuple[str, list[dict[str, Any]], str | None, float | None]:
-        model = self.ensure_model()
+        profile = transcription_profile(job.get("transcription_tier"))
+        model = self.ensure_model(profile)
         audio = self.decode_audio(audio_path)
-        segments_iter, info = model.transcribe(
-            audio,
-            beam_size=1,
-            vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 500},
-            condition_on_previous_text=True,
-        )
+        options: dict[str, Any] = {
+            "beam_size": profile.beam_size,
+            "vad_filter": True,
+            "vad_parameters": {"min_silence_duration_ms": 500},
+            "condition_on_previous_text": profile.condition_on_previous_text,
+        }
+        if profile.language:
+            options["language"] = profile.language
+        segments_iter, info = model.transcribe(audio, **options)
         segments: list[dict[str, Any]] = []
         transcript_parts: list[str] = []
         duration = float(info.duration) if info.duration else None
@@ -653,6 +704,7 @@ class Worker:
         elapsed: float,
         storage_paths: list[str],
     ) -> None:
+        profile = transcription_profile(job.get("transcription_tier"))
         result = {
             "job_id": job["id"],
             "user_id": job["user_id"],
@@ -662,7 +714,7 @@ class Worker:
             "key_points": notes["key_points"],
             "action_items": notes["action_items"],
             "segments": segments,
-            "transcription_model": f"faster-whisper/{self.settings.whisper_model}-cpu-int8",
+            "transcription_model": f"faster-whisper/{profile.model}-cpu-int8",
             "summary_model": f"ollama/{self.settings.ollama_model}",
             "processing_seconds": round(elapsed, 2),
         }

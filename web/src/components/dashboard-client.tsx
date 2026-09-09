@@ -6,6 +6,7 @@ import { AlertCircle, Archive, ArchiveRestore, ArrowRight, Check, CheckCheck, Cl
 import { NotificationSettings } from "@/components/notification-settings";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
+import { getTranscriptionTier, TRANSCRIPTION_TIERS, type TranscriptionTier } from "@/lib/transcription-tiers";
 
 type RecordingState = Database["public"]["Tables"]["recording_user_states"]["Row"];
 type RecordingStateUpdate = Database["public"]["Tables"]["recording_user_states"]["Update"];
@@ -18,7 +19,7 @@ type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 type UploadState = "idle" | "preparing" | "uploading" | "creating";
 type HistoryFilter = "todo" | "done" | "archived" | "all";
 type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
-type UploadRecordingRecord = { job_id: string; original_filename: string; parts: UploadPartRecord[] };
+type UploadRecordingRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier; parts: UploadPartRecord[] };
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -76,6 +77,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [label, setLabel] = useState("");
+  const [transcriptionTier, setTranscriptionTier] = useState<TranscriptionTier>("fast");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadCount, setUploadCount] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -183,13 +185,14 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
           await uploadPart(sourceFile, 0);
         }
 
-        records.push({ job_id: jobId, original_filename: safeName(sourceFile.name), parts });
+        records.push({ job_id: jobId, original_filename: safeName(sourceFile.name), transcription_tier: transcriptionTier, parts });
         setUploadCount(index + 1);
       }
       setUploadState("creating");
       const { error: queueError } = await supabase.rpc("create_upload_batch", { p_label: label.trim(), p_files: records as unknown as Json });
       if (queueError) throw queueError;
-      setSuccess(`${files.length} recording${files.length === 1 ? "" : "s"} added to the queue.`);
+      const selectedTier = getTranscriptionTier(transcriptionTier);
+      setSuccess(`${files.length} recording${files.length === 1 ? "" : "s"} added to the ${selectedTier.label} queue.`);
       setFiles([]);
       setLabel("");
       setUploadCount(0);
@@ -327,6 +330,18 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
 
       <div className="upload-card">
         <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Large audio and video become compact speech audio on this device before upload.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
+        <fieldset className="transcription-tier-picker" disabled={uploadState !== "idle"}>
+          <legend>Transcription quality <span>Applies to every recording in this upload</span></legend>
+          <div className="tier-options">
+            {TRANSCRIPTION_TIERS.map((tier) => <label className={`tier-option ${transcriptionTier === tier.value ? "selected" : ""}`} key={tier.value}>
+              <input type="radio" name="transcription-tier" value={tier.value} checked={transcriptionTier === tier.value} onChange={() => setTranscriptionTier(tier.value)} />
+              <span className="tier-option-heading"><strong>{tier.label}</strong>{tier.value === "balanced" ? <em>Recommended</em> : null}</span>
+              <small>{tier.estimate}</small>
+              <span>{tier.description}</span>
+            </label>)}
+          </div>
+          <p>Estimates use this computer and one active job at a time. Actual time varies with recording quality.</p>
+        </fieldset>
         <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple disabled={uploadState !== "idle"} accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,.mov,.m4v,.mkv,audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/x-matroska" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
         <label htmlFor="audio-input" aria-disabled={uploadState !== "idle"} className={`drop-zone ${dragging ? "dragging" : ""} ${uploadState !== "idle" ? "disabled" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (uploadState === "idle") setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); if (uploadState === "idle") addFiles(Array.from(event.dataTransfer.files)); }}>
           <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop recordings here</strong><small>Audio plus MP4, WebM, MOV, M4V, and MKV video</small>
@@ -362,11 +377,12 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
                   const recordingState = job.recording_user_states;
                   const copyLabel = copiedLabel(recordingState);
                   const busy = savingJobIds.includes(job.id);
+                  const tier = getTranscriptionTier(job.transcription_tier);
                   return <article className={`job-row ${recordingState?.done_at ? "done" : ""} ${recordingState?.archived_at ? "archived" : ""}`} key={job.id}>
                     <div className={`job-status-icon ${job.status} ${recordingState?.done_at ? "handled" : ""}`}>{recordingState?.done_at ? <CheckCheck size={18} /> : job.status === "completed" ? <Check size={18} /> : job.status === "failed" ? <AlertCircle size={18} /> : job.status === "queued" ? <Clock3 size={18} /> : <LoaderCircle className="spin" size={18} />}</div>
                     <div className="job-info">
-                      <div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{recordingState?.archived_at ? "archived" : recordingState?.done_at ? "done" : job.status}</span></div>
-                      <small>{job.stage} · {relativeTime(job.created_at)} · {formatBytes(job.size_bytes)}</small>
+                      <div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{recordingState?.archived_at ? "archived" : recordingState?.done_at ? "done" : job.status}</span><span className={`tier-pill tier-${tier.value}`}>{tier.label}</span></div>
+                      <small>{job.stage} · {relativeTime(job.created_at)} · {formatBytes(job.size_bytes)} · {tier.model}</small>
                       {copyLabel && <span className="copy-status"><ClipboardCheck size={13} />{copyLabel}</span>}
                       {job.status !== "completed" && job.status !== "failed" && <div className="progress-track slim"><span style={{ width: `${job.progress}%` }} /></div>}
                       {job.error_message && <p className="job-error">{job.error_message}</p>}

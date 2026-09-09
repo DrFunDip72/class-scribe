@@ -11,7 +11,10 @@ Supabase Auth + Postgres + Storage
   |  outbound HTTPS polling using a dedicated worker Auth identity
   |
 Windows startup task -> worker.py
-  -> faster-whisper small / CPU INT8
+  -> selected faster-whisper tier / CPU INT8
+     -> Fast: small
+     -> Balanced: distil-large-v3
+     -> High: medium.en
   -> Ollama qwen3:4b on 127.0.0.1
   -> signed Web Push -> browser service worker -> OS notification
   -> FluxPrompt Email Agent -> account email with dashboard link
@@ -27,7 +30,7 @@ The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refres
 
 Objects at or below 6 MB use the standard Storage upload. Larger objects use Supabase's TUS endpoint with 6 MB chunks, retry delays, and browser upload fingerprint resumption. TUS improves interrupted-transfer recovery but does not bypass the Free plan's 50 MB per-object cap; the multipart recording design handles that cap.
 
-After every selected file has uploaded, the browser calls `create_upload_batch` once so all part metadata and logical jobs are inserted atomically. One selected source always creates one job even when it has many parts. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
+Before upload, the browser presents one accessible Fast/Balanced/High radio group with measured estimates; that selection is included in every logical file record. After every selected file has uploaded, the browser calls `create_upload_batch` once so all part metadata, validated tier values, and logical jobs are inserted atomically. One selected source always creates one job even when it has many parts. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
 
 Vercel serves the application code but does not receive media and performs no inference. The original video never leaves the browser; only derived audio is sent directly to Supabase. This avoids Vercel Function payload/duration limits and keeps the cloud portion inexpensive.
 
@@ -37,7 +40,7 @@ Supabase is the durable coordination layer:
 
 - Auth owns users and sessions.
 - The private `recordings` bucket stores queued direct audio or prepared audio parts.
-- Postgres stores batches, queue jobs, ordered job-part manifests, results, account-owned recording workflow state, worker heartbeat, and completion events.
+- Postgres stores batches, queue jobs with immutable user-selected transcription tiers, ordered job-part manifests, results, account-owned recording workflow state, worker heartbeat, and completion events.
 - Postgres stores account preferences, browser push subscriptions, public notification configuration, durable per-device push deliveries, and a durable email outbox.
 - RLS makes user ownership authoritative.
 - `claim_next_job` uses `FOR UPDATE SKIP LOCKED` and recovers expired leases.
@@ -46,7 +49,7 @@ Supabase is the durable coordination layer:
 
 The Windows scheduled task starts Ollama if needed, then `worker.py`. The worker signs in as a dedicated Auth user tagged with `app_metadata.role=worker`, polls over outbound HTTPS, and claims exactly one oldest job. It downloads and transcribes that job's ordered parts sequentially, offsets timestamps into one continuous transcript, creates one summary/result, records a completion event, and deletes every remote part only after result commit. Legacy one-object jobs remain readable during rollout.
 
-System FFmpeg decodes each downloaded part to mono 16 kHz float audio before inference. `faster-whisper` still runs the pinned `small` model on CPU INT8; bypassing PyAV avoids an unsigned native extension blocked by Windows Smart App Control and uses the already installed FFmpeg runtime instead.
+System FFmpeg decodes each downloaded part to mono 16 kHz float audio before inference. The job's persisted profile selects pinned faster-whisper behavior on CPU INT8: Fast is `small`/beam 1 with automatic language detection, Balanced is `distil-large-v3`/beam 5 with fixed English and previous-text conditioning disabled, and High is `medium.en`/beam 5 with fixed English. The worker retains only one Whisper model in memory and releases it before loading a different tier. The `SYSTEM` launcher points `HF_HOME` at the owner's verified model cache, avoiding duplicate multi-gigabyte downloads. Bypassing PyAV avoids an unsigned native extension blocked by Windows Smart App Control and uses the already installed FFmpeg runtime instead.
 
 A global cross-session Windows named mutex prevents duplicate worker processes even when the scheduled task runs as `SYSTEM` and a manual launch runs in the owner's desktop session. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
 
@@ -83,7 +86,7 @@ The dashboard joins the state and upload-batch metadata into its existing read. 
 ## Lifecycle
 
 ```text
-local preparation (when needed) -> part upload(s) -> one queued job -> sequential part transcription -> one summary -> completed
+choose tier -> local preparation (when needed) -> part upload(s) -> one queued job -> selected-model sequential part transcription -> one summary -> completed
                                              \-> failed -> user retry -> queued
 ```
 

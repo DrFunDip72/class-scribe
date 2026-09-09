@@ -62,7 +62,7 @@ The owner must keep GitHub issue-assignment email notifications enabled. GitHub 
 - Web: restore/promote the last verified Vercel deployment.
 - Database: apply a forward corrective migration; do not reset production.
 - Worker: disable and stop the task, restore the last verified commit, reinstall pinned dependencies if necessary, run `.\install-worker-task.ps1` from Administrator PowerShell, confirm the task uses `SYSTEM` with three triggers, and confirm a fresh heartbeat.
-- Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, pull both models, restore `.worker-secrets/vapid_private_key.pem` from a secure backup, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
+- Replacement computer: install Python/FFmpeg/Ollama, clone, recreate the venv, cache all three Whisper tier models plus `qwen3:4b`, restore `.worker-secrets/vapid_private_key.pem` from a secure backup, provision a new worker Auth identity, register the task, verify, then revoke the old identity.
 
 If the VAPID private key cannot be restored, let the replacement worker generate one. It will publish the new public key and remove subscriptions signed for the old key. Users must then enable notifications again on each browser.
 

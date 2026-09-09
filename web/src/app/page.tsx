@@ -25,7 +25,7 @@ export default async function Home() {
       <section className="hero">
         <div className="eyebrow"><Sparkles size={14} /> Your private study assistant</div>
         <h1>Turn every lecture into<br /><span>notes you can use.</span></h1>
-        <p className="hero-copy">Upload up to 20 audio or video class recordings at once. Large recordings become compact, upload-safe audio on your device, then your own computer transcribes and summarizes each one.</p>
+        <p className="hero-copy">Upload up to 20 audio or video class recordings at once, choose Fast, Balanced, or High transcription, and let your own computer create the transcript and study guide.</p>
         <div className="hero-actions">
           <Link className="button button-primary" href={user ? "/dashboard" : "/signup"}>
             {user ? "Open your dashboard" : "Start transcribing free"} <ArrowRight size={17} />

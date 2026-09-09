@@ -321,6 +321,7 @@ export type Database = {
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
           storage_path: string
+          transcription_tier: string
           updated_at: string
           user_id: string
         }
@@ -343,6 +344,7 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           storage_path: string
+          transcription_tier?: string
           updated_at?: string
           user_id: string
         }
@@ -365,6 +367,7 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           storage_path?: string
+          transcription_tier?: string
           updated_at?: string
           user_id?: string
         }
@@ -519,6 +522,7 @@ export type Database = {
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
           storage_path: string
+          transcription_tier: string
           updated_at: string
           user_id: string
         }[]

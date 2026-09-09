@@ -8,11 +8,11 @@
 | FFmpeg | 9.0 |
 | faster-whisper | 1.2.1 |
 | CTranslate2 | 4.8.1, CPU INT8 |
-| Whisper | `small` |
+| Whisper tiers | Fast `small`; Balanced `distil-large-v3`; High `medium.en` |
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker`, running as Windows `SYSTEM` |
-| Worker version | `1.4.2` |
+| Worker version | `1.5.0` |
 | Push library | `pywebpush` 2.4.0 |
 | Email transport | FluxPrompt Email Agent over outbound HTTPS |
 
@@ -27,6 +27,8 @@ Copy `.env.worker.example` to ignored `.env.worker.local`. Populate the Supabase
 `FLUXPROMPT_API_KEY` is the only required email secret. Add it to ignored `.env.worker.local`; never add it to Vercel, Supabase, a `NEXT_PUBLIC_` variable, Git, logs, or chat. `FLUXPROMPT_API_URL`, `FLUXPROMPT_FLOW_ID`, and `SITE_URL` have production defaults in `.env.worker.example`. Restart the startup task after changing the file. With no key, transcription and Web Push continue normally and opted-in email events wait durably.
 
 FFmpeg is required for worker-side decoding. The worker checks optional `FFMPEG_PATH`, the process PATH, the owner's standard WinGet FFmpeg package location, and common machine-wide locations. This works under the `SYSTEM` startup task even though that account has a different profile. The worker passes decoded NumPy audio to `faster-whisper`; it does not load PyAV, whose unsigned native extension is blocked by Windows Smart App Control on this computer.
+
+Whisper selection comes from the validated tier stored on each job, not an environment variable. Fast uses `small`/beam 1 with automatic language detection; Balanced uses `distil-large-v3`/beam 5 with English fixed and previous-text conditioning disabled; High uses `medium.en`/beam 5 with English fixed. The worker holds only the current model in memory and unloads it when the next FIFO job requires another tier.
 
 `bootstrap-worker-auth.py` creates local bootstrap material for an administrator to provision the dedicated Auth row with `app_metadata.role=worker`. Its generated JSON and local environment are ignored. Revoke the old Auth identity before provisioning a replacement computer.
 
@@ -67,7 +69,7 @@ The default `production` comparison suite decodes the source once, then runs `sm
 
 The installer registers three independent triggers: Windows startup, user logon, and a five-minute repeating recovery trigger. It runs under the built-in `SYSTEM` service account, so no user sign-in or stored Windows password is required. The task starts missed runs when available, allows 999 one-minute Task Scheduler restarts, has no execution time limit, and ignores overlapping triggers. A normal repair preserves an already-running worker; use `-RestartRunning` only while the queue is idle when the new task identity must take effect immediately.
 
-The launcher is also a persistent supervisor. It starts Ollama in a hidden process if needed, waits for the local API, starts the queue worker, and relaunches it after any exit. Because `SYSTEM` has a different Windows profile, the launcher explicitly points Ollama at the owner's existing `.ollama\models` directory rather than downloading another model. A cross-process launcher lock, a global cross-session Windows worker mutex, and atomic database claiming prevent duplicate processing.
+The launcher is also a persistent supervisor. It starts Ollama in a hidden process if needed, waits for the local API, starts the queue worker, and relaunches it after any exit. Because `SYSTEM` has a different Windows profile, the launcher explicitly points Ollama at the owner's existing `.ollama\models` directory and `HF_HOME` at the owner's verified faster-whisper cache rather than downloading duplicate models. A cross-process launcher lock, a global cross-session Windows worker mutex, and atomic database claiming prevent duplicate processing.
 
 Supervisor-only events and exit codes are written to ignored `.worker-state\worker-launcher.log`. The log does not contain credentials, transcript text, summaries, signed links, or authorization headers.
 
@@ -86,6 +88,7 @@ Start-ScheduledTask -TaskName AudioTranscriberWorker
 
 - Idle polling interval: 8 seconds.
 - One active job.
+- Jobs remain FIFO even when tiers differ. Switching tiers unloads the current Whisper model before loading the next one; the selected tier never changes queue priority.
 - Heartbeat is sent while idle and at progress changes.
 - Lease: 20 minutes, refreshed during work.
 - Maximum attempts: 3.

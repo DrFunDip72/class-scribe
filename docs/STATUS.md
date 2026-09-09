@@ -28,7 +28,7 @@ No credentials are stored in this document.
 - Pre-login Windows `SYSTEM` task with startup, logon, five-minute fallback, missed-run, and 999 one-minute restart protections; a persistent launcher supervises Ollama and the worker, while cross-session locks prevent duplicates.
 - Boolean-only public worker health route plus a GitHub Actions monitor configured every five minutes that creates one assigned outage issue and closes it after recovery; monitoring uses no AI, email API, new vendor, paid runner, artifact, or cache. GitHub's free scheduled-event delivery is best-effort and has not met the configured interval reliably.
 - Production Vercel deployment and production login/dashboard/result verification.
-- Production deployment `dpl_GDdXPdtLqAu245izFSYrH4LW82v9` includes oversized-audio preparation, resumable multipart upload, updated privacy/workflow copy, optional email/browser channels, selective copy actions, and the mobile-first layout and is Ready on the public alias.
+- Production deployment `dpl_9doRpu5BXFgXeg8XJqnqJ5utXQmq` includes selectable transcription tiers together with oversized-audio preparation, resumable multipart upload, optional notifications, workflow/copy actions, and the mobile-first layout. It is Ready on the public alias.
 - Full data-path test: browser upload -> Storage -> queue -> local Whisper -> local Ollama -> saved result -> deleted audio -> production result UI.
 - Opt-in Web Push controls, per-device subscription storage, privacy-safe completion/failure alerts, durable retry outbox, service-worker click-through, and locally held VAPID signing key.
 - Independent opt-in email controls using the signed-in account email, shared batch/per-recording/failure preferences, a branded privacy-safe HTML template, and durable FluxPrompt delivery retries from the outbound local worker.
@@ -109,6 +109,9 @@ No credentials are stored in this document.
 - Turbo is not safe to promote under the tested settings: it invented 37 words in 11 segments wholly after the audio ended and extended its timestamps 26.916 seconds past the source. Distil had no post-audio hallucination and is the leading balanced candidate; current `medium.en` remains the more exact non-hallucinating option. Production `small` is unchanged.
 - Production migration `transcription_tiers` is applied. The column is non-null with default `fast`, its three-value check is validated, all 35 historical jobs are Fast, and the two-argument upload RPC validates or defaults every per-file tier without changing its grants.
 - Actual worker-code smoke transcription passed for all three profiles on the 9.63-second verification source: Fast returned 23 words in 6.781 seconds, Balanced returned 23 words in 15.328 seconds, and High returned 23 words in 11.985 seconds including model-load/switch time. Worker `1.5.0` then returned online and idle.
+- Production tier release: `dpl_9doRpu5BXFgXeg8XJqnqJ5utXQmq` reached Ready on `https://class-scribe-ruddy.vercel.app`. A 390 x 844 authenticated mobile check showed all three accessible radio cards with no horizontal overflow.
+- Production three-tier data path: the same 415 KB verification recording completed once as Fast/`small`, once as Balanced/`distil-large-v3`, and once as High/`medium.en`. The queue stayed sequential, the worker returned online/idle on `1.5.0`, completed source objects were deleted, and Vercel reported no current-deployment runtime errors or warning/error/fatal logs.
+- Production test cleanup: the exact disposable Auth user and its three batches, jobs, and results were cascade-deleted after all source objects had already been removed. Follow-up counts were zero for the user, application rows, and Storage objects.
 
 ## Supabase Auth policy
 
@@ -122,6 +125,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Keep `tyler_eager.m4a` out of every course repository. Run one short disposable production upload through each selectable tier and verify the persisted tier, actual result model, completed UI label, audio cleanup, and queue continuity; then test five real 30-60 minute recordings as one mixed-tier batch. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
+Keep `tyler_eager.m4a` out of every course repository. Test five real 30-60 minute recordings as one mixed-tier batch and compare whether Balanced is the best routine default in practice. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

@@ -3,7 +3,7 @@
 ## Selectable Fast, Balanced, and High tiers — PASS
 
 **Date:** 2026-09-09
-**Environment:** production Supabase, Next.js 16.3.2 build, Windows `SYSTEM` task, Intel i7-10700 CPU, faster-whisper CPU INT8, and cached `small`, `distil-large-v3`, and `medium.en` models.
+**Environment:** production Vercel/Supabase, Next.js 16.3.2 build, Windows `SYSTEM` task, Intel i7-10700 CPU, faster-whisper CPU INT8, and cached `small`, `distil-large-v3`, and `medium.en` models.
 
 1. Created and applied migration `20260909181020_transcription_tiers.sql`. Production exposes a non-null text column with default `fast`; the validated check accepts only `fast`, `balanced`, and `high`. All 35 historical jobs were backfilled/defaulted to Fast, and no queued or active job existed during rollout.
 2. The unchanged two-argument `create_upload_batch` signature now reads and validates each file record's tier, defaults a missing legacy value to Fast, and preserves its authenticated-only execution grant. No RLS policy or browser write grant was broadened.
@@ -12,8 +12,12 @@
 5. The pre-login launcher now sets `HF_HOME` to the owner's existing verified cache so the `SYSTEM` worker does not download duplicate models. The scheduled task was disabled only while the queue was confirmed idle, then re-enabled and started. Supabase reported worker `1.5.0` online and idle with no active job.
 6. Python compilation and all 21 worker/comparison tests passed. `npm run lint`, TypeScript checking, optimized `npm run build`, and `git diff --check` passed.
 7. Supabase security advisors reported only the intentionally documented guarded SECURITY DEFINER RPC warnings plus Free-plan leaked-password protection; performance advisors reported only the two pre-existing low-traffic unused indexes. No new tier-related advisory appeared.
+8. Production deployment `dpl_9doRpu5BXFgXeg8XJqnqJ5utXQmq` reached Ready and moved `https://class-scribe-ruddy.vercel.app` to the selectable-tier release. The deployment contained the exact committed `web/` tree plus only the two browser-public Supabase build settings, so unrelated local Auth-page edits were not deployed.
+9. A disposable immediate-session account verified the live selector at desktop width and at 390 x 844 CSS pixels. Fast was the default; Balanced and High were independently selectable; the radio group retained accessible names; and the mobile page reported `scrollWidth === innerWidth` with no horizontal overflow.
+10. The same 415 KB verification recording was uploaded once through each live tier. The production queue completed all three sequentially and displayed the exact persisted mappings: Fast -> `small`, Balanced -> `distil-large-v3`, and High -> `medium.en`. The worker returned online/idle after the third job, proving queue continuity and model switching across separate jobs.
+11. After completion, the disposable account had three batches, jobs, and results with zero Storage objects. Deleting that exact disposable Auth user cascade-removed all nine application rows; a follow-up query returned zero users, batches, jobs, results, and Storage objects. The current deployment had no runtime error cluster and no warning/error/fatal runtime logs during the test.
 
-**Result:** database persistence, defensive validation, exact model-option mapping, real local inference, one-model memory switching, generated TypeScript shape, and the production worker restart pass. Final deployed browser verification is recorded after the production alias moves.
+**Result:** PASS. Database persistence, defensive validation, exact model-option mapping, real production uploads, one-model memory switching, queue continuity, audio cleanup, responsive live UI, deployment health, and disposable-data cleanup all passed.
 
 ## Next-generation local transcription benchmark — PASS WITH FINDINGS
 

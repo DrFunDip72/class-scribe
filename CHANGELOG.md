@@ -9,6 +9,7 @@
 - Updated worker `1.5.0` to honor each job's exact model, beam, language, and previous-text-conditioning profile while preserving FIFO processing and recording the actual model in results.
 - Kept only one Whisper model in memory at a time and configured the pre-login `SYSTEM` launcher to reuse the owner's verified Hugging Face cache.
 - Displayed the tier/model on dashboard rows, in-progress pages, and completed result pages. Turbo remains unavailable because its benchmark fabricated post-audio speech.
+- Deployed the selectable-tier release to production and completed one real browser upload through every tier. All three jobs finished with the expected model labels, source audio was removed, the mobile dashboard had no horizontal overflow at 390 pixels, and the disposable test account/data were deleted.
 
 ### Summary repair and transcription comparison
 

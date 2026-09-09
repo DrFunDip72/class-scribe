@@ -228,20 +228,38 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 
 Do not promise processing time until real long-class benchmarks are recorded.
 
-## Private GitHub course export — PASS
+## GitHub course export and public access — PASS
 
 **Date:** 2026-09-09
 **Scope:** one-time owner export from production Supabase to private GitHub course repositories.
 
 1. Queried recordings created from 2026-09-02 onward and confirmed the four September 2 course filenames belonged to `jmaximum72@gmail.com`; another account's recordings were excluded.
 2. Confirmed `hrm_391_9-2.m4a`, `pse_390_9-2.m4a`, `strat_392_-_9-2.m4a`, and `philo_201_9-2.m4a` were completed and had result rows.
-3. Created `DrFunDip72/HRM-391`, `DrFunDip72/PSE-390`, `DrFunDip72/STRAT-392`, and `DrFunDip72/PHIL-201` with private visibility.
+3. Created `DrFunDip72/HRM-391`, `DrFunDip72/PSE-390`, `DrFunDip72/STRAT-392`, and `DrFunDip72/PHIL-201`, then changed all four to public visibility at the owner's explicit direction.
 4. Wrote each result to `notes/2026/2026-09-02.md` with its Class Scribe job UUID, dated metadata, generated study guide, and complete transcript.
 5. Retrieved every remote file through the authenticated GitHub API, decoded its content, and compared its SHA-256 digest with the staged export. All four comparisons returned `exact_match=True`.
 6. Verified the latest commits: HRM `af79a32c733acc9680a39854dd7014ac14c1b92a`, PSE `ef2009d3ba0941a095bef6d9ba2e9be77e0ec5ba`, STRAT `5bbc3422cb134aebcf1e06f7c3638c0b6dabaec4`, and PHIL `bc30712904073522dcf6e0070d1158c8c97c7dac`.
-7. Did not export `tyler_eager.m4a`; its content is an interview with a Burger King franchise consultant, but its course and intended lecture date are not determinable from saved metadata.
+7. Verified all four repositories report `PUBLIC`, and anonymous raw-file requests returned HTTP 200 for every exported path.
+8. Verified each document's heading order is Summary, Key Points, Action Items, then Transcript, with all sections in the same Markdown file.
+9. Did not export `tyler_eager.m4a`; the owner explicitly directed that it go nowhere.
 
-**Result:** PASS for the four unambiguous September 2 recordings. One owner recording remains pending classification.
+**Result:** PASS for the four September 2 course recordings. `tyler_eager.m4a` remains intentionally unexported.
+
+## Real transcript text-only quality audit — PASS WITH LIMITATIONS
+
+**Date:** 2026-09-09
+**Scope:** the four owner recordings exported for September 2. Source audio was already deleted by the normal retention policy, so this audit evaluates text coherence and obvious contextual substitutions, not measured word-error rate.
+
+| Course | Audio | Words | Processing | Text-only finding |
+|---|---:|---:|---:|---|
+| HRM 391 | 73.5 min | 11,105 | 22.8 min | Main organization-management lecture is recoverable; opening, student discussion, repeated phrases, names, and the closing prayer contain obvious errors. |
+| PSE 390 | 60.3 min | 7,413 | 19.2 min | Ethics concepts and assignments are recoverable; `Brigham Young University`, `BYU`, `adjunct`, `Wealth of Nations`, names, and the final prayer are misrecognized in places. |
+| STRAT 392 | 71.1 min | 9,211 | 20.1 min | Amazon and competitive-advantage sections are coherent; the opening prayer, soft classroom interaction, and ending contain substantial garbling. |
+| PHIL 201 | 61.6 min | 9,219 | 19.9 min | Course structure and broad Aristotle discussion are usable; Greek phrases, philosophical terminology, examples, and cross-talk are frequently unreliable. |
+
+The stored segment records contain timestamps and text but omit confidence fields, so low-confidence passages cannot currently be highlighted after processing. The worker uses `faster-whisper/small-cpu-int8` with `beam_size=1`, VAD, and previous-text conditioning. The summaries generally preserve the main topics but can repeat transcription errors. The HRM fallback `Big takeaway` ends after `Dr.` because its first-sentence extraction treats the title abbreviation as a sentence boundary.
+
+**Result:** Suitable as a searchable study aid and summary source; unsuitable for exact quotation, proper-name verification, or a verbatim academic record without listening back to the original audio.
 
 ## Business-model documentation review — PASS
 

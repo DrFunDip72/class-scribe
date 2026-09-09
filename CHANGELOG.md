@@ -2,12 +2,16 @@
 
 ## 2026-09-09
 
-### Private course archive bootstrap
+### Course archive bootstrap
 
 - Created private `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201` repositories under the owner's GitHub account.
 - Exported the owner's four completed September 2 recordings as dated Markdown containing metadata, summary, key points, action items, and full transcript.
 - Embedded each Class Scribe job UUID for future duplicate-safe Notion synchronization and kept all transcript text out of the public application repository.
 - Verified all four remote files and repository visibility; left the ambiguous `tyler_eager.m4a` recording unexported pending owner classification.
+- Changed all four course repositories to public at the owner's explicit direction and verified anonymous HTTP 200 access to every exported document.
+- Confirmed every document keeps Summary, Key Points, and Action Items before the complete Transcript in the same file; `tyler_eager.m4a` is intentionally excluded.
+- Completed a text-only quality audit of the four real hour-long transcripts: main concepts are usable, but obvious proper-noun, technical-vocabulary, distant-speech, prayer, and cross-talk recognition errors make the current output unsuitable as a verbatim record.
+- Identified an abbreviation-sensitive study-guide fallback that truncates the HRM `Big takeaway` after `Dr.`; a measured transcription-settings comparison and that formatting fix remain follow-up work.
 
 ## 2026-09-02
 

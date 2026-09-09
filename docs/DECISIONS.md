@@ -151,3 +151,11 @@ Store any GitHub copy of a private transcription only in a private course-specif
 **Reason:** The owner wants course-organized GitHub archives and future Notion automation, while transcripts remain private educational data. A stable source ID supports duplicate-safe synchronization even if a title or filename later changes.
 
 **Consequence:** The initial private repositories are `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`. The September 2 owner results were exported once to `notes/2026/2026-09-02.md`. Recordings without an unambiguous course and lecture date must remain unexported until the owner classifies them. This decision establishes the privacy and identity convention only; durable automatic GitHub and Notion delivery still requires a reviewed implementation and retry outbox.
+
+## ADR-026 — Owner-Directed Public Course Archives
+
+Supersede ADR-025's private-repository requirement for these four owner-controlled course archives. Publish `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201` so the owner can intentionally share the notes with friends. Keep the public application repository separate and continue excluding all other users' data.
+
+**Reason:** The owner explicitly chose public visibility for the four course repositories after reviewing the sharing purpose. Public GitHub links are simpler to distribute and can later feed a public Notion workflow without repository authentication.
+
+**Consequence:** Anyone can discover, read, copy, index, or redistribute these exported summaries and transcripts, including content retained in Git history. Future automatic export must be opt-in and restricted to the owner's account; it must never publish another account's recording. Every public document must preserve its source job UUID and place the study-guide summary before the complete transcript. `tyler_eager.m4a` is explicitly excluded from all course repositories.

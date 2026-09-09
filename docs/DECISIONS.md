@@ -143,3 +143,11 @@ Treat 50 MB as a Supabase Storage object limit, not a source-recording limit. Up
 **Reason:** Long classes and uncompressed M4A/WAV sources can exceed the Supabase Free 50 MB per-object limit even when compact speech audio fits the overall free Storage allowance. Local preparation avoids Vercel payload/runtime limits and prevents the original large recording from leaving the user's device. Multipart objects retain the $0 stack; resumable transfer avoids restarting a large part after a brief connection failure.
 
 **Consequence:** Every object remains at most 50 MB, every logical recording is limited to 32 parts and 1 GB of prepared audio, and the project-wide 1 GB free Storage quota still applies. Browser/device resources and source codec support remain practical limits. The batch RPC validates exact owner/job/part paths and creates manifests atomically. The outbound worker downloads and transcribes parts sequentially, offsets timestamps, commits one result, and deletes all remote parts only after success. System FFmpeg decodes parts to NumPy for the unchanged faster-whisper `small` CPU/INT8 model, avoiding the PyAV native extension blocked by Windows Smart App Control.
+
+## ADR-025 — Private Course Repositories for Transcript Exports
+
+Store any GitHub copy of a private transcription only in a private course-specific repository. Never place transcript or summary content in the public `class-scribe` application repository. Use the immutable Class Scribe job UUID in each Markdown document's frontmatter and use the lecture date, rather than upload or completion time, for its dated path.
+
+**Reason:** The owner wants course-organized GitHub archives and future Notion automation, while transcripts remain private educational data. A stable source ID supports duplicate-safe synchronization even if a title or filename later changes.
+
+**Consequence:** The initial private repositories are `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`. The September 2 owner results were exported once to `notes/2026/2026-09-02.md`. Recordings without an unambiguous course and lecture date must remain unexported until the owner classifies them. This decision establishes the privacy and identity convention only; durable automatic GitHub and Notion delivery still requires a reviewed implementation and retry outbox.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-09
+
+### Private course archive bootstrap
+
+- Created private `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201` repositories under the owner's GitHub account.
+- Exported the owner's four completed September 2 recordings as dated Markdown containing metadata, summary, key points, action items, and full transcript.
+- Embedded each Class Scribe job UUID for future duplicate-safe Notion synchronization and kept all transcript text out of the public application repository.
+- Verified all four remote files and repository visibility; left the ambiguous `tyler_eager.m4a` recording unexported pending owner classification.
+
 ## 2026-09-02
 
 ### Oversized audio and durable multipart uploads

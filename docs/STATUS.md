@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-09
 **Phase:** Built and deployed with source recordings larger than 50 MB, local audio/video preparation, resumable multipart uploads, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -37,6 +37,7 @@ No credentials are stored in this document.
 - Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 - Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
+- Created four private owner-only course repositories (`HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`) and performed a one-time export of the owner's September 2 completed results as dated Markdown notes. Automatic GitHub/Notion delivery is not implemented yet.
 
 ## Last verified state
 
@@ -92,6 +93,7 @@ No credentials are stored in this document.
 - Production multipart result: pass. Two private audio parts became one 19.265-second completed result on attempt 1 with continuous segment timestamps, a non-empty summary, and zero remaining Storage objects.
 - Production oversized-audio selector: pass. The deployed dashboard accepted a synthetic 51.0 MB M4A, labeled it `compresses locally`, created no job because submission was intentionally not started, and retained no test media/account.
 - Production release health: login and worker-health returned HTTP 200; health returned exactly `{"status":"online"}` with `no-store`; current-deployment runtime error and warning/error/fatal log scans were empty.
+- On 2026-09-09, the Supabase owner record for `jmaximum72@gmail.com` was used to export the four unambiguous September 2 course results into separate private GitHub repositories at `notes/2026/2026-09-02.md`. Each remote file was decoded and SHA-256-compared with its staged database export; all four matched exactly. The unrelated account's results were excluded. `tyler_eager.m4a` remains unexported because its course and lecture date are not reliably encoded in its metadata.
 
 ## Supabase Auth policy
 
@@ -105,6 +107,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Upload the real `hrm 391 9-2.m4a` from the owner's normal browser and record preparation time, peak browser memory, uploaded-part count, and completed result quality. Then test five real 30-60 minute recordings as one batch to confirm practical FIFO timing and live Storage headroom. Separately, replace or supplement the best-effort GitHub schedule with a genuinely dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Also verify one opted-in automatic completion email plus its `completion_events` delivery state.
+Have the owner identify the course and intended lecture date for `tyler_eager.m4a`, then export it to the matching private course repository. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and repository conventions are approved. Separately, test five real 30-60 minute recordings as one batch, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill. On the next planned Windows restart, confirm the task reaches Running and publishes a fresh heartbeat before any user signs in. Also verify one opted-in automatic completion email plus its `completion_events` delivery state.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

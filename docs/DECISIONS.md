@@ -175,3 +175,11 @@ Retain ADR-005's `small`/CPU INT8/beam-1 production default. Do not adopt `small
 **Reason:** On a difficult 10-minute real PHIL 201 excerpt, `small.en` took 184.532 seconds versus the baseline's 97.235 seconds without a consistent quality gain. `medium.en` recovered materially better technical, name, and sentence-level wording, but took 536.625 seconds—5.5 times the baseline transcription time—and still was not verbatim-perfect.
 
 **Consequence:** Existing uploads keep their current speed and FIFO capacity. A future High accuracy feature must expose the processing-time tradeoff before submission, persist the chosen model per job, keep processing sequential, and be tested on a full class and multi-file queue before release. The current comparison tool remains available for private operator experiments without changing saved production results.
+
+## ADR-029 — Prefer Distil for a Future Balanced Tier; Reject Turbo as Tested
+
+Keep production on ADR-005's `small` default. If a faster higher-quality tier is implemented, use `distil-large-v3` as the leading Balanced candidate and retain `medium.en` as the High/exactness candidate. Do not promote `turbo` with the tested beam-5, previous-text-conditioned configuration.
+
+**Reason:** On the cached ten-minute PHIL 201 benchmark, Distil took 204.844 seconds versus 554.953 for `medium.en`, a 63.09% reduction, and produced no post-audio text. Its bounded 107-word published-reference WER was 6.54% versus 3.74% for `medium.en`, showing a measurable exact-wording tradeoff. Turbo was faster than `medium.en` and scored 2.80% on that bounded reference, but invented 37 words across 11 segments wholly beyond the source boundary and extended timestamps 26.916 seconds past the audio.
+
+**Consequence:** No deployed model changes in this decision. A future tiered implementation must label speed/accuracy tradeoffs, persist the selected tier, and retain sequential queueing. Turbo requires a separate configuration and hallucination-control test before reconsideration; bounded quote WER must never be presented as whole-lecture accuracy.

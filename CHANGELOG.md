@@ -12,6 +12,9 @@
 - Benchmarked a difficult 10-minute PHIL 201 excerpt from a retained 59.7 MB real class source. `medium.en` materially improved technical and lecture-specific wording but took 5.5 times the baseline transcription time; `small.en`/beam 5 was slower without a consistent quality gain.
 - Scored 107 spoken words with published source text: Original/Fast had 9.35% WER, Medium had 15.89%, and High had 3.74%. High reduced errors 76.47% versus Medium on this bounded reference while taking 2.908 times as long.
 - Kept production `small`/beam 1 unchanged, documented `medium.en` as a possible future per-recording High accuracy option, and restored the scheduled worker online after the idle-queue benchmark.
+- Added a `next-gen` benchmark suite for current High `medium.en`, `distil-large-v3`, and `turbo`, with per-model previous-text conditioning and automatic post-audio timestamp/word detection.
+- On the cached ten-minute PHIL excerpt, Distil ran 63.09% faster than current High and emerged as the Balanced-tier candidate; its bounded 107-word WER was 6.54% versus High's 3.74%.
+- Rejected Turbo under the tested configuration despite a 2.80% bounded WER because it fabricated 37 words after the audio ended. Production transcription remains unchanged.
 
 ### Course archive bootstrap
 

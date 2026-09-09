@@ -35,6 +35,7 @@ No credentials are stored in this document.
 - Streamlined study-guide generation with a short overview, lecture-ordered concepts and definitions, selective examples, a final big takeaway, and genuine action items.
 - Abbreviation-aware fallback summary processing so a first sentence containing a title such as `Dr.` produces a complete `Big takeaway`.
 - Local-only three-configuration transcription comparison for production `small`/beam 1, English `small.en`/beam 5, and English `medium.en`/beam 5, with ignored transcript, segment, timing, and agreement reports.
+- Optional `next-gen` benchmark suite for `medium.en`, `distil-large-v3`, and `turbo`, including automatic timestamp-overrun/post-audio-word detection; it is an operator experiment and does not alter production jobs.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 - Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
@@ -54,7 +55,7 @@ No credentials are stored in this document.
 - Production dashboard: pass; reports worker online.
 - Production result view: pass.
 - Next.js lint/build: pass.
-- Python compile and all 17 helper/comparison tests: pass.
+- Python compile and all 19 helper/comparison tests: pass.
 - Notification migration: applied; VAPID public key published and private key retained locally.
 - Production Web Push: real Chrome/FCM subscription, one-attempt worker delivery, service-worker receipt, generic payload, and private-result click-through all passed end to end; disposable data was removed.
 - Production selective-copy test: Summary excluded the transcript, Transcript excluded study-note sections, and Everything contained summary, key points, action items, and transcript.
@@ -103,6 +104,8 @@ No credentials are stored in this document.
 - Exact word-error scoring was possible for 107 spoken reference words drawn from the displayed Aristotle passage and 2 Nephi 2:27. Original/Fast made 10 errors (9.35% WER), Medium made 17 (15.89% WER), and High made 4 (3.74% WER). On this bounded reference, High reduced errors 76.47% versus Medium and 60.00% versus Original/Fast. Whole-lecture WER remains unavailable without a full human transcript.
 - Against the full 1,729-word original model transcript, Medium differs by a minimum 208 normalized-word edits (12.03%) and High by 146 (8.44%). High is 62 edits/29.81% closer than Medium, but closeness to the error-bearing original is agreement rather than accuracy.
 - The one affected stored HRM result was corrected in Supabase, and the matching public `HRM-391` Markdown note was corrected in commit `dcc94c6c7f23be497a2d9b1e607e6e26d72344ab`. A post-write read returned the complete takeaway.
+- A cached next-generation run on the same ten-minute PHIL excerpt measured `medium.en` at 554.953 seconds, Distil at 204.844 seconds, and Turbo at 331.250 seconds. Distil was 63.09% faster than current High. On the bounded 107-word published-text reference, WER was 3.74%, 6.54%, and 2.80% respectively.
+- Turbo is not safe to promote under the tested settings: it invented 37 words in 11 segments wholly after the audio ended and extended its timestamps 26.916 seconds past the source. Distil had no post-audio hallucination and is the leading balanced candidate; current `medium.en` remains the more exact non-hallucinating option. Production `small` is unchanged.
 
 ## Supabase Auth policy
 
@@ -116,6 +119,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Keep `tyler_eager.m4a` out of every course repository. Decide whether the measured `medium.en` quality gain justifies an explicit per-recording High accuracy option with roughly a 55-minute transcription-only projection for a 61:33 class; keep production `small` as the fast default unless that product change is approved. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, test five real 30-60 minute recordings as one batch, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
+Keep `tyler_eager.m4a` out of every course repository. Decide whether routine uploads should gain an explicit Distil Balanced tier (about 21 minutes projected for this 61:33 source) alongside `medium.en` High (about 57 minutes); do not enable Turbo without a separate hallucination-control benchmark, and keep production `small` as the default unless a product change is approved. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, test five real 30-60 minute recordings as one batch, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

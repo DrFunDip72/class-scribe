@@ -1,5 +1,24 @@
 # Testing and Verification
 
+## Next-generation local transcription benchmark — PASS WITH FINDINGS
+
+**Date:** 2026-09-09
+**Environment:** Intel Core i7-10700 (8 cores/16 threads), 15.7 GB RAM, local Python 3.12 worker environment, faster-whisper CPU INT8, and cached `medium.en`, `distil-large-v3`, and `turbo` models.
+
+1. Added a `next-gen` comparison suite containing current High (`medium.en`), `distil-large-v3`, and `turbo`, all at beam 5 and fixed English. Distil uses `condition_on_previous_text=False`; the other two retain conditioning.
+2. Added automatic timestamp-overrun and post-audio word metrics so invented trailing speech is visible in future reports. Python compilation and all 19 worker/comparison tests passed.
+3. Reused the same private 600.014-second PHIL 201 excerpt from 29:30-39:30. The scheduled production worker was disabled only after confirming an idle queue, and the source and all outputs remained under ignored `.transcriber-benchmarks/`.
+4. The first sequential run completed all three candidates and populated the two new model caches. The cached repeat is the comparable performance run: `medium.en` took 554.953 seconds (RTF 0.9249), Distil took 204.844 seconds (RTF 0.3414), and Turbo took 331.250 seconds (RTF 0.5521).
+5. Distil was 63.09% faster than current High; current High took 2.709 times as long. Turbo was 40.31% faster than current High, while Distil was 38.16% faster than Turbo. Linear transcription-only projections for the complete 61:33 source are 56:56, 21:01, and 33:59 respectively.
+6. Pairwise normalized-word agreement was 94.0% for current High versus Distil, 94.5% for current High versus Turbo, and 94.1% for Distil versus Turbo. These values measure agreement, not correctness.
+7. The same bounded 107-word published-text reference produced 4 edits for current High (3.74% WER), 7 for Distil (6.54% WER), and 3 for Turbo (2.80% WER). This is an exact score for those two quote regions only, not the ten-minute excerpt or whole lecture, and it has not been replaced by a full human-produced transcript.
+8. Turbo nevertheless failed the hallucination check: after the other models ended at `Sometimes shock value`, it generated 37 words in 11 segments beginning after the 600.014-second audio boundary and extended timestamps to 626.93 seconds. Those segments shared an extremely low average log probability near -2.868; the model-wide average was -0.45421 versus -0.16654 for current High and -0.16031 for Distil.
+9. Distil made more proper-noun and exact-quotation substitutions than current High but did not invent post-audio speech. Current High retained the strongest conservative exactness of the non-hallucinating choices. Turbo's slightly better bounded quote score does not outweigh its fabricated tail under this configuration.
+10. Model cache footprints were approximately 1.43 GB for `medium.en`, 1.41 GB for Distil, and 1.51 GB for Turbo. The production worker was then re-enabled and started; Task Scheduler returned Running and Supabase published a fresh idle heartbeat from worker `1.4.2`.
+11. Final `npm run lint`, `npm run build`, Python compilation, all 19 worker/comparison tests, `git diff --check`, and ignored-secret checks passed. The public health endpoint returned HTTP 200 with exactly `{"status":"online"}` and `Cache-Control: no-store, max-age=0`; the scheduled worker remained enabled and Running.
+
+**Result:** the benchmark machinery and all candidates ran successfully. Do not promote Turbo as configured. Distil is the best speed/quality candidate for routine study notes, while `medium.en` remains the safer choice when exact wording matters. Production `small` remains unchanged pending an explicit product-tier decision.
+
 ## Summary sentence boundary and three-model comparison — PASS
 
 **Date:** 2026-09-09

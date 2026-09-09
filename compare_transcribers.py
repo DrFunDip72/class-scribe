@@ -35,6 +35,7 @@ class TranscriberConfiguration:
     model: str
     beam_size: int
     language: str | None
+    condition_on_previous_text: bool = True
 
 
 CONFIGURATIONS = (
@@ -42,6 +43,23 @@ CONFIGURATIONS = (
     TranscriberConfiguration("small-en-beam5", "small.en", 5, "en"),
     TranscriberConfiguration("medium-en-beam5", "medium.en", 5, "en"),
 )
+
+NEXT_GENERATION_CONFIGURATIONS = (
+    TranscriberConfiguration("current-high-medium-en", "medium.en", 5, "en"),
+    TranscriberConfiguration(
+        "distil-large-v3",
+        "distil-large-v3",
+        5,
+        "en",
+        condition_on_previous_text=False,
+    ),
+    TranscriberConfiguration("turbo", "turbo", 5, "en"),
+)
+
+SUITES = {
+    "production": CONFIGURATIONS,
+    "next-gen": NEXT_GENERATION_CONFIGURATIONS,
+}
 
 
 def safe_name(value: str) -> str:
@@ -60,6 +78,27 @@ def word_similarity(left: str, right: str) -> float:
     if not left_words and not right_words:
         return 1.0
     return SequenceMatcher(None, left_words, right_words).ratio()
+
+
+def timestamp_overrun_seconds(
+    segments: list[dict[str, Any]],
+    audio_duration_seconds: float,
+) -> float:
+    """Return how far the last segment extends beyond the decoded audio."""
+    final_end = max((float(item["end"]) for item in segments), default=0.0)
+    return round(max(0.0, final_end - audio_duration_seconds), 3)
+
+
+def words_starting_after_audio(
+    segments: list[dict[str, Any]],
+    audio_duration_seconds: float,
+) -> int:
+    """Count words in segments that begin after the decoded audio ends."""
+    return sum(
+        len(normalized_words(str(item["text"])))
+        for item in segments
+        if float(item["start"]) >= audio_duration_seconds
+    )
 
 
 def decode_audio(audio_path: Path, sampling_rate: int = 16_000) -> np.ndarray:
@@ -126,7 +165,7 @@ def run_configuration(
         "beam_size": configuration.beam_size,
         "vad_filter": True,
         "vad_parameters": {"min_silence_duration_ms": 500},
-        "condition_on_previous_text": True,
+        "condition_on_previous_text": configuration.condition_on_previous_text,
     }
     if configuration.language:
         options["language"] = configuration.language
@@ -172,6 +211,14 @@ def run_configuration(
             "word_count": len(normalized_words(transcript)),
             "character_count": len(transcript),
             "segment_count": len(segments),
+            "timestamp_overrun_seconds": timestamp_overrun_seconds(
+                segments,
+                duration_seconds,
+            ),
+            "words_starting_after_audio": words_starting_after_audio(
+                segments,
+                duration_seconds,
+            ),
             "mean_avg_logprob": round(fmean(logprobs), 5) if logprobs else None,
             "mean_no_speech_probability": round(fmean(no_speech), 5) if no_speech else None,
             "transcript": transcript,
@@ -194,6 +241,10 @@ def write_outputs(output_dir: Path, source: Path, results: list[dict[str, Any]])
                 f"- Model: `{result['configuration']['model']}`",
                 f"- Beam size: `{result['configuration']['beam_size']}`",
                 f"- Language: `{result['configuration']['language'] or 'auto-detect'}`",
+                (
+                    "- Previous-text conditioning: "
+                    f"`{result['configuration']['condition_on_previous_text']}`"
+                ),
                 f"- CPU time: `{result['elapsed_seconds']} seconds`",
                 "",
                 "## Transcript",
@@ -252,9 +303,9 @@ def write_outputs(output_dir: Path, source: Path, results: list[dict[str, Any]])
         "",
         (
             "| Configuration | Model | Beam | Words | Seconds | "
-            "Real-time factor | Avg. log probability |"
+            "Real-time factor | Timestamp overrun | Words after audio | Avg. log probability |"
         ),
-        "|---|---|---:|---:|---:|---:|---:|",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for result in results:
         config = result["configuration"]
@@ -262,6 +313,8 @@ def write_outputs(output_dir: Path, source: Path, results: list[dict[str, Any]])
             f"| [{config['key']}]({config['key']}.md) | `{config['model']}` | "
             f"{config['beam_size']} | {result['word_count']} | "
             f"{result['elapsed_seconds']} | {result['real_time_factor']} | "
+            f"{result['timestamp_overrun_seconds']}s | "
+            f"{result['words_starting_after_audio']} | "
             f"{result['mean_avg_logprob'] if result['mean_avg_logprob'] is not None else 'n/a'} |"
         )
     report_lines.extend(["", "## Pairwise word-sequence similarity", ""])
@@ -296,6 +349,15 @@ def main() -> int:
     )
     parser.add_argument("audio", type=Path, help="Local audio or video file to transcribe")
     parser.add_argument(
+        "--suite",
+        choices=tuple(SUITES),
+        default="production",
+        help=(
+            "production compares the deployed baseline candidates; next-gen compares "
+            "medium.en, distil-large-v3, and turbo"
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         help="Directory for private benchmark output (must not already exist)",
@@ -316,7 +378,7 @@ def main() -> int:
     print(f"Decoding {source.name} once for all three configurations...", flush=True)
     audio = decode_audio(source)
     results: list[dict[str, Any]] = []
-    for configuration in CONFIGURATIONS:
+    for configuration in SUITES[args.suite]:
         result = run_configuration(configuration, audio)
         results.append(result)
         print(

@@ -10,6 +10,7 @@
 - Added ignored Markdown/JSON benchmark reports containing transcripts, segment metadata, cached timing, and model-agreement measurements without uploading private audio or changing production settings.
 - Smoke-tested all three configurations twice on the 9.63-second verification sample; the clean clip was nearly identical across models, so no production-model winner was declared.
 - Benchmarked a difficult 10-minute PHIL 201 excerpt from a retained 59.7 MB real class source. `medium.en` materially improved technical and lecture-specific wording but took 5.5 times the baseline transcription time; `small.en`/beam 5 was slower without a consistent quality gain.
+- Scored 107 spoken words with published source text: Original/Fast had 9.35% WER, Medium had 15.89%, and High had 3.74%. High reduced errors 76.47% versus Medium on this bounded reference while taking 2.908 times as long.
 - Kept production `small`/beam 1 unchanged, documented `medium.en` as a possible future per-recording High accuracy option, and restored the scheduled worker online after the idle-queue benchmark.
 
 ### Course archive bootstrap

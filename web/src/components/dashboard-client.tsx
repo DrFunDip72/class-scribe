@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Archive, ArchiveRestore, ArrowRight, Check, CheckCheck, ClipboardCheck, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Server, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, ArrowRight, Check, CheckCheck, ClipboardCheck, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Sparkles, Trash2, UploadCloud, X } from "lucide-react";
 import { NotificationSettings } from "@/components/notification-settings";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
@@ -16,10 +16,12 @@ type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
   upload_batches: { created_at: string; file_count: number; label: string | null } | null;
 };
 type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
-type UploadState = "idle" | "preparing" | "uploading" | "creating";
+type UploadState = "idle" | "starting" | "preparing" | "uploading";
+type UploadItemStatus = "waiting" | "preparing" | "uploading" | "queued" | "failed";
+type UploadItem = { jobId: string; name: string; status: UploadItemStatus; progress: number };
 type HistoryFilter = "todo" | "done" | "archived" | "all";
 type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
-type UploadRecordingRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier; parts: UploadPartRecord[] };
+type PendingUploadRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier };
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -33,12 +35,6 @@ const mimeByExtension: Record<string, string> = {
 function safeName(name: string) {
   const cleaned = name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^[_\.]+/, "").slice(-220);
   return cleaned || `recording_${Date.now()}.mp3`;
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 function extensionOf(file: File) {
@@ -70,6 +66,35 @@ function copiedLabel(state: RecordingState | null) {
   return null;
 }
 
+function uploadItemLabel(item: UploadItem) {
+  if (item.status === "waiting") return "Waiting to upload";
+  if (item.status === "preparing") return `Preparing · ${Math.round(item.progress * 100)}%`;
+  if (item.status === "uploading") return `Uploading · ${Math.round(item.progress * 100)}%`;
+  if (item.status === "queued") return "Uploaded · processing can begin";
+  return "Upload interrupted";
+}
+
+function jobStatusLabel(job: Job, state: RecordingState | null) {
+  if (state?.archived_at) return "Archived";
+  if (state?.done_at) return "Done";
+  if (job.status === "uploading") return "Uploading";
+  if (job.status === "queued") return "Waiting";
+  if (job.status === "transcribing") return "Transcribing";
+  if (job.status === "summarizing") return "Creating notes";
+  if (job.status === "completed") return "Ready";
+  return "Needs attention";
+}
+
+function jobProgressLabel(job: Job) {
+  if (job.status === "uploading") return "Waiting for this upload to finish";
+  if (job.status === "queued") return "Waiting to start";
+  if (job.status === "transcribing") return "Creating your transcript";
+  if (job.status === "summarizing") return "Creating your study notes";
+  if (job.status === "completed") return "Ready to review";
+  if (job.error_code === "upload_failed") return "Upload interrupted — select this recording again to retry";
+  return "We couldn't finish this recording";
+}
+
 export function DashboardClient({ userId, userEmail }: { userId: string; userEmail: string }) {
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,7 +104,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [label, setLabel] = useState("");
   const [transcriptionTier, setTranscriptionTier] = useState<TranscriptionTier>("fast");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
-  const [uploadCount, setUploadCount] = useState(0);
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [preparationProgress, setPreparationProgress] = useState(0);
   const [preparationIndex, setPreparationIndex] = useState(0);
@@ -91,6 +116,10 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [checkedAt, setCheckedAt] = useState(0);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("todo");
   const [savingJobIds, setSavingJobIds] = useState<string[]>([]);
+
+  function updateUploadItem(jobId: string, update: Partial<UploadItem>) {
+    setUploadItems((current) => current.map((item) => item.jobId === jobId ? { ...item, ...update } : item));
+  }
 
   const refresh = useCallback(async () => {
     const [jobResponse, workerResponse] = await Promise.all([
@@ -130,80 +159,131 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
 
   async function submitBatch() {
     if (!files.length || uploadState !== "idle") return;
-    setUploadState("uploading");
-    setUploadCount(0);
+    const batchFiles = [...files];
+    const pendingRecords: PendingUploadRecord[] = batchFiles.map((file) => ({
+      job_id: crypto.randomUUID(),
+      original_filename: safeName(file.name),
+      transcription_tier: transcriptionTier,
+    }));
+    setUploadItems(pendingRecords.map((record, index) => ({
+      jobId: record.job_id,
+      name: batchFiles[index].name,
+      status: "waiting",
+      progress: 0,
+    })));
+    setUploadState("starting");
     setUploadProgress(0);
     setError(null);
     setSuccess(null);
-    const uploaded: string[] = [];
-    const records: UploadRecordingRecord[] = [];
+    let queuedCount = 0;
+    let failedCount = 0;
+    let batchStarted = false;
+    const settledJobIds = new Set<string>();
     try {
+      const { error: batchError } = await supabase.rpc("begin_upload_batch", {
+        p_label: label.trim(),
+        p_files: pendingRecords as unknown as Json,
+      });
+      if (batchError) throw batchError;
+      batchStarted = true;
+      await refresh();
+
       const { uploadRecordingPart } = await import("@/lib/storage/upload-recording");
-      for (let index = 0; index < files.length; index += 1) {
-        const sourceFile = files[index];
-        const jobId = crypto.randomUUID();
+      for (let index = 0; index < batchFiles.length; index += 1) {
+        const sourceFile = batchFiles[index];
+        const jobId = pendingRecords[index].job_id;
+        setPreparationIndex(index + 1);
+        const uploaded: string[] = [];
         const parts: UploadPartRecord[] = [];
+        try {
+          const uploadPart = async (file: File, partIndex: number) => {
+            if (file.size > MAX_BYTES) {
+              throw new Error(`${sourceFile.name} could not be prepared for upload.`);
+            }
+            const filename = safeName(file.name);
+            const extension = filename.split(".").pop()?.toLowerCase() ?? "";
+            const storageFilename = `part-${String(partIndex + 1).padStart(4, "0")}.${extension}`;
+            const path = `${userId}/${jobId}/${storageFilename}`;
+            const mimeType = file.type && file.type !== "application/octet-stream"
+              ? file.type
+              : mimeByExtension[extension];
+            if (!mimeType) throw new Error(`${sourceFile.name} is not a supported recording format.`);
 
-        const uploadPart = async (file: File, partIndex: number) => {
-          if (file.size > MAX_BYTES) {
-            throw new Error(`${sourceFile.name} produced an audio part larger than 50 MB.`);
-          }
-          const filename = safeName(file.name);
-          const extension = filename.split(".").pop()?.toLowerCase() ?? "";
-          const storageFilename = `part-${String(partIndex + 1).padStart(4, "0")}.${extension}`;
-          const path = `${userId}/${jobId}/${storageFilename}`;
-          const mimeType = file.type && file.type !== "application/octet-stream"
-            ? file.type
-            : mimeByExtension[extension];
-          if (!mimeType) throw new Error(`${sourceFile.name} has an unsupported audio type.`);
+            setUploadState("uploading");
+            setUploadProgress(0);
+            updateUploadItem(jobId, { status: "uploading", progress: 0 });
+            await uploadRecordingPart({
+              supabase,
+              path,
+              file,
+              contentType: mimeType,
+              onProgress: (progress) => {
+                setUploadProgress(progress);
+                updateUploadItem(jobId, { status: "uploading", progress });
+              },
+            });
+            uploaded.push(path);
+            parts.push({ storage_path: path, size_bytes: file.size, mime_type: mimeType, extension });
+          };
 
-          setUploadState("uploading");
-          setUploadProgress(0);
-          await uploadRecordingPart({
-            supabase,
-            path,
-            file,
-            contentType: mimeType,
-            onProgress: setUploadProgress,
-          });
-          uploaded.push(path);
-          parts.push({ storage_path: path, size_bytes: file.size, mime_type: mimeType, extension });
-        };
-
-        if (needsLocalPreparation(sourceFile)) {
-          setUploadState("preparing");
-          setPreparationIndex(index + 1);
-          setPreparationProgress(0);
-          const { extractAudioPartsForUpload } = await import("@/lib/media/extract-audio");
-          for await (const part of extractAudioPartsForUpload(sourceFile, (progress) => {
+          if (needsLocalPreparation(sourceFile)) {
             setUploadState("preparing");
-            setPreparationProgress(progress);
-          })) {
-            await uploadPart(part.file, part.partIndex);
+            setPreparationIndex(index + 1);
+            setPreparationProgress(0);
+            updateUploadItem(jobId, { status: "preparing", progress: 0 });
+            const { extractAudioPartsForUpload } = await import("@/lib/media/extract-audio");
+            for await (const part of extractAudioPartsForUpload(sourceFile, (progress) => {
+              setUploadState("preparing");
+              setPreparationProgress(progress);
+              updateUploadItem(jobId, { status: "preparing", progress });
+            })) {
+              await uploadPart(part.file, part.partIndex);
+            }
+          } else {
+            await uploadPart(sourceFile, 0);
           }
-        } else {
-          await uploadPart(sourceFile, 0);
-        }
 
-        records.push({ job_id: jobId, original_filename: safeName(sourceFile.name), transcription_tier: transcriptionTier, parts });
-        setUploadCount(index + 1);
+          const { error: queueError } = await supabase.rpc("queue_uploaded_recording", {
+            p_job_id: jobId,
+            p_parts: parts as unknown as Json,
+          });
+          if (queueError) throw queueError;
+
+          queuedCount += 1;
+          settledJobIds.add(jobId);
+          updateUploadItem(jobId, { status: "queued", progress: 1 });
+          await refresh();
+        } catch (fileError) {
+          failedCount += 1;
+          if (uploaded.length) await supabase.storage.from("recordings").remove(uploaded);
+          await supabase.rpc("fail_recording_upload", { p_job_id: jobId });
+          settledJobIds.add(jobId);
+          updateUploadItem(jobId, { status: "failed", progress: 0 });
+          setError(fileError instanceof Error ? `${sourceFile.name}: ${fileError.message}` : `${sourceFile.name} did not finish uploading.`);
+          await refresh();
+        }
       }
-      setUploadState("creating");
-      const { error: queueError } = await supabase.rpc("create_upload_batch", { p_label: label.trim(), p_files: records as unknown as Json });
-      if (queueError) throw queueError;
       const selectedTier = getTranscriptionTier(transcriptionTier);
-      setSuccess(`${files.length} recording${files.length === 1 ? "" : "s"} added to the ${selectedTier.label} queue.`);
+      if (queuedCount > 0) {
+        setSuccess(`${queuedCount} recording${queuedCount === 1 ? " is" : "s are"} on the way with ${selectedTier.label} quality.${failedCount ? ` ${failedCount} did not finish uploading.` : " You can leave this page."}`);
+      }
       setFiles([]);
       setLabel("");
-      setUploadCount(0);
       setUploadProgress(0);
       setPreparationProgress(0);
       setPreparationIndex(0);
       if (inputRef.current) inputRef.current.value = "";
       await refresh();
+      setUploadItems([]);
     } catch (caught) {
-      if (uploaded.length) await supabase.storage.from("recordings").remove(uploaded);
-      setError(caught instanceof Error ? caught.message : "The upload could not be completed.");
+      if (batchStarted) {
+        await Promise.all(pendingRecords
+          .filter((record) => !settledJobIds.has(record.job_id))
+          .map((record) => supabase.rpc("fail_recording_upload", { p_job_id: record.job_id })));
+        await refresh();
+      }
+      setUploadItems([]);
+      setError(caught instanceof Error ? caught.message : "We couldn't start this upload. Please try again.");
     } finally {
       setUploadState("idle");
     }
@@ -273,9 +353,8 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   }
 
   const activeWorker = workers.find((worker) => checkedAt - new Date(worker.last_seen_at).getTime() < 45000);
-  const queueCount = jobs.filter((job) => job.status === "queued").length;
+  const activeCount = jobs.filter((job) => ["uploading", "queued", "transcribing", "summarizing"].includes(job.status)).length;
   const completeCount = jobs.filter((job) => job.status === "completed").length;
-  const selectedBytes = files.reduce((total, file) => total + file.size, 0);
   const todoCount = jobs.filter((job) => !job.recording_user_states?.archived_at && (job.status !== "completed" || !job.recording_user_states?.done_at)).length;
   const doneCount = jobs.filter((job) => job.recording_user_states?.done_at && !job.recording_user_states.archived_at).length;
   const archivedCount = jobs.filter((job) => job.recording_user_states?.archived_at).length;
@@ -324,12 +403,12 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
 
   return <div className="dashboard-grid">
     <section className="dashboard-main">
-      <div className="page-heading"><div><span className="section-kicker">Your workspace</span><h1>Lecture dashboard</h1><p>Upload class recordings and come back when your study notes are ready.</p></div>
-        <div className={`worker-card ${activeWorker ? "online" : ""}`}><span className="worker-dot" /><div><strong>{activeWorker ? "Worker online" : "Worker offline"}</strong><small>{activeWorker ? activeWorker.state === "processing" ? "Processing a recording" : "Ready for recordings" : "Start your computer worker to process the queue"}</small></div></div>
+      <div className="page-heading"><div><span className="section-kicker">Your workspace</span><h1>My recordings</h1><p>Upload your classes and come back when your notes are ready.</p></div>
+        <div className={`worker-card ${activeWorker ? "online" : ""}`}><span className="worker-dot" /><div><strong>{activeWorker ? "Service ready" : "Service unavailable"}</strong><small>{activeWorker ? activeWorker.state === "processing" ? "Creating class notes now" : "Recordings will process automatically" : "Uploads are saved and will wait safely"}</small></div></div>
       </div>
 
       <div className="upload-card">
-        <div className="card-heading"><div><h2>New recordings</h2><p>Add up to 20 files. Large audio and video become compact speech audio on this device before upload.</p></div><span>{files.length}/{MAX_FILES}{selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}</span></div>
+        <div className="card-heading"><div><h2>Add recordings</h2><p>Choose up to 20 audio or video files. Each recording starts processing as soon as its upload finishes.</p></div><span>{files.length}/{MAX_FILES}</span></div>
         <fieldset className="transcription-tier-picker" disabled={uploadState !== "idle"}>
           <legend>Transcription quality <span>Applies to every recording in this upload</span></legend>
           <div className="tier-options">
@@ -340,16 +419,24 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
               <span>{tier.description}</span>
             </label>)}
           </div>
-          <p>Estimates use this computer and one active job at a time. Actual time varies with recording quality.</p>
+          <p>Times are estimates and may vary with recording length and sound quality.</p>
         </fieldset>
         <input ref={inputRef} className="sr-only" id="audio-input" type="file" multiple disabled={uploadState !== "idle"} accept=".mp3,.m4a,.wav,.flac,.ogg,.webm,.mp4,.mov,.m4v,.mkv,audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/x-matroska" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
         <label htmlFor="audio-input" aria-disabled={uploadState !== "idle"} className={`drop-zone ${dragging ? "dragging" : ""} ${uploadState !== "idle" ? "disabled" : ""}`} onDragEnter={(event) => { event.preventDefault(); if (uploadState === "idle") setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); if (uploadState === "idle") addFiles(Array.from(event.dataTransfer.files)); }}>
           <span className="upload-icon"><UploadCloud size={24} /></span><strong>Drop recordings here</strong><small>Audio plus MP4, WebM, MOV, M4V, and MKV video</small>
         </label>
-        {files.length > 0 && <div className="selected-files">{files.map((file, index) => <div className="selected-file" key={`${file.name}-${file.lastModified}`}>{isVideo(file) ? <FileVideo size={17} /> : <FileAudio size={17} />}<div><strong>{file.name}</strong><small>{formatBytes(file.size)}{needsLocalPreparation(file) ? " · compresses locally" : ""}</small></div><button aria-label={`Remove ${file.name}`} disabled={uploadState !== "idle"} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div>)}</div>}
-        {uploadState === "preparing" && <div className="preparation-status" role="status"><div><span>Preparing compact audio from recording {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>The original recording stays on this device. Very long classes are divided automatically.</small></div>}
-        {uploadState === "uploading" && <div className="preparation-status" role="status"><div><span>Uploading recording {Math.min(uploadCount + 1, files.length)} of {files.length}</span><strong>{Math.round(uploadProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${uploadProgress * 100}%` }} /></div><small>Large uploads resume automatically after brief connection interruptions.</small></div>}
-        {files.length > 0 && <div className="upload-footer"><label>Batch label <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Add to queue</> : <><LoaderCircle className="spin" size={17} />{uploadState === "preparing" ? `Preparing ${preparationIndex}/${files.length}` : uploadState === "uploading" ? `Uploading ${Math.min(uploadCount + 1, files.length)}/${files.length}` : "Creating jobs…"}</>}</button></div>}
+        {files.length > 0 ? <div className="selected-files">{files.map((file, index) => {
+          const uploadItem = uploadItems[index];
+          return <div className={`selected-file ${uploadItem ? `upload-${uploadItem.status}` : ""}`} key={`${file.name}-${file.lastModified}-${index}`}>
+            {uploadItem?.status === "queued" ? <Check size={17} /> : uploadItem?.status === "failed" ? <AlertCircle size={17} /> : isVideo(file) ? <FileVideo size={17} /> : <FileAudio size={17} />}
+            <div><strong>{file.name}</strong><small>{uploadItem ? uploadItemLabel(uploadItem) : needsLocalPreparation(file) ? "Will be prepared before upload" : "Ready to upload"}</small>{uploadItem && ["preparing", "uploading"].includes(uploadItem.status) ? <div className="progress-track slim"><span style={{ width: `${uploadItem.progress * 100}%` }} /></div> : null}</div>
+            <button aria-label={`Remove ${file.name}`} disabled={uploadState !== "idle"} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button>
+          </div>;
+        })}</div> : null}
+        {uploadState === "starting" ? <div className="preparation-status" role="status"><div><span>Getting your uploads ready</span><LoaderCircle className="spin" size={17} /></div><small>Your files will begin one at a time.</small></div> : null}
+        {uploadState === "preparing" ? <div className="preparation-status" role="status"><div><span>Preparing recording {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
+        {uploadState === "uploading" ? <div className="preparation-status" role="status"><div><span>Uploading recording {preparationIndex} of {files.length}</span><strong>{Math.round(uploadProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${uploadProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
+        {files.length > 0 ? <div className="upload-footer"><label>Group name <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Start upload</> : <><LoaderCircle className="spin" size={17} />{uploadState === "starting" ? "Getting ready…" : `Sending ${preparationIndex}/${files.length}`}</>}</button></div> : null}
         {error && <p className="inline-alert error" role="alert"><AlertCircle size={16} />{error}</p>}
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}
       </div>
@@ -357,7 +444,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       <NotificationSettings userId={userId} accountEmail={userEmail} />
 
       <div className="history-section">
-        <div className="card-heading history-heading"><div><h2>Your recordings</h2><p>{completeCount} complete · {queueCount} waiting</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>
+        <div className="card-heading history-heading"><div><h2>Your recordings</h2><p>{completeCount} ready · {activeCount} in progress</p></div><button className="ghost-button" onClick={() => void refresh()}><RotateCcw size={14} /> Refresh</button></div>
         <div className="history-filters" aria-label="Recording history filters">
           {filters.map((filter) => <button key={filter.value} type="button" aria-pressed={historyFilter === filter.value} className={historyFilter === filter.value ? "active" : ""} onClick={() => setHistoryFilter(filter.value)}>{filter.label}<span>{filter.count}</span></button>)}
         </div>
@@ -381,11 +468,11 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
                   return <article className={`job-row ${recordingState?.done_at ? "done" : ""} ${recordingState?.archived_at ? "archived" : ""}`} key={job.id}>
                     <div className={`job-status-icon ${job.status} ${recordingState?.done_at ? "handled" : ""}`}>{recordingState?.done_at ? <CheckCheck size={18} /> : job.status === "completed" ? <Check size={18} /> : job.status === "failed" ? <AlertCircle size={18} /> : job.status === "queued" ? <Clock3 size={18} /> : <LoaderCircle className="spin" size={18} />}</div>
                     <div className="job-info">
-                      <div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{recordingState?.archived_at ? "archived" : recordingState?.done_at ? "done" : job.status}</span><span className={`tier-pill tier-${tier.value}`}>{tier.label}</span></div>
-                      <small>{job.stage} · {relativeTime(job.created_at)} · {formatBytes(job.size_bytes)} · {tier.model}</small>
+                      <div className="job-title"><strong>{job.original_filename}</strong><span className={`status-pill status-${job.status}`}>{jobStatusLabel(job, recordingState)}</span><span className={`tier-pill tier-${tier.value}`}>{tier.label}</span></div>
+                      <small>{jobProgressLabel(job)} · {relativeTime(job.created_at)}</small>
                       {copyLabel && <span className="copy-status"><ClipboardCheck size={13} />{copyLabel}</span>}
                       {job.status !== "completed" && job.status !== "failed" && <div className="progress-track slim"><span style={{ width: `${job.progress}%` }} /></div>}
-                      {job.error_message && <p className="job-error">{job.error_message}</p>}
+                      {job.status === "failed" ? <p className="job-error">{job.error_code === "upload_failed" ? "Select the recording again above to retry the upload." : job.attempt_count < 3 ? "Try processing this recording again." : "Upload this recording again if you want another attempt."}</p> : null}
                     </div>
                     {job.status === "completed" ? <div className="job-actions">
                       <Link className="row-action" href={`/jobs/${job.id}`}>View notes <ArrowRight size={15} /></Link>
@@ -398,8 +485,8 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       </div>
     </section>
     <aside className="dashboard-aside">
-      <div className="aside-card"><Server size={19} /><h3>How processing works</h3><ol><li><span>1</span>Large recordings become compact audio locally.</li><li><span>2</span>Audio uploads privately in safe-size parts.</li><li><span>3</span>Your computer creates one set of notes.</li><li><span>4</span>The uploaded audio is deleted.</li></ol></div>
-      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Media retention</h3><p>Original videos and oversized audio never upload. Temporary audio parts are kept only until a job succeeds; transcripts and notes remain in your account.</p></div>
+      <div className="aside-card"><Sparkles size={19} /><h3>What happens next</h3><ol><li><span>1</span>Each recording uploads securely.</li><li><span>2</span>Processing starts as soon as that file is ready.</li><li><span>3</span>Your transcript and study notes appear here.</li><li><span>4</span>You can receive an email or pop-up.</li></ol></div>
+      <div className="aside-card privacy-card"><Trash2 size={19} /><h3>Your recordings stay private</h3><p>Uploaded recordings are private and removed after your notes are ready. Your transcript and study notes stay in your account.</p></div>
     </aside>
   </div>;
 }

@@ -9,9 +9,9 @@ Give students a simple account-based website that converts class recordings into
 1. Create an email/password account and enter the dashboard immediately; sign-up confirmation email is disabled.
 2. Drag or select one to 20 audio or video class recordings.
 3. Choose Fast, Balanced, or High transcription for the upload; the choice applies to every selected recording and shows a measured per-hour estimate.
-4. Let the browser compress oversized audio or strip video locally, divide very long output into upload-safe parts, then upload only compact audio privately and leave one logical recording queued.
+4. Register the selected recordings, then prepare and upload them one at a time. As soon as one recording finishes uploading, make that logical recording available to the processing queue while later files continue uploading.
 5. The owner's Windows computer processes the oldest job one at a time with the selected model.
-6. Return to a dashboard showing status, selected tier, and saved study notes.
+6. Return to a dashboard showing plain-language progress and saved study notes; keep internal model names, raw pipeline stages, byte counts, and infrastructure terminology out of the normal client experience.
 7. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
 8. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
 9. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
@@ -26,6 +26,7 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - Video input: MP4, WebM, MOV, M4V, and MKV. The original source stays on the device; only derived audio parts upload.
 - Direct audio input: MP3, M4A, WAV, FLAC, and OGG.
 - Prepared output: mono 16 kHz AAC at 48 kbps in an M4A container, processed and uploaded one source/part at a time.
+- Batch behavior: all logical jobs are registered before transfer so batch notifications remain accurate, but only a recording with a complete, validated part manifest can become `queued` and claimable.
 - Current browser recommendation: an up-to-date Chrome or Edge, especially for less common source codecs.
 - Audio is private and deleted after successful processing.
 - Text results remain associated with the user.

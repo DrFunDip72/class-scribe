@@ -89,6 +89,7 @@ Start-ScheduledTask -TaskName AudioTranscriberWorker
 - Idle polling interval: 8 seconds.
 - One active job.
 - Jobs remain FIFO even when tiers differ. Switching tiers unloads the current Whisper model before loading the next one; the selected tier never changes queue priority.
+- Batch uploads may contain non-claimable `uploading` placeholders while the browser sends later files. The worker still claims only `queued` jobs, so no worker restart or configuration change is required for progressive uploads.
 - Heartbeat is sent while idle and at progress changes.
 - Lease: 20 minutes, refreshed during work.
 - Maximum attempts: 3.

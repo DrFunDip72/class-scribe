@@ -1,6 +1,6 @@
 # Class Scribe
 
-Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload up to 20 audio or video recordings together; a Windows worker processes them one at a time with local AI.
+Class Scribe is a deployed, account-based web app for turning class recordings into private transcripts, summaries, key points, and action items. Users can upload up to 20 audio or video recordings together; each recording enters the queue as soon as its own upload finishes, and a Windows worker processes queued work one at a time with local AI.
 
 - Live app: https://class-scribe-ruddy.vercel.app
 - Supabase project: `class-transcriber` (`wmsotywnkqdajhmiultx`)
@@ -21,7 +21,7 @@ Authenticated browser
   -> public Boolean health check -> GitHub outage issue/email
 ```
 
-The Next.js site runs on Vercel. Each upload can use Fast (`small`), Balanced (`distil-large-v3`), or High (`medium.en`) transcription, and the choice is saved with every recording. Oversized audio and MP4, WebM, MOV, M4V, or MKV input become compact speech audio on the user's device. The browser divides long output into 90-minute parts, uploads parts larger than 6 MB resumably, and still creates one queue job and one result for the original recording. Original videos and oversized source audio never upload. Media goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded parts are deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop pop-ups, completion email to the account address, or both. Result pages let the user copy just the study-guide summary, just the transcript, or everything together. Successful copy choices remain checked, and the dashboard provides explicit Done and reversible Archive states with progress for each upload batch.
+The Next.js site runs on Vercel. Each upload can use Fast (`small`), Balanced (`distil-large-v3`), or High (`medium.en`) transcription, and the choice is saved with every recording. Oversized audio and MP4, WebM, MOV, M4V, or MKV input become compact speech audio on the user's device. The browser divides long output into 90-minute parts, uploads parts larger than 6 MB resumably, and still creates one result for the original recording. All selected recordings are registered up front, but each becomes claimable as soon as that recording's parts finish uploading; later files can continue preparing and uploading. Original videos and oversized source audio never upload. Media goes directly to a private Supabase bucket without passing through a Vercel Function, and the local worker makes outbound HTTPS requests only. Uploaded parts are deleted after successful processing; results stay with the user's account. A signed-in user can opt into persistent browser/desktop pop-ups, completion email to the account address, or both. Result pages let the user copy just the study-guide summary, just the transcript, or everything together. Successful copy choices remain checked, and the dashboard provides explicit Done and reversible Archive states with progress for each upload batch.
 
 ## Repository map
 

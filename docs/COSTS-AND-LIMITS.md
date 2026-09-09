@@ -69,7 +69,7 @@ This project does not require GitHub Actions to operate.
 
 ### Browser recording preparation
 
-- Oversized audio and video sources are processed one at a time before upload; queue submission waits for all selected files to prepare and upload.
+- Oversized audio and video sources are processed one at a time before upload. Each recording enters the FIFO queue as soon as that recording finishes uploading; submission no longer waits for the rest of the selected files.
 - Source data is read lazily with an 8 MiB cache. One finished 90-minute M4A part is held in browser memory, uploaded, and released before the next part is encoded.
 - Objects above 6 MB use TUS resumable upload with 6 MB chunks and retries. Resumption reduces retransmission after brief network loss but still requires the user to keep/reselect the local source as the browser permits.
 - Encoding time depends on the user's CPU, browser codec support, source resolution/codec, and recording length.

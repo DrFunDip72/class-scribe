@@ -313,14 +313,14 @@ export type Database = {
           error_message: string | null
           id: string
           lease_expires_at: string | null
-          mime_type: string
+          mime_type: string | null
           original_filename: string
           progress: number
-          size_bytes: number
+          size_bytes: number | null
           stage: string
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
-          storage_path: string
+          storage_path: string | null
           transcription_tier: string
           updated_at: string
           user_id: string
@@ -336,14 +336,14 @@ export type Database = {
           error_message?: string | null
           id?: string
           lease_expires_at?: string | null
-          mime_type: string
+          mime_type?: string | null
           original_filename: string
           progress?: number
-          size_bytes: number
+          size_bytes?: number | null
           stage?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
-          storage_path: string
+          storage_path?: string | null
           transcription_tier?: string
           updated_at?: string
           user_id: string
@@ -359,14 +359,14 @@ export type Database = {
           error_message?: string | null
           id?: string
           lease_expires_at?: string | null
-          mime_type?: string
+          mime_type?: string | null
           original_filename?: string
           progress?: number
-          size_bytes?: number
+          size_bytes?: number | null
           stage?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
-          storage_path?: string
+          storage_path?: string | null
           transcription_tier?: string
           updated_at?: string
           user_id?: string
@@ -501,6 +501,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      begin_upload_batch: {
+        Args: { p_files: Json; p_label: string }
+        Returns: string
+      }
       claim_next_job: {
         Args: { p_worker_id: string }
         Returns: {
@@ -514,14 +518,14 @@ export type Database = {
           error_message: string | null
           id: string
           lease_expires_at: string | null
-          mime_type: string
+          mime_type: string | null
           original_filename: string
           progress: number
-          size_bytes: number
+          size_bytes: number | null
           stage: string
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
-          storage_path: string
+          storage_path: string | null
           transcription_tier: string
           updated_at: string
           user_id: string
@@ -537,6 +541,14 @@ export type Database = {
         Args: { p_files: Json; p_label: string }
         Returns: string
       }
+      fail_recording_upload: {
+        Args: { p_job_id: string }
+        Returns: boolean
+      }
+      queue_uploaded_recording: {
+        Args: { p_job_id: string; p_parts: Json }
+        Returns: string
+      }
       retry_transcription_job: {
         Args: { p_job_id: string }
         Returns: undefined
@@ -548,6 +560,7 @@ export type Database = {
     }
     Enums: {
       job_status:
+        | "uploading"
         | "queued"
         | "transcribing"
         | "summarizing"
@@ -681,6 +694,7 @@ export const Constants = {
   public: {
     Enums: {
       job_status: [
+        "uploading",
         "queued",
         "transcribing",
         "summarizing",

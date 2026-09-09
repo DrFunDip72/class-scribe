@@ -25,24 +25,24 @@ export default async function Home() {
       <section className="hero">
         <div className="eyebrow"><Sparkles size={14} /> Your private study assistant</div>
         <h1>Turn every lecture into<br /><span>notes you can use.</span></h1>
-        <p className="hero-copy">Upload up to 20 audio or video class recordings at once, choose Fast, Balanced, or High transcription, and let your own computer create the transcript and study guide.</p>
+        <p className="hero-copy">Upload up to 20 audio or video class recordings, choose your quality, and receive a complete transcript and focused study guide.</p>
         <div className="hero-actions">
           <Link className="button button-primary" href={user ? "/dashboard" : "/signup"}>
             {user ? "Open your dashboard" : "Start transcribing free"} <ArrowRight size={17} />
           </Link>
-          <span className="cost-note">$0 stack · no per-minute fees</span>
+          <span className="cost-note">Free to use · private by default</span>
         </div>
         <div className="workflow-card">
-          <div className="workflow-head"><span>Monday lectures</span><span className="status-pill status-active"><span /> Local worker online</span></div>
+          <div className="workflow-head"><span>Monday lectures</span><span className="status-pill status-active"><span /> Service ready</span></div>
           <div className="mock-job"><div className="file-icon"><FileAudio size={20} /></div><div><strong>Biology_lecture_08.m4a</strong><small>48:12 · Summary and 8 key points ready</small></div><span className="mock-done">Complete</span></div>
-          <div className="mock-job"><div className="file-icon purple"><FileAudio size={20} /></div><div className="grow"><strong>Modern_History_week_4.mp3</strong><small>Transcribing on your computer</small><div className="progress-track"><span style={{ width: "62%" }} /></div></div><span className="percent">62%</span></div>
-          <div className="mock-job muted"><div className="file-icon"><FileAudio size={20} /></div><div><strong>Statistics_review.wav</strong><small>Next in queue</small></div><span className="status-pill">Queued</span></div>
+          <div className="mock-job"><div className="file-icon purple"><FileAudio size={20} /></div><div className="grow"><strong>Modern_History_week_4.mp3</strong><small>Creating transcript</small><div className="progress-track"><span style={{ width: "62%" }} /></div></div><span className="percent">62%</span></div>
+          <div className="mock-job muted"><div className="file-icon"><FileAudio size={20} /></div><div><strong>Statistics_review.wav</strong><small>Waiting to start</small></div><span className="status-pill">Waiting</span></div>
         </div>
       </section>
       <section className="feature-grid">
-        <article><LockKeyhole /><h2>Private by design</h2><p>Original videos and oversized audio never upload. Compact audio parts live in private storage, are removed after processing, and are transcribed on your Windows computer.</p></article>
+        <article><LockKeyhole /><h2>Private by design</h2><p>Your recordings are stored privately, removed after processing, and visible only from your account.</p></article>
         <article><ListChecks /><h2>Study-ready results</h2><p>Get a full transcript, concise summary, key points, and action items for every recording.</p></article>
-        <article><Sparkles /><h2>Built for class days</h2><p>Send up to 20 recordings together. Videos prepare locally and the worker processes the queue sequentially.</p></article>
+        <article><Sparkles /><h2>Built for class days</h2><p>Send up to 20 recordings together. Each one can start processing as soon as its upload finishes.</p></article>
       </section>
     </main>
   );

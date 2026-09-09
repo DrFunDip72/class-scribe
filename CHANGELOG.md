@@ -2,6 +2,15 @@
 
 ## 2026-09-09
 
+### Client-facing workflow and progressive uploads
+
+- Reworded the landing page, dashboard, and result states around recordings, notes, privacy, and user actions instead of local-worker, model-ID, storage-size, and raw pipeline terminology.
+- Added per-file preparation/upload progress and plain-language Uploading, Waiting, Transcribing, Creating notes, Ready, and Needs attention states.
+- Registered every selected recording as a non-claimable upload placeholder, then made each recording independently claimable as soon as its own validated upload completed.
+- Continued later files after an individual upload failure while preserving the complete batch boundary for completion notifications.
+- Added authenticated-only Supabase RPCs, strict media-integrity constraints, safe interrupted-upload state, and backward compatibility for already-open clients.
+- Applied and rollback-tested all four forward migrations against production without disturbing the active FIFO worker queue.
+
 ### Selectable transcription tiers
 
 - Added Fast (`small`), Balanced (`distil-large-v3`), and High (`medium.en`) choices to the upload dashboard with measured per-hour estimates and a mobile-first radio-card layout.

@@ -30,7 +30,11 @@ The `web/` app uses Next.js App Router and Supabase SSR. Proxy middleware refres
 
 Objects at or below 6 MB use the standard Storage upload. Larger objects use Supabase's TUS endpoint with 6 MB chunks, retry delays, and browser upload fingerprint resumption. TUS improves interrupted-transfer recovery but does not bypass the Free plan's 50 MB per-object cap; the multipart recording design handles that cap.
 
-Before upload, the browser presents one accessible Fast/Balanced/High radio group with measured estimates; that selection is included in every logical file record. After every selected file has uploaded, the browser calls `create_upload_batch` once so all part metadata, validated tier values, and logical jobs are inserted atomically. One selected source always creates one job even when it has many parts. If preparation, upload, or batch creation fails, the browser removes any objects already uploaded for that attempt.
+Before upload, the browser presents one accessible Fast/Balanced/High radio group with measured estimates; that selection is included in every logical file record. `begin_upload_batch` atomically creates the batch and all logical job placeholders in `uploading` state before media transfer begins. The browser prepares and uploads sources sequentially. Immediately after one source's complete part manifest is present, `queue_uploaded_recording` validates the account, paths, MIME types, sizes, part order, and tier-bound job, inserts the manifest, and changes only that job to `queued`. The worker can claim it while later sources continue preparing or uploading. One selected source always creates one job even when it has many parts.
+
+If an individual source fails, the browser removes only that source's objects, calls `fail_recording_upload`, and continues with the remaining selection. All placeholders exist from the start, so batch-completion notifications cannot fire while another source is still uploading. A browser that is force-closed can leave an `uploading` placeholder; it is never worker-claimable and can be safely classified as an interrupted upload in a later cleanup feature. The legacy `create_upload_batch` RPC remains available for already-open clients and queues its fully uploaded batch atomically.
+
+The signed-in interface translates these internal states into client-facing language such as Uploading, Waiting, Transcribing, Creating notes, Ready, and Needs attention. It does not expose model identifiers, storage sizes, worker terminology, detected-language diagnostics, or raw internal stage/error strings in the primary workflow. Fast/Balanced/High remain visible because they are deliberate user choices.
 
 Vercel serves the application code but does not receive media and performs no inference. The original video never leaves the browser; only derived audio is sent directly to Supabase. This avoids Vercel Function payload/duration limits and keeps the cloud portion inexpensive.
 
@@ -40,7 +44,7 @@ Supabase is the durable coordination layer:
 
 - Auth owns users and sessions.
 - The private `recordings` bucket stores queued direct audio or prepared audio parts.
-- Postgres stores batches, queue jobs with immutable user-selected transcription tiers, ordered job-part manifests, results, account-owned recording workflow state, worker heartbeat, and completion events.
+- Postgres stores batches, upload placeholders, queue jobs with immutable user-selected transcription tiers, ordered job-part manifests, results, account-owned recording workflow state, worker heartbeat, and completion events.
 - Postgres stores account preferences, browser push subscriptions, public notification configuration, durable per-device push deliveries, and a durable email outbox.
 - RLS makes user ownership authoritative.
 - `claim_next_job` uses `FOR UPDATE SKIP LOCKED` and recovers expired leases.
@@ -86,8 +90,12 @@ The dashboard joins the state and upload-batch metadata into its existing read. 
 ## Lifecycle
 
 ```text
-choose tier -> local preparation (when needed) -> part upload(s) -> one queued job -> selected-model sequential part transcription -> one summary -> completed
-                                             \-> failed -> user retry -> queued
+choose tier -> create all uploading placeholders -> prepare/upload recording 1 -> queue recording 1 -> worker may claim it
+                                           |      \-> prepare/upload recording 2 -> queue recording 2 -> ...
+                                           \-> one upload fails -> mark that placeholder failed; continue later files
+
+queued -> selected-model sequential part transcription -> one summary -> completed
+   \-> processing failure -> user retry -> queued
 ```
 
 Claims have a 20-minute lease that the worker refreshes while processing. A stale in-progress job is returned to the queue if attempts remain. Attempts are capped at three.

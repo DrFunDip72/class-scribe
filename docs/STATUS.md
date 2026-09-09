@@ -1,7 +1,7 @@
 # Current Status
 
 **Last updated:** 2026-09-09
-**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
+**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a client-facing mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
 
@@ -21,6 +21,8 @@ No credentials are stored in this document.
 - Sequential browser-side conversion to mono 16 kHz, 48 kbps AAC/M4A in 90-minute parts. Original oversized audio/video never uploads; each private object remains at most 50 MB.
 - Authenticated TUS resumable transfer for objects above 6 MB, with 6 MB chunks, retry delays, and prior-upload resumption.
 - Ordered multipart manifests with up to 32 parts and a 1 GB prepared-recording safety ceiling; one selected source remains one FIFO job and one result.
+- Progressive batch submission: all logical recordings are registered as non-claimable upload placeholders, and each becomes claimable immediately after its own complete manifest uploads instead of waiting for the rest of the selection.
+- Client-facing landing, dashboard, upload, history, and result copy that uses plain progress language while keeping model IDs, byte counts, raw worker stages/errors, and infrastructure terms out of the normal workflow.
 - Supabase schema, private bucket, ownership RLS, FIFO claim RPC, leases, retry limit, heartbeats, results, and deferred completion events.
 - Dedicated worker Auth identity with only the RLS access required to process jobs.
 - Sequential Windows worker using user-selected faster-whisper Fast `small`, Balanced `distil-large-v3`, or High `medium.en` on CPU INT8 plus Ollama `qwen3:4b`.
@@ -112,6 +114,8 @@ No credentials are stored in this document.
 - Production tier release: `dpl_9doRpu5BXFgXeg8XJqnqJ5utXQmq` reached Ready on `https://class-scribe-ruddy.vercel.app`. A 390 x 844 authenticated mobile check showed all three accessible radio cards with no horizontal overflow.
 - Production three-tier data path: the same 415 KB verification recording completed once as Fast/`small`, once as Balanced/`distil-large-v3`, and once as High/`medium.en`. The queue stayed sequential, the worker returned online/idle on `1.5.0`, completed source objects were deleted, and Vercel reported no current-deployment runtime errors or warning/error/fatal logs.
 - Production test cleanup: the exact disposable Auth user and its three batches, jobs, and results were cascade-deleted after all source objects had already been removed. Follow-up counts were zero for the user, application rows, and Storage objects.
+- Progressive-upload migrations are applied to production. An authenticated rollback-only test created two placeholders, queued the first while the second remained `uploading`, safely failed the second, and left no test rows. The real queue remained uninterrupted with one active job and five waiting jobs.
+- Final client-facing web checks: ESLint, optimized Next.js build/type checking, and `git diff --check` pass. Production deployment and browser verification are pending the release commit.
 
 ## Supabase Auth policy
 
@@ -122,6 +126,7 @@ Password-reset email stays enabled. The production reset URL should remain allow
 ## Deferred by design
 - Speaker diarization, cloud inference fallback, billing, teams, and public sharing.
 - Performance benchmarking with actual 30- and 60-minute private class recordings.
+- Automatic cleanup or user cancellation for stale `uploading` placeholders left by a force-closed browser.
 
 ## Exact next task
 

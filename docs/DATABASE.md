@@ -5,7 +5,7 @@ Committed migrations under `supabase/migrations/` are authoritative and have bee
 ## Tables
 
 - `upload_batches` — owner, label, file count, timestamps.
-- `transcription_jobs` — owner, first-part compatibility path, logical display metadata, validated `fast`/`balanced`/`high` transcription tier, FIFO status, progress, attempts, claim/lease, and safe errors.
+- `transcription_jobs` — owner, nullable pre-upload media metadata, logical display metadata, validated `fast`/`balanced`/`high` transcription tier, FIFO status including non-claimable `uploading`, progress, attempts, claim/lease, and safe errors.
 - `transcription_job_parts` — ordered private Storage-object manifest for a logical job; each object is at most 50 MB and owner/worker readable through RLS.
 - `transcription_results` — transcript, segments, summary, key points, action items, language, duration, and model metadata.
 - `recording_user_states` — one owner-controlled row per job with separate Summary/Transcript/Everything copy timestamps plus reversible Done and Archive timestamps.
@@ -22,6 +22,9 @@ Notification tables added by `web_push_notifications`:
 - `push_notification_deliveries` — worker-only durable per-device delivery outbox with attempts, backoff, and sent state.
 
 - `create_upload_batch(label, files)` validates authentication, 1-20 logical recordings, each per-file `fast`/`balanced`/`high` tier, 1-32 ordered parts per recording, supported audio types, exact owner/job/part paths, 50 MB per object, and 1 GB per logical recording, then creates the batch, jobs, and manifests atomically. A missing tier defaults to Fast so legacy one-object payloads and already-open browser tabs remain compatible.
+- `begin_upload_batch(label, files)` validates authentication, the 1-20 limit, filenames, and controlled tier values, then creates the batch and every logical job as a non-claimable `uploading` placeholder.
+- `queue_uploaded_recording(job_id, parts)` locks and verifies one owner-controlled `uploading` job, validates its complete ordered manifest and exact private paths, inserts all part rows, fills media metadata, and atomically changes that job to `queued`. Repeating it after a successful queue transition is harmless.
+- `fail_recording_upload(job_id)` can change only the caller's own `uploading` placeholder to a terminal upload failure. It cannot alter queued or worker-owned processing state.
 - `retry_transcription_job(job_id)` checks ownership, failed status, and remaining attempts.
 - `claim_next_job(worker_id)` requires the dedicated worker JWT role (or service role), recovers stale leases, and atomically claims the oldest eligible row with `SKIP LOCKED`.
 
@@ -53,6 +56,8 @@ The timestamped `recording_user_states` migration adds persistent account-scoped
 
 The timestamped `multipart_recordings` and `optimize_recording_parts_policies` migrations add ordered job parts, lift the logical job size to a 1 GB safety ceiling while retaining 50 MB per object, update the atomic batch RPC, combine owner/worker part reads, and add the part-owner index.
 
-The timestamped `transcription_tiers` migration adds the non-null checked tier column, backfills existing jobs to Fast through the default, and extends the atomic upload RPC without changing its signature or grants.
+The timestamped `transcription_tiers` migration adds the non-null checked tier column, backfills existing jobs to Fast through the default, and extends the legacy atomic upload RPC without changing its signature or grants.
+
+The `upload_status_enum`, `progressive_upload_queue`, `tighten_progressive_upload_rpc_grants`, and `allow_interrupted_upload_state` migrations add non-claimable upload placeholders, per-recording queue transitions, safe upload-failure state, media-integrity checks, and authenticated-only RPC execution. Service-role execution is intentionally revoked because these entry points represent an end-user upload session.
 
 Use forward migrations; never reset the production database.

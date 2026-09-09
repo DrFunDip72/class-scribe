@@ -1,5 +1,20 @@
 # Testing and Verification
 
+## Client-facing workflow and progressive per-recording queue admission — PASS
+
+**Date:** 2026-09-09
+**Environment:** production Supabase, local Next.js 16.3.2 lint/build, and the live Windows worker queue.
+
+1. Created and applied four forward migrations: `upload_status_enum`, `progressive_upload_queue`, `tighten_progressive_upload_rpc_grants`, and `allow_interrupted_upload_state`.
+2. Production exposes non-claimable `uploading` jobs with nullable media metadata, plus authenticated-only `begin_upload_batch`, `queue_uploaded_recording`, and `fail_recording_upload` RPCs. Anonymous and service-role execution is revoked; each SECURITY DEFINER function uses an empty search path and verifies `auth.uid()` ownership.
+3. A rollback-only authenticated production transaction created two upload placeholders, queued the first with a validated one-part manifest while the second remained `uploading`, marked the second as a safe upload failure, and rolled everything back. The two fixed test IDs were absent afterward.
+4. The production worker queue remained uninterrupted at one `transcribing` and five `queued` jobs after the schema and function test. The task/process was not restarted.
+5. The browser now creates the full batch boundary before transfer, processes files sequentially, calls the queue transition immediately after each individual recording uploads, isolates cleanup to a failed source, and continues to later files.
+6. The landing page, dashboard, upload progress, job history, and result page were reviewed against the React client checklist. User-facing states are plain language, model identifiers and detected-language diagnostics are absent from normal pages, and Fast/Balanced/High remain visible as intentional choices.
+7. `npm run lint`, optimized `npm run build`, and `git diff --check` passed after the final TSX/CSS changes.
+
+**Result:** PASS for database behavior, queue isolation, build/type safety, and client-facing code. Deployment verification is recorded in Current Status when the production alias moves to this release.
+
 ## Selectable Fast, Balanced, and High tiers — PASS
 
 **Date:** 2026-09-09

@@ -191,3 +191,13 @@ Implement one transcription-tier choice per upload batch and persist the choice 
 **Reason:** The owner approved all three non-hallucinating benchmark candidates so users can choose turnaround versus exactness. Persisting a controlled tier identifier instead of an arbitrary model name prevents browsers from requesting unreviewed models or parameters. Keeping the existing two-argument upload RPC and placing the tier inside each validated file record avoids an unsupported overloaded PostgREST function and preserves already-open clients.
 
 **Consequence:** The dashboard shows rounded estimates of 10, 20, and 55 transcription minutes per recorded hour on the current worker and identifies the selected tier in history and results. FIFO order never changes based on tier. To stay within 16 GB RAM, the worker retains one Whisper model and unloads it before switching. The `SYSTEM` launcher reuses the owner's Hugging Face cache. Existing jobs and missing legacy inputs resolve to Fast; only `fast`, `balanced`, and `high` pass the database constraint and RPC validation.
+
+## ADR-031 — Progressive Per-Recording Queue Admission
+
+Create every logical job in a batch as an `uploading` placeholder, then atomically promote each job to `queued` immediately after its own complete Storage manifest has uploaded and passed validation. Keep media preparation and transfer sequential in the browser and keep worker inference FIFO with one active job.
+
+**Reason:** A large multi-file selection should not make the first completed upload wait for every later file. Creating all placeholders first preserves the true batch boundary for notification logic, while a distinct non-claimable state prevents the worker from seeing incomplete media.
+
+**Consequence:** The first finished source may begin processing while later files prepare or upload. One failed source is marked with a safe upload failure and does not prevent later selections from entering the queue. The worker and its active queue require no restart because `claim_next_job` still selects only `queued` rows. A force-closed browser can leave an `uploading` placeholder; it cannot be processed or trigger a false batch-complete notification, and automatic stale-upload cleanup is deferred. The old atomic `create_upload_batch` RPC remains for backward compatibility.
+
+The normal client UI describes results and progress in plain language and hides implementation details such as model IDs, byte counts, raw worker stages, detected-language diagnostics, and infrastructure names. Fast, Balanced, and High remain visible because users actively choose their speed/quality tradeoff.

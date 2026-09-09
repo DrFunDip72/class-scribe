@@ -15,6 +15,7 @@ from worker import (
     clean_list,
     email_error_message,
     extract_fluxprompt_response_text,
+    first_sentence,
     finalize_study_guide,
     parse_json_object,
     safe_suffix,
@@ -60,6 +61,28 @@ class WorkerHelperTests(unittest.TestCase):
             "action_items": [],
         })
         self.assertEqual(notes["key_points"][-1], "Big takeaway — CBT connects thoughts, feelings, and behaviors.")
+
+    def test_first_sentence_preserves_title_abbreviation(self) -> None:
+        summary = (
+            "The course, taught by Dr. Peter Dennis, focuses on organizational management. "
+            "Students apply the model."
+        )
+        self.assertEqual(
+            first_sentence(summary),
+            "The course, taught by Dr. Peter Dennis, focuses on organizational management.",
+        )
+        notes = finalize_study_guide({
+            "summary": summary,
+            "key_points": [],
+            "action_items": [],
+        })
+        self.assertEqual(
+            notes["key_points"][-1],
+            (
+                "Big takeaway — The course, taught by Dr. Peter Dennis, focuses on "
+                "organizational management."
+            ),
+        )
 
     def test_safe_suffix(self) -> None:
         self.assertEqual(safe_suffix("lecture.MP3"), ".mp3")

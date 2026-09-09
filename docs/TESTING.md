@@ -1,5 +1,27 @@
 # Testing and Verification
 
+## Summary sentence boundary and three-model comparison — PASS
+
+**Date:** 2026-09-09
+**Environment:** local Python 3.12 worker environment, installed FFmpeg, faster-whisper CPU INT8, and cached `small`, `small.en`, and `medium.en` models.
+
+1. Added a regression test using the HRM-shaped sentence `The course, taught by Dr. Peter Dennis, focuses on organizational management. Students apply the model.` The sentence helper returned the complete first sentence, and deterministic study-guide post-processing preserved the embedded title instead of truncating at `Dr.`
+2. Python compilation passed for `worker.py`, `compare_transcribers.py`, `test_worker_helpers.py`, and `test_compare_transcribers.py`. All 17 helper/comparison tests passed.
+3. `compare_transcribers.py verification-sample.wav` decoded the 9.63-second source once and ran all three configurations sequentially without Supabase access. Each configuration wrote a local ignored transcript and segment JSON, plus combined metrics and comparison Markdown.
+4. The first run completed all models but included first-time download/cache cost: 6.750 seconds for `small`/beam 1, 43.125 seconds for `small.en`/beam 5, and 121.672 seconds for `medium.en`/beam 5.
+5. The cached repeat took 5.828 seconds, 3.766 seconds, and 11.516 seconds respectively. All outputs had 23 words. The two English models matched exactly; the baseline used `learn` instead of `learned` and different capitalization, producing 95.7% word-sequence agreement.
+6. Pairwise similarity was treated only as model agreement. The 9.63-second synthetic clip is too clean and short to rank lecture accuracy, especially for names, technical vocabulary, distant speech, prayers, and cross-talk.
+7. `.transcriber-benchmarks/`, `.worker-state/`, `.worker-secrets/`, and `.env.worker.local` are ignored and untracked. No source audio or generated comparison artifact was committed.
+8. A production query found exactly one stored result with the known `Dr.` truncation. An exact-match update repaired only job `671723a1-16e5-497e-b53d-223428329112`; its returned final point contains the complete first sentence. The matching public HRM note was updated in commit `dcc94c6c7f23be497a2d9b1e607e6e26d72344ab`, and a remote read returned the corrected line.
+9. Production contained 35 completed jobs and no queued or active status before restart. The `AudioTranscriberWorker` scheduled task was restarted, returned to Running under `SYSTEM`, and Supabase published an idle heartbeat from worker `1.4.2`.
+10. The owner's ZIP contained the four September 2 source recordings. Only the 59,730,190-byte, 3,693.296-second PHIL 201 source was extracted into ignored local benchmark storage. A 600.014-second stream-copy excerpt from 29:30 through 39:30 targeted the difficult Aristotle/agency passage; neither source was uploaded.
+11. On that excerpt, production `small`/beam 1 produced 1,729 words in 97.235 seconds (RTF 0.1621), `small.en`/beam 5 produced 1,681 words in 184.532 seconds (RTF 0.3075), and `medium.en`/beam 5 produced 1,712 words in 536.625 seconds (RTF 0.8944). Pairwise agreement ranged from 90.6% to 92.3%.
+12. Textual review against lecture context and the displayed Aristotle *On the Soul*, Book II, Chapter 5 wording showed `medium.en` correctly recovered multiple phrases both small candidates missed, including `to be acted upon`, `extinction`, `Latter-day Saint`, `fixing the car`, `logical deduction`, `Taylorsville Temple`, and `grade eight`. It still made errors such as `primacy` for `premises`; this is not a human-produced word-error-rate score.
+13. `small.en`/beam 5 took 1.9 times the baseline time without a consistent quality improvement. `medium.en` was the clear text-quality winner but took 5.5 times the baseline transcription time. Linear projection for the full 61:33 recording is approximately 10:00, 18:56, and 55:03 transcription-only; the historical baseline job took 19.9 minutes end to end after summarization.
+14. The scheduled production worker was disabled/stopped only after confirming an empty queue, then re-enabled immediately after the comparison. Task Scheduler returned Running and Supabase published a fresh idle heartbeat from worker `1.4.2`.
+
+**Result:** the summary repair and all three transcription paths pass. Keep `small`/beam 1 as the fast default, reject `small.en`/beam 5 as an upgrade candidate for this hardware, and consider `medium.en` only as an explicit High accuracy option because its material quality gain carries a large queue-time cost.
+
 ## Oversized audio, multipart queue, and FFmpeg decode — PASS
 
 **Date:** 2026-09-02

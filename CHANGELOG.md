@@ -2,6 +2,16 @@
 
 ## 2026-09-09
 
+### Summary repair and transcription comparison
+
+- Fixed the deterministic `Big takeaway` fallback so a first sentence containing titles such as `Dr.` is not truncated at the abbreviation.
+- Added a regression test for the HRM-style title case and advanced the local worker to version 1.4.2.
+- Added an operator-only comparison tool that transcribes one retained audio source sequentially with production `small`/beam 1, `small.en`/beam 5, and `medium.en`/beam 5 on CPU INT8.
+- Added ignored Markdown/JSON benchmark reports containing transcripts, segment metadata, cached timing, and model-agreement measurements without uploading private audio or changing production settings.
+- Smoke-tested all three configurations twice on the 9.63-second verification sample; the clean clip was nearly identical across models, so no production-model winner was declared.
+- Benchmarked a difficult 10-minute PHIL 201 excerpt from a retained 59.7 MB real class source. `medium.en` materially improved technical and lecture-specific wording but took 5.5 times the baseline transcription time; `small.en`/beam 5 was slower without a consistent quality gain.
+- Kept production `small`/beam 1 unchanged, documented `medium.en` as a possible future per-recording High accuracy option, and restored the scheduled worker online after the idle-queue benchmark.
+
 ### Course archive bootstrap
 
 - Created private `HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201` repositories under the owner's GitHub account.
@@ -11,7 +21,7 @@
 - Changed all four course repositories to public at the owner's explicit direction and verified anonymous HTTP 200 access to every exported document.
 - Confirmed every document keeps Summary, Key Points, and Action Items before the complete Transcript in the same file; `tyler_eager.m4a` is intentionally excluded.
 - Completed a text-only quality audit of the four real hour-long transcripts: main concepts are usable, but obvious proper-noun, technical-vocabulary, distant-speech, prayer, and cross-talk recognition errors make the current output unsuitable as a verbatim record.
-- Identified an abbreviation-sensitive study-guide fallback that truncates the HRM `Big takeaway` after `Dr.`; a measured transcription-settings comparison and that formatting fix remain follow-up work.
+- Identified and subsequently repaired an abbreviation-sensitive study-guide fallback that had truncated the HRM `Big takeaway` after `Dr.`.
 
 ## 2026-09-02
 

@@ -12,7 +12,7 @@
 | Ollama | 0.32.15 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker`, running as Windows `SYSTEM` |
-| Worker version | `1.4.1` |
+| Worker version | `1.4.2` |
 | Push library | `pywebpush` 2.4.0 |
 | Email transport | FluxPrompt Email Agent over outbound HTTPS |
 
@@ -36,6 +36,9 @@ FFmpeg is required for worker-side decoding. The worker checks optional `FFMPEG_
 # Stack smoke test
 \.venv-worker\Scripts\python.exe verify-local-stack.py verification-sample.mp3
 
+# Compare three local transcriber configurations against the same retained audio
+\.venv-worker\Scripts\python.exe compare_transcribers.py "C:\path\to\retained-class.m4a"
+
 # Process at most one queued job
 \.venv-worker\Scripts\python.exe worker.py --once
 
@@ -56,6 +59,8 @@ Get-ScheduledTaskInfo -TaskName AudioTranscriberWorker
 Stop-ScheduledTask -TaskName AudioTranscriberWorker
 Start-ScheduledTask -TaskName AudioTranscriberWorker
 ```
+
+The comparison command decodes the source once, then runs `small`/beam 1, `small.en`/beam 5, and `medium.en`/beam 5 sequentially on CPU INT8. It never contacts Supabase and writes transcripts, segment metadata, timing, and pairwise word-sequence agreement only to ignored `.transcriber-benchmarks/`. Agreement between models is not correctness; listen to the retained source and review names, technical vocabulary, quiet speech, cross-talk, and repetitions before choosing a production model. The first run may download `small.en` and `medium.en`, so rerun after the downloads finish for cached timing. Never commit the source recording or benchmark output. For a long benchmark, first confirm the production queue is idle and disable/stop the scheduled worker to avoid CPU contention; re-enable and start it afterward.
 
 The installer registers three independent triggers: Windows startup, user logon, and a five-minute repeating recovery trigger. It runs under the built-in `SYSTEM` service account, so no user sign-in or stored Windows password is required. The task starts missed runs when available, allows 999 one-minute Task Scheduler restarts, has no execution time limit, and ignores overlapping triggers. A normal repair preserves an already-running worker; use `-RestartRunning` only while the queue is idle when the new task identity must take effect immediately.
 
@@ -87,7 +92,7 @@ Start-ScheduledTask -TaskName AudioTranscriberWorker
 - Push deliveries: durable, attempted separately after result commit, up to three attempts with exponential backoff.
 - Email deliveries: durable, recheck opt-in immediately before sending, then call FluxPrompt separately with up to three attempts and exponential backoff.
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
-- Summary output: a brief overview (usually 2-4 sentences), up to 14 ordered concept/definition/process points without padding, selective examples, a final `Big takeaway`, and only genuine action items. Single-section recordings skip the consolidation pass.
+- Summary output: a brief overview (usually 2-4 sentences), up to 14 ordered concept/definition/process points without padding, selective examples, a final `Big takeaway`, and only genuine action items. The fallback sentence extractor preserves common titles such as `Dr.` instead of truncating the takeaway. Single-section recordings skip the consolidation pass.
 
 ## Owner outage notification
 

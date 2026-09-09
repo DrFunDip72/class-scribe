@@ -159,3 +159,19 @@ Supersede ADR-025's private-repository requirement for these four owner-controll
 **Reason:** The owner explicitly chose public visibility for the four course repositories after reviewing the sharing purpose. Public GitHub links are simpler to distribute and can later feed a public Notion workflow without repository authentication.
 
 **Consequence:** Anyone can discover, read, copy, index, or redistribute these exported summaries and transcripts, including content retained in Git history. Future automatic export must be opt-in and restricted to the owner's account; it must never publish another account's recording. Every public document must preserve its source job UUID and place the study-guide summary before the complete transcript. `tyler_eager.m4a` is explicitly excluded from all course repositories.
+
+## ADR-027 — Local Three-Configuration Transcription Benchmark Before Model Changes
+
+Keep the production transcriber on `faster-whisper` `small`, CPU INT8, beam 1 while evaluating three configurations against the exact same retained source: the production baseline, English-only `small.en` with beam 5, and English-only `medium.en` with beam 5. Decode once, run each model sequentially, and save only local ignored comparison artifacts.
+
+**Reason:** The September 2 text audit exposed proper-noun, technical-vocabulary, quiet-speech, prayer, and cross-talk errors, but the source audio had already been deleted. Model-to-model agreement on a clean synthetic clip does not measure accuracy. A retained real lecture plus human listening is required to determine whether added CPU time produces a meaningful quality gain.
+
+**Consequence:** `compare_transcribers.py` is an operator-only experiment and never uploads audio or changes database results. Its outputs belong in ignored `.transcriber-benchmarks/` and must not be committed. First-time model downloads distort timing, so use a cached repeat for performance. Do not change ADR-005 or the production worker configuration until a real class recording is reviewed against all three outputs.
+
+## ADR-028 — Keep the Fast Default; Treat Medium English as an Optional Quality Tier
+
+Retain ADR-005's `small`/CPU INT8/beam-1 production default. Do not adopt `small.en`/beam 5. Treat `medium.en`/beam 5 as a candidate for a future explicit per-recording High accuracy option, not a silent system-wide replacement.
+
+**Reason:** On a difficult 10-minute real PHIL 201 excerpt, `small.en` took 184.532 seconds versus the baseline's 97.235 seconds without a consistent quality gain. `medium.en` recovered materially better technical, name, and sentence-level wording, but took 536.625 seconds—5.5 times the baseline transcription time—and still was not verbatim-perfect.
+
+**Consequence:** Existing uploads keep their current speed and FIFO capacity. A future High accuracy feature must expose the processing-time tradeoff before submission, persist the chosen model per job, keep processing sequential, and be tested on a full class and multi-file queue before release. The current comparison tool remains available for private operator experiments without changing saved production results.

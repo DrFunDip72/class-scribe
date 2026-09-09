@@ -38,7 +38,7 @@ from pywebpush import WebPushException, webpush
 from supabase import Client, create_client
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 LOG = logging.getLogger("class-scribe-worker")
 T = TypeVar("T")
 
@@ -1146,6 +1146,36 @@ def clean_list(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()][:15]
 
 
+SENTENCE_ABBREVIATIONS = frozenset({
+    "dr",
+    "jr",
+    "mr",
+    "mrs",
+    "ms",
+    "prof",
+    "sr",
+    "st",
+})
+
+
+def first_sentence(text: str) -> str:
+    """Return the first sentence without splitting after titles such as Dr."""
+    value = text.strip()
+    if not value:
+        return ""
+    for boundary in re.finditer(r"[.!?](?:[\"')\]]+)?(?=\s|$)", value):
+        if value[boundary.start()] == ".":
+            token_match = re.search(r"([A-Za-z]+)$", value[:boundary.start()])
+            token = token_match.group(1).lower() if token_match else ""
+            if token in SENTENCE_ABBREVIATIONS or len(token) == 1:
+                continue
+            following = value[boundary.end():].lstrip()
+            if following and following[0].islower():
+                continue
+        return value[:boundary.end()].strip()
+    return value
+
+
 def finalize_study_guide(notes: dict[str, Any]) -> dict[str, Any]:
     summary = str(notes.get("summary", "")).strip()
     key_points = clean_list(notes.get("key_points"))
@@ -1157,8 +1187,7 @@ def finalize_study_guide(notes: dict[str, Any]) -> dict[str, Any]:
         else:
             regular_points.append(point)
     if takeaway is None and summary:
-        first_sentence = re.split(r"(?<=[.!?])\s+", summary, maxsplit=1)[0].strip()
-        takeaway = f"Big takeaway — {first_sentence}"
+        takeaway = f"Big takeaway — {first_sentence(summary)}"
     if takeaway:
         regular_points = regular_points[:14] + [takeaway]
     return {

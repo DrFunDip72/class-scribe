@@ -12,8 +12,12 @@
 5. The browser now creates the full batch boundary before transfer, processes files sequentially, calls the queue transition immediately after each individual recording uploads, isolates cleanup to a failed source, and continues to later files.
 6. The landing page, dashboard, upload progress, job history, and result page were reviewed against the React client checklist. User-facing states are plain language, model identifiers and detected-language diagnostics are absent from normal pages, and Fast/Balanced/High remain visible as intentional choices.
 7. `npm run lint`, optimized `npm run build`, and `git diff --check` passed after the final TSX/CSS changes.
+8. Commit `f3288cc` was pushed to GitHub `main`. The first two direct deployment attempts failed before alias promotion because API-created source deployments did not inherit the public Supabase build settings; build logs identified the missing settings, and the existing production deployment remained live.
+9. Deployment `dpl_CwHpe7SmsLx4YmNX5PozCU4vbXPC` supplied only the two browser-public Supabase settings through an uncommitted deployment-only `.env.production`, completed its Next.js build, reached Ready, and moved both production aliases.
+10. The public landing page and `/api/worker-health` returned HTTP 200. The landing response contains the new per-recording-start copy; health returned exactly `{"status":"online"}` with `Cache-Control: no-store, max-age=0`. Deployment-scoped warning/error/fatal runtime logs were empty.
+11. The preferred in-app preview controls were absent and the browser fallback reported no available browser, so no claim is made for an authenticated visual or interactive production test in this release.
 
-**Result:** PASS for database behavior, queue isolation, build/type safety, and client-facing code. Deployment verification is recorded in Current Status when the production alias moves to this release.
+**Result:** PASS for database behavior, queue isolation, build/type safety, production deployment, public copy, service health, and early runtime logs. Authenticated visual verification remains pending.
 
 ## Selectable Fast, Balanced, and High tiers — PASS
 

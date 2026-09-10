@@ -10,6 +10,7 @@
 - Continued later files after an individual upload failure while preserving the complete batch boundary for completion notifications.
 - Added authenticated-only Supabase RPCs, strict media-integrity constraints, safe interrupted-upload state, and backward compatibility for already-open clients.
 - Applied and rollback-tested all four forward migrations against production without disturbing the active FIFO worker queue.
+- Pushed release commit `f3288cc` and deployed it to the public production alias; HTTP copy/health checks passed and the release produced no early warning/error/fatal runtime logs.
 
 ### Selectable transcription tiers
 

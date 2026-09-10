@@ -115,7 +115,7 @@ No credentials are stored in this document.
 - Production three-tier data path: the same 415 KB verification recording completed once as Fast/`small`, once as Balanced/`distil-large-v3`, and once as High/`medium.en`. The queue stayed sequential, the worker returned online/idle on `1.5.0`, completed source objects were deleted, and Vercel reported no current-deployment runtime errors or warning/error/fatal logs.
 - Production test cleanup: the exact disposable Auth user and its three batches, jobs, and results were cascade-deleted after all source objects had already been removed. Follow-up counts were zero for the user, application rows, and Storage objects.
 - Progressive-upload migrations are applied to production. An authenticated rollback-only test created two placeholders, queued the first while the second remained `uploading`, safely failed the second, and left no test rows. The real queue remained uninterrupted with one active job and five waiting jobs.
-- Final client-facing web checks: ESLint, optimized Next.js build/type checking, and `git diff --check` pass. Production deployment and browser verification are pending the release commit.
+- Client-facing release commit `f3288cc` is pushed to GitHub. Production deployment `dpl_CwHpe7SmsLx4YmNX5PozCU4vbXPC` is Ready on `https://class-scribe-ruddy.vercel.app`; the landing page and worker-health route return HTTP 200, the page contains the progressive-upload copy, health returns exactly `{"status":"online"}`, and the new deployment has no warning/error/fatal runtime logs. The browser automation surface was unavailable, so authenticated visual verification remains pending.
 
 ## Supabase Auth policy
 

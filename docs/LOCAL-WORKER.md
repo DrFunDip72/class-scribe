@@ -9,7 +9,7 @@
 | faster-whisper | 1.2.1 |
 | CTranslate2 | 4.8.1, CPU INT8 |
 | Whisper tiers | Fast `small`; Balanced `distil-large-v3`; High `medium.en` |
-| Ollama | 0.32.15 |
+| Ollama | 0.33.3 |
 | Summary model | `qwen3:4b` |
 | Startup task | `AudioTranscriberWorker`, running as Windows `SYSTEM` |
 | Worker version | `1.5.0` |
@@ -69,7 +69,7 @@ The default `production` comparison suite decodes the source once, then runs `sm
 
 The installer registers three independent triggers: Windows startup, user logon, and a five-minute repeating recovery trigger. It runs under the built-in `SYSTEM` service account, so no user sign-in or stored Windows password is required. The task starts missed runs when available, allows 999 one-minute Task Scheduler restarts, has no execution time limit, and ignores overlapping triggers. A normal repair preserves an already-running worker; use `-RestartRunning` only while the queue is idle when the new task identity must take effect immediately.
 
-The launcher is also a persistent supervisor. It starts Ollama in a hidden process if needed, waits for the local API, starts the queue worker, and relaunches it after any exit. Because `SYSTEM` has a different Windows profile, the launcher explicitly points Ollama at the owner's existing `.ollama\models` directory and `HF_HOME` at the owner's verified faster-whisper cache rather than downloading duplicate models. A cross-process launcher lock, a global cross-session Windows worker mutex, and atomic database claiming prevent duplicate processing.
+The launcher is also a persistent supervisor. It starts Ollama in a hidden process if needed, verifies both the local API and Ollama's `llama-server.exe` inference runner, starts the queue worker, and relaunches it after any exit. The runner check prevents a partially installed Ollama process from claiming jobs and consuming their retry attempts. Because `SYSTEM` has a different Windows profile, the launcher explicitly points Ollama at the owner's existing `.ollama\models` directory and `HF_HOME` at the owner's verified faster-whisper cache rather than downloading duplicate models. A cross-process launcher lock, a global cross-session Windows worker mutex, and atomic database claiming prevent duplicate processing.
 
 Supervisor-only events and exit codes are written to ignored `.worker-state\worker-launcher.log`. The log does not contain credentials, transcript text, summaries, signed links, or authorization headers.
 
@@ -83,6 +83,23 @@ Stop-ScheduledTask -TaskName AudioTranscriberWorker
 Enable-ScheduledTask -TaskName AudioTranscriberWorker
 Start-ScheduledTask -TaskName AudioTranscriberWorker
 ```
+
+An Ollama installer cannot replace files held by the detached `SYSTEM`-owned runtime. For an Ollama repair or upgrade, use the launcher's ignored maintenance marker so the task itself stops that process:
+
+```powershell
+New-Item -ItemType File -Path .\.worker-state\ollama-maintenance.pause -Force
+Stop-ScheduledTask -TaskName AudioTranscriberWorker
+Start-ScheduledTask -TaskName AudioTranscriberWorker
+# After the maintenance run exits, disable the task while running the signed installer.
+Disable-ScheduledTask -TaskName AudioTranscriberWorker
+
+# After installation:
+Remove-Item -LiteralPath .\.worker-state\ollama-maintenance.pause
+Enable-ScheduledTask -TaskName AudioTranscriberWorker
+Start-ScheduledTask -TaskName AudioTranscriberWorker
+```
+
+Confirm the installer is official and Authenticode-valid before running it. Do not leave the maintenance marker in place; every later task start will intentionally stop Ollama and exit until it is removed.
 
 ## Normal operation
 
@@ -116,7 +133,7 @@ The public route exposes only `online` or `offline`. It contains no filename, tr
 - **Worker repeatedly exits:** inspect only `.worker-state\worker-launcher.log`, the task result, and safe worker error output. Do not redirect private transcript or credential data into persistent logs.
 - **Worker auth error:** verify the worker Auth user still exists, its `app_metadata.role` is `worker`, and local credentials match.
 - **Job stays queued:** inspect heartbeat first, then run `worker.py --once` in a terminal.
-- **Ollama unavailable:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
+- **Ollama unavailable:** confirm both `ollama.exe` and `lib\ollama\llama-server.exe` exist under `$env:LOCALAPPDATA\Programs\Ollama`. If the runner is missing, repair Ollama with the official signed installer using the maintenance procedure above. Otherwise run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`.
 - **Model missing:** run `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3:4b`.
 - **FFmpeg unavailable:** run `Get-Command ffmpeg`; if the `SYSTEM` task still cannot find it, set the exact executable path as `FFMPEG_PATH` in ignored `.env.worker.local`, then restart the task.
 - **No browser pop-up:** verify worker version `1.3.0`, confirm `notification_configuration` contains `web_push`, check the account enabled notifications on that browser, and inspect `push_notification_deliveries` for the safe error message.

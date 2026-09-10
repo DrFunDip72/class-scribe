@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $workerRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ownerProfile = Split-Path -Parent (Split-Path -Parent $workerRoot)
 $ollamaExe = Join-Path $ownerProfile "AppData\Local\Programs\Ollama\ollama.exe"
+$ollamaRunner = Join-Path (Split-Path -Parent $ollamaExe) "lib\ollama\llama-server.exe"
 $ollamaModels = Join-Path $ownerProfile ".ollama\models"
 $huggingFaceHome = Join-Path $ownerProfile ".cache\huggingface"
 $workerPython = Join-Path $workerRoot ".venv-worker\Scripts\python.exe"
@@ -10,6 +11,7 @@ $workerScript = Join-Path $workerRoot "worker.py"
 $stateRoot = Join-Path $workerRoot ".worker-state"
 $launcherLog = Join-Path $stateRoot "worker-launcher.log"
 $launcherLock = Join-Path $stateRoot "worker-launcher.lock"
+$ollamaMaintenanceMarker = Join-Path $stateRoot "ollama-maintenance.pause"
 $ollamaTagsUrl = "http://127.0.0.1:11434/api/tags"
 
 New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -25,6 +27,13 @@ function Write-LauncherLog {
 }
 
 function Test-OllamaReady {
+    # The HTTP process can answer /api/tags even when Ollama's inference runner
+    # is missing. Do not start the queue worker in that partially installed state,
+    # because every summary request would fail and consume a durable job attempt.
+    if (-not (Test-Path -LiteralPath $ollamaRunner)) {
+        return $false
+    }
+
     try {
         $null = Invoke-RestMethod -Uri $ollamaTagsUrl -Method Get -TimeoutSec 5
         return $true
@@ -47,6 +56,13 @@ catch [System.IO.IOException] {
 }
 
 try {
+    if (Test-Path -LiteralPath $ollamaMaintenanceMarker) {
+        Write-LauncherLog "Ollama maintenance pause requested; stopping the local runtime."
+        Get-Process -Name "ollama" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+        exit 0
+    }
+
     if (-not (Test-Path -LiteralPath $workerPython)) {
         Write-LauncherLog "Worker virtual environment is missing."
         exit 2

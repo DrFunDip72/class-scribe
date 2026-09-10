@@ -122,6 +122,23 @@
 
 **Result:** PASS.
 
+## Ollama inference repair and guarded retry — PASS; RETRIES RUNNING
+
+**Date:** 2026-09-09
+**Scope:** local Ollama runtime, `SYSTEM` launcher readiness, and the three production jobs whose summary stage failed with Ollama HTTP 500.
+
+1. Reproduced the failure with a minimal local generation call: Ollama reported that its `llama-server` binary was missing while `/api/tags` still returned successfully.
+2. Downloaded the official Ollama 0.33.3 installer identified by WinGet. Its SHA-256 exactly matched the package manifest, Windows Authenticode reported `Valid`, and the signer was Ollama Inc.
+3. Used the new ignored maintenance marker to let the `SYSTEM` task stop its own detached Ollama process, then completed the repair installation.
+4. Confirmed Ollama 0.33.3, `lib\ollama\llama-server.exe`, localhost port 11434, and the pre-login worker task were present/running.
+5. Re-ran the exact structured `qwen3:4b` schema request that had failed; it returned a completed response with summary, key points, and action-items fields.
+6. Added a launcher gate requiring both the runner file and `/api/tags`; PowerShell parsing reported zero errors.
+7. Ran all 16 worker helper tests; all passed.
+8. Selected only the three failed High-tier job UUIDs, required `HTTPStatusError`, fewer than three prior attempts, and no existing result, then returned them to `queued` without resetting attempt counts.
+9. Confirmed the PSE 390 retry was claimed with a live lease and reached `Transcribing audio locally` on attempt 3; the STRAT 392 and PHIL 201 retries remained queued behind it.
+
+**Result:** PASS for runtime repair, failure reproduction, summary generation, guarded requeue, and first-job claim. Final transcription/result/source-cleanup verification remains pending because these High-tier recordings are long and process sequentially.
+
 ## Private OpenWhispr restart recovery — PASS
 
 **Date:** 2026-09-09

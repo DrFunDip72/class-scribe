@@ -2,6 +2,13 @@
 
 ## 2026-09-09
 
+### Ollama repair and failed-job recovery
+
+- Repaired the incomplete Ollama 0.32.15 installation with the official Authenticode-valid 0.33.3 installer after confirming the missing `llama-server.exe` caused summary requests to return HTTP 500.
+- Added an ignored maintenance-pause marker so the pre-login `SYSTEM` task can stop its own detached Ollama runtime during future upgrades.
+- Hardened launcher readiness to require both Ollama's HTTP API and its inference runner before starting the queue worker, preventing a partial installation from consuming job attempts.
+- Verified the exact structured `qwen3:4b` request that previously failed now completes successfully, then requeued only the three affected High-tier recordings while preserving attempt counts.
+
 ### Private OpenWhispr recovery
 
 - Restored Docker Desktop and the existing `openwhispr-speaches` container after the Windows restart left port 8000 unavailable.

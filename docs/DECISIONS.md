@@ -209,3 +209,11 @@ Keep the owner's separate Speaches API in its existing Docker container, bound o
 **Reason:** The 2026-09-09 Windows restart left Docker Desktop, WSL, and the port-8000 API stopped even though Docker's normal login auto-start setting was enabled. Class Scribe recovered because it has an independent `SYSTEM` task; OpenWhispr had no equivalent retry layer.
 
 **Consequence:** `Systran/faster-whisper-base.en` returns automatically after the owner signs in, and later Docker/container failures are retried within about five minutes. Docker Desktop still depends on the owner's interactive profile, so this design does not promise pre-login availability. Concurrent OpenWhispr and Class Scribe inference share CPU and can increase fan noise and completion time.
+
+## ADR-033 — Gate Queue Startup on a Complete Ollama Runtime
+
+Require the Windows launcher to verify Ollama's installed `llama-server.exe` inference runner as well as its localhost `/api/tags` response before starting the queue worker. Keep an ignored maintenance marker that lets the `SYSTEM` task stop its own detached Ollama process during a signed installer repair or upgrade.
+
+**Reason:** Ollama 0.32.15 could still answer `/api/tags` after its inference runner disappeared, so the earlier health check reported ready while every `qwen3:4b` summary request failed with HTTP 500 and consumed durable job attempts. A normal user process could not terminate the `SYSTEM`-owned runtime to repair the installation.
+
+**Consequence:** A partial Ollama installation now holds jobs safely in the durable queue instead of claiming them. An operator must repair the local runtime before processing resumes. The maintenance marker is local, ignored, and must be removed after maintenance; it changes no database, network, model, or privacy boundary.

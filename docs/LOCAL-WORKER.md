@@ -124,3 +124,5 @@ The public route exposes only `online` or `offline`. It contains no filename, tr
 - **Private push key replaced:** restart the worker, then ask each user to disable and re-enable notifications on every desired device.
 
 Do not expose Ollama, add port forwarding, or create a public tunnel.
+
+The separate private-Tailscale OpenWhispr/Speaches service has its own container and recovery task. It is not managed by `AudioTranscriberWorker`; see `docs/OPENWHISPR.md`.

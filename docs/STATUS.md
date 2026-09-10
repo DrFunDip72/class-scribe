@@ -44,6 +44,7 @@ No credentials are stored in this document.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 - Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
 - Created four public course repositories (`HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`) and performed a one-time export of the owner's September 2 completed results as dated Markdown notes for intentional sharing. Automatic GitHub/Notion delivery is not implemented yet.
+- Restored the separate private-Tailscale OpenWhispr/Speaches API and added an owner-session Windows recovery task that checks it every five minutes, starts Docker Desktop when needed, and restores the existing `openwhispr-speaches` container without exposing port 8000 publicly.
 
 ## Last verified state
 
@@ -116,6 +117,7 @@ No credentials are stored in this document.
 - Production test cleanup: the exact disposable Auth user and its three batches, jobs, and results were cascade-deleted after all source objects had already been removed. Follow-up counts were zero for the user, application rows, and Storage objects.
 - Progressive-upload migrations are applied to production. An authenticated rollback-only test created two placeholders, queued the first while the second remained `uploading`, safely failed the second, and left no test rows. The real queue remained uninterrupted with one active job and five waiting jobs.
 - Client-facing release commit `f3288cc` is pushed to GitHub. Production deployment `dpl_CwHpe7SmsLx4YmNX5PozCU4vbXPC` is Ready on `https://class-scribe-ruddy.vercel.app`; the landing page and worker-health route return HTTP 200, the page contains the progressive-upload copy, health returns exactly `{"status":"online"}`, and the new deployment has no warning/error/fatal runtime logs. The browser automation surface was unavailable, so authenticated visual verification remains pending.
+- After the 2026-09-09 Windows restart, Docker Desktop had not relaunched and nothing listened on port 8000 even though Tailscale retained `100.79.197.76`. Docker was started, its existing `openwhispr-speaches` container resumed with `unless-stopped`, and the private endpoint returned HTTP 200 with `Systran/faster-whisper-base.en`. `OpenWhisprServerSupervisor` is installed for owner logon plus five-minute recovery; a manual run and the next scheduled run both returned `0x00000000`. The actual `/v1/audio/transcriptions` route produced a non-empty 23-word transcript from the 9.6-second verification sample.
 
 ## Supabase Auth policy
 

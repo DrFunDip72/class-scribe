@@ -201,3 +201,11 @@ Create every logical job in a batch as an `uploading` placeholder, then atomical
 **Consequence:** The first finished source may begin processing while later files prepare or upload. One failed source is marked with a safe upload failure and does not prevent later selections from entering the queue. The worker and its active queue require no restart because `claim_next_job` still selects only `queued` rows. A force-closed browser can leave an `uploading` placeholder; it cannot be processed or trigger a false batch-complete notification, and automatic stale-upload cleanup is deferred. The old atomic `create_upload_batch` RPC remains for backward compatibility.
 
 The normal client UI describes results and progress in plain language and hides implementation details such as model IDs, byte counts, raw worker stages, detected-language diagnostics, and infrastructure names. Fast, Balanced, and High remain visible because users actively choose their speed/quality tradeoff.
+
+## ADR-032 — Recover the Private OpenWhispr API After Owner Logon
+
+Keep the owner's separate Speaches API in its existing Docker container, bound only to the computer's Tailscale IPv4 address. Retain the container's `unless-stopped` policy and add a least-privileged owner-session Windows task that runs at logon and every five minutes. The task may start Docker Desktop and the existing container, but it must not recreate the container or publish port 8000 beyond Tailscale.
+
+**Reason:** The 2026-09-09 Windows restart left Docker Desktop, WSL, and the port-8000 API stopped even though Docker's normal login auto-start setting was enabled. Class Scribe recovered because it has an independent `SYSTEM` task; OpenWhispr had no equivalent retry layer.
+
+**Consequence:** `Systran/faster-whisper-base.en` returns automatically after the owner signs in, and later Docker/container failures are retried within about five minutes. Docker Desktop still depends on the owner's interactive profile, so this design does not promise pre-login availability. Concurrent OpenWhispr and Class Scribe inference share CPU and can increase fan noise and completion time.

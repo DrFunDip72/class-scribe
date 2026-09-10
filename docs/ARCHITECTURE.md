@@ -111,3 +111,9 @@ The web UI is designed from a 320 CSS-pixel minimum viewport upward. Flex and gr
 ## Privacy boundary
 
 No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Original videos and oversized source audio never upload. Derived parts and direct audio objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.
+
+## Separate private OpenWhispr API
+
+The computer also hosts a separate OpenAI-compatible Speaches container for private Tailscale clients. This is not part of the Class Scribe request path or FIFO queue. Docker publishes container port 8000 only on `100.79.197.76`, and `/v1/models` must include `Systran/faster-whisper-base.en`.
+
+The container uses Docker's `unless-stopped` policy. Because Docker Desktop is a per-user WSL 2 application, `OpenWhisprServerSupervisor` runs at the owner's Windows logon and every five minutes. Its short-lived PowerShell action checks the model endpoint, launches Docker Desktop if the engine is unavailable, starts the existing container if necessary, and exits. It never recreates the container and never opens a router port. Pre-login availability is not promised; Class Scribe's independent `SYSTEM` worker remains available without owner login. See `docs/OPENWHISPR.md`.

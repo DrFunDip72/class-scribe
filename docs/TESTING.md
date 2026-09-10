@@ -122,6 +122,23 @@
 
 **Result:** PASS.
 
+## Private OpenWhispr restart recovery — PASS
+
+**Date:** 2026-09-09
+**Environment:** Docker Desktop 29.7.2, WSL 2, Tailscale, existing `openwhispr-speaches` container, and Windows Task Scheduler.
+
+1. Confirmed the failed endpoint had no port-8000 listener while Tailscale remained online with `100.79.197.76` assigned to this computer.
+2. Confirmed Docker Desktop's service and `docker-desktop` WSL distribution were stopped and Docker CLI could not reach the engine.
+3. Started Docker Desktop. Its existing container resumed without recreation and reported `running` with restart policy `unless-stopped`.
+4. Requested `http://100.79.197.76:8000/v1/models`; it returned HTTP 200 and listed `Systran/faster-whisper-base.en` plus the existing Distil model.
+5. Verified the listener binds only to `100.79.197.76:8000`; localhost is intentionally not bound.
+6. Parsed both recovery PowerShell scripts with zero syntax errors and ran the supervisor directly with exit code 0.
+7. Installed `OpenWhisprServerSupervisor` for owner logon plus five-minute repetition. The immediate task run and the next naturally scheduled run both completed with `0x00000000`; the container and required model endpoint remained healthy.
+8. Posted the repository's non-private 9.6-second verification MP3 to `/v1/audio/transcriptions` with `Systran/faster-whisper-base.en`; the API returned a non-empty 23-word transcript.
+9. Did not interrupt the active Class Scribe High-tier transcription and did not perform a full Windows reboot.
+
+**Result:** PASS for live restoration, healthy-state checks, and scheduled execution. A future physical reboot should confirm owner-logon recovery; pre-login Docker Desktop availability is intentionally not claimed.
+
 ## External worker-outage monitor — PARTIALLY VERIFIED, SCHEDULER GAP
 
 **Date:** 2026-08-28 and 2026-08-30

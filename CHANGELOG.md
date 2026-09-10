@@ -2,6 +2,15 @@
 
 ## 2026-09-09
 
+### Private OpenWhispr recovery
+
+- Restored Docker Desktop and the existing `openwhispr-speaches` container after the Windows restart left port 8000 unavailable.
+- Verified the private Tailscale `/v1/models` endpoint returns HTTP 200 with `Systran/faster-whisper-base.en`; the listener remains bound only to `100.79.197.76`.
+- Added a short-lived OpenWhispr supervisor and least-privileged Windows task that runs at owner logon and every five minutes, starts Docker Desktop when needed, and restores the existing container without recreating it.
+- Preserved Docker's `unless-stopped` container policy, documented the owner-login availability boundary, and kept the separate Class Scribe `SYSTEM` worker unchanged.
+- Verified PowerShell parsing, direct supervisor success, task registration, and a naturally scheduled `0x00000000` run while the live endpoint stayed healthy.
+- Completed an actual API transcription with the required base English model and received a non-empty 23-word result.
+
 ### Client-facing workflow and progressive uploads
 
 - Reworded the landing page, dashboard, and result states around recordings, notes, privacy, and user actions instead of local-worker, model-ID, storage-size, and raw pipeline terminology.

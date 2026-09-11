@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-09
+**Last updated:** 2026-09-11
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a client-facing mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -46,6 +46,7 @@ No credentials are stored in this document.
 - Created four public course repositories (`HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`) and performed a one-time export of the owner's September 2 completed results as dated Markdown notes for intentional sharing. Automatic GitHub/Notion delivery is not implemented yet.
 - Restored the separate private-Tailscale OpenWhispr/Speaches API and added an owner-session Windows recovery task that checks it every five minutes, starts Docker Desktop when needed, and restores the existing `openwhispr-speaches` container without exposing port 8000 publicly.
 - Repaired Ollama from an incomplete 0.32.15 installation to signed 0.33.3, restored its missing inference runner, and hardened the `SYSTEM` launcher so both the runner and localhost API must be ready before the queue worker can claim jobs.
+- Replaced all four public September 2 course notes with their completed High-tier results and added the valid September 8 PSE 390 recording. Remote GitHub blobs exactly match the staged database exports and preserve Summary, Key Points, Action Items, then Transcript. The corrupted September 8 HRM result remains unpublished.
 
 ## Last verified state
 
@@ -120,6 +121,7 @@ No credentials are stored in this document.
 - Client-facing release commit `f3288cc` is pushed to GitHub. Production deployment `dpl_CwHpe7SmsLx4YmNX5PozCU4vbXPC` is Ready on `https://class-scribe-ruddy.vercel.app`; the landing page and worker-health route return HTTP 200, the page contains the progressive-upload copy, health returns exactly `{"status":"online"}`, and the new deployment has no warning/error/fatal runtime logs. The browser automation surface was unavailable, so authenticated visual verification remains pending.
 - After the 2026-09-09 Windows restart, Docker Desktop had not relaunched and nothing listened on port 8000 even though Tailscale retained `100.79.197.76`. Docker was started, its existing `openwhispr-speaches` container resumed with `unless-stopped`, and the private endpoint returned HTTP 200 with `Systran/faster-whisper-base.en`. `OpenWhisprServerSupervisor` is installed for owner logon plus five-minute recovery; a manual run and the next scheduled run both returned `0x00000000`. The actual `/v1/audio/transcriptions` route produced a non-empty 23-word transcript from the 9.6-second verification sample.
 - On 2026-09-09, three High-tier jobs were confirmed to have failed only during Ollama summary generation because `llama-server.exe` was missing even though `/api/tags` still responded. The official Ollama 0.33.3 installer matched WinGet's SHA-256 and had a valid Ollama Inc. Authenticode signature. After repair, the exact structured `qwen3:4b` request completed successfully; all three affected jobs were guardedly requeued without resetting attempt counts. `pse_390_-_9-8.m4a` was then claimed and began transcribing on attempt 3 while `strat_392_-_9-2.m4a` and `philo_201_9-2.m4a` remained queued behind it.
+- By 2026-09-10, all three Ollama-related retries completed with High `medium.en` results and zero remaining source objects. On 2026-09-11, the September 2 High results replaced the Fast exports in HRM 391, PSE 390, STRAT 392, and PHIL 201; PSE 390 September 8 was added. The resulting recording-note inventory is HRM 391: one published recording (September 2), PSE 390: two (September 2 and 8), STRAT 392: one (September 2), and PHIL 201: one (September 2). HRM 391 September 8 is withheld because 182 of 198 segments repeat the same sentence across most of the 73-minute result; its deleted source must be re-uploaded for a valid retranscription.
 
 ## Supabase Auth policy
 
@@ -134,6 +136,6 @@ Password-reset email stays enabled. The production reset URL should remain allow
 
 ## Exact next task
 
-Monitor the three Ollama-related retries through completed results, starting with the final-attempt PSE 390 job, and verify source cleanup after each success. Keep `tyler_eager.m4a` out of every course repository. Then test five real 30-60 minute recordings as one mixed-tier batch and compare whether Balanced is the best routine default in practice. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
+Ask the owner to re-upload the original HRM 391 September 8 recording because its stored High result is corrupted and the source was deleted after completion. Keep that result and `tyler_eager.m4a` out of every course repository. Then test five real 30-60 minute recordings as one mixed-tier batch and compare whether Balanced is the best routine default in practice. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
 
 For business validation, recruit 20-30 invited students for four active school weeks and measure retained usage, end-to-end processing time, egress, failures, support time, and willingness to pay before implementing billing.

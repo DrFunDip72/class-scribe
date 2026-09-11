@@ -345,6 +345,21 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 
 Do not promise processing time until real long-class benchmarks are recorded.
 
+## High-tier GitHub course refresh — PASS WITH ONE CORRUPT RESULT WITHHELD
+
+**Date:** 2026-09-11
+
+1. Queried only completed course jobs owned by `jmaximum72@gmail.com` and matched the four September 2 Fast/High pairs by exact course filename and duration.
+2. Replaced the HRM 391, PSE 390, STRAT 392, and PHIL 201 September 2 notes with the corresponding High `medium.en` results. Added PSE 390 September 8 as a new note.
+3. Verified each of the five remote GitHub blob IDs exactly matches its local staged blob, embeds the expected High-result UUID, declares `transcription_tier: "high"`, and places Summary before Transcript.
+4. Verified all four repositories remain public, each local branch equals `origin/main`, and all four refresh worktrees are clean.
+5. Verified the six relevant High database jobs have result rows and zero remaining Storage objects.
+6. Withheld HRM 391 September 8: its 73-minute result contains 1,187 words, 198 segments, and 182 exact repetitions of one sentence spread through most of the audio duration. Because source cleanup already occurred, a fresh owner upload is required.
+7. Compared normalized full transcripts. Sequence-match ratios were HRM 88.44%, PSE 92.89%, STRAT 83.70%, and PHIL 91.47%; word-level diff edits per 100 old words were 17.13, 11.05, 24.36, and 11.93 respectively. These are difference/agreement measurements, not WER.
+8. Reused the existing 107-word published PHIL reference for the only ground-truth accuracy statement: High WER was 3.74% versus Fast's 9.35%, a 60% error reduction on that bounded passage. Manual terminology checks also found High recovered `extinction`, `Latter-day Saint`, and `logical deduction`, while HRM still worsened the instructor surname.
+
+**Result:** PASS for five valid publications and remote verification. HRM September 8 correctly remains unpublished pending re-upload.
+
 ## GitHub course export and public access — PASS
 
 **Date:** 2026-09-09

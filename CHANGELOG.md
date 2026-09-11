@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-11
+
+### High-tier course archive refresh
+
+- Replaced the September 2 HRM 391, PSE 390, STRAT 392, and PHIL 201 public notes with their completed High `medium.en` transcript and regenerated study guide.
+- Added the valid September 8 PSE 390 recording as a new summary-first Markdown note.
+- Verified all five remote GitHub blobs exactly match their staged database result, contain the expected immutable Class Scribe job ID and High-tier metadata, and keep the summary before the complete transcript.
+- Kept the September 8 HRM 391 result out of GitHub after detecting that 182 of 198 segments repeat the same sentence across most of the 73-minute recording; its deleted source must be re-uploaded for a valid retry.
+- Measured old/new full-transcript agreement and word-level differences without mislabeling model disagreement as ground-truth accuracy; retained the existing bounded PHIL reference result as the only exact WER comparison.
+
 ## 2026-09-09
 
 ### Ollama repair and failed-job recovery

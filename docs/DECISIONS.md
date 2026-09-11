@@ -217,3 +217,11 @@ Require the Windows launcher to verify Ollama's installed `llama-server.exe` inf
 **Reason:** Ollama 0.32.15 could still answer `/api/tags` after its inference runner disappeared, so the earlier health check reported ready while every `qwen3:4b` summary request failed with HTTP 500 and consumed durable job attempts. A normal user process could not terminate the `SYSTEM`-owned runtime to repair the installation.
 
 **Consequence:** A partial Ollama installation now holds jobs safely in the durable queue instead of claiming them. An operator must repair the local runtime before processing resumes. The maintenance marker is local, ignored, and must be removed after maintenance; it changes no database, network, model, or privacy boundary.
+
+## ADR-034 — Withhold Corrupted Results From Public Course Archives
+
+Replace an existing course note only when the new completed result has an unambiguous owner, course, lecture date, expected model, complete document structure, and a basic transcript-integrity check. Do not publish a nominally completed result when repetition or coverage evidence indicates corruption.
+
+**Reason:** The High-tier HRM 391 September 8 job spans 73 minutes but contains only 1,187 words, and 182 of its 198 segments repeat the same sentence through most of the recording. Publishing it would turn a processing failure into misleading public study material. Its source object was deleted by the normal post-completion retention path, so the existing result cannot be repaired from stored media.
+
+**Consequence:** The four valid September 2 High results replace their Fast counterparts, and the valid PSE 390 September 8 result is added. HRM 391 September 8 remains unpublished until the owner re-uploads the source and a new result passes integrity review. Git history preserves every superseded public note for rollback.

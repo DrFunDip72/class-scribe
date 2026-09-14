@@ -118,6 +118,12 @@ Confirm the installer is official and Authenticode-valid before running it. Do n
 - Expired browser subscriptions: removed automatically after a push provider returns HTTP 404 or 410.
 - Summary output: a brief overview (usually 2-4 sentences), up to 14 ordered concept/definition/process points without padding, selective examples, a final `Big takeaway`, and only genuine action items. The fallback sentence extractor preserves common titles such as `Dr.` instead of truncating the takeaway. Single-section recordings skip the consolidation pass.
 
+## Drive and GitHub automation
+
+`ClassScribeDriveAutomation` is separate from the continuously running inference worker. It runs as `SYSTEM` at startup and hourly, scans Drive only on Monday/Wednesday or one missed-day catch-up, and checks completed ingestions for GitHub export every hour. `ClassScribeGitHubAudit` runs Thursday at 8:00 AM. Both use `drive-automation-launcher.ps1`; repair them with `install-drive-automation-tasks.ps1 -StartAndVerify` from Administrator PowerShell.
+
+Safe automation logs are under `.worker-state/class-scribe-automation.log`; task installation/status evidence is under `.worker-state/`. Credentials are ignored under `.worker-secrets/`. Full operations and recovery are in `docs/DRIVE-GITHUB-AUTOMATION.md`.
+
 ## Owner outage notification
 
 The external monitor is `.github/workflows/worker-health-monitor.yml`; it does not run on this computer and uses no AI. Every five minutes it checks `https://class-scribe-ruddy.vercel.app/api/worker-health`. A heartbeat older than 10 minutes makes the route unavailable. After three checks, the workflow opens one `worker-offline` GitHub issue assigned to `DrFunDip72`, and closes it when health returns.

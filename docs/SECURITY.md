@@ -30,9 +30,13 @@ Recordings, filenames, transcripts, summaries, account IDs, and signed object UR
 - Boolean-only public worker health RPC; anonymous callers cannot select heartbeat rows or see worker, queue, job, recording, or account metadata.
 - GitHub outage issues contain only generic operational status and never private educational data.
 
+- Drive automation uses a read-only rclone credential rooted operationally to `URecorder`; the token is ACL-restricted in ignored `.worker-secrets/rclone.conf` and is never sent to Vercel, Supabase, GitHub, or logs.
+- GitHub course export uses a fine-grained token restricted to Contents read/write on only the four owner-controlled public course repositories. It lives in ignored `.worker-secrets/github-course-export.token` and is read by `SYSTEM` only at execution time.
+- Only the confirmed owner account can be targeted by the configured importer. Worker-only RPCs validate protected `app_metadata.role=worker`; automatic public export refuses ambiguous filenames, duplicate public paths, and suspicious repeated/timestamp-overrun results.
+
 ## Advisor notes
 
-Supabase reports warnings for the three authenticated SECURITY DEFINER functions. They are intentional narrow RPCs: anonymous execution is revoked, the user RPCs bind writes to `auth.uid()`, and the worker RPC checks protected JWT `app_metadata`.
+Supabase reports warnings for authenticated SECURITY DEFINER functions. They are intentional narrow RPCs: anonymous execution is revoked, user RPCs bind writes to `auth.uid()`, and worker RPCs check protected JWT `app_metadata` before reading or writing.
 
 Supabase also reports one intentional anonymous SECURITY DEFINER warning for `worker_is_online()`. The function takes no input and returns one Boolean derived from heartbeat freshness. Anonymous table reads remain revoked; it exposes no row or timestamp. The permission is required for a credential-free external dead-man's-switch.
 
@@ -59,3 +63,5 @@ Tracked examples contain names/placeholders only. Real values live in ignored `.
 The generated `.worker-secrets/vapid_private_key.pem` is also a secret. Keep it out of Git and ordinary cloud documents. Store any recovery copy in the same protected secret/password backup used for worker credentials. Rotating it is safe but invalidates all current push subscriptions.
 
 The FluxPrompt API key belongs only in ignored `.env.worker.local` on the Windows worker. Do not store it in a notification payload or delivery error. If exposed, rotate it in FluxPrompt before restoring email delivery.
+
+The first rclone authorization token was printed by rclone's default configuration output during setup. It was immediately revoked through Google's revocation endpoint and deleted before a replacement authorization was created with output suppression. Only the replacement credential is active. If either current automation credential is exposed, revoke it at Google/GitHub before recreating the ignored local file.

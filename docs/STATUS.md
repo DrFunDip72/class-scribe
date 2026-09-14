@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-09-11
-**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, and a client-facing mobile-first interface. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
+**Last updated:** 2026-09-14
+**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, and owner-only Google Drive-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
 
@@ -47,6 +47,8 @@ No credentials are stored in this document.
 - Restored the separate private-Tailscale OpenWhispr/Speaches API and added an owner-session Windows recovery task that checks it every five minutes, starts Docker Desktop when needed, and restores the existing `openwhispr-speaches` container without exposing port 8000 publicly.
 - Repaired Ollama from an incomplete 0.32.15 installation to signed 0.33.3, restored its missing inference runner, and hardened the `SYSTEM` launcher so both the runner and localhost API must be ready before the queue worker can claim jobs.
 - Replaced all four public September 2 course notes with their completed High-tier results and added the valid September 8 PSE 390 recording. Remote GitHub blobs exactly match the staged database exports and preserve Summary, Key Points, Action Items, then Transcript. The corrupted September 8 HRM result remains unpublished.
+- Added an hourly `SYSTEM` automation that reads the owner's `URecorder` Drive folder on Monday/Wednesday, performs missed-class-day catch-up, recognizes tolerant course/date filename variants, creates ten-minute private M4A parts, deduplicates Drive versions and matching browser uploads, queues High-tier processing, gates corrupted results, and publishes summary-first owner notes to the matching public course repository.
+- Added a Thursday 8:00 AM `SYSTEM` GitHub audit for the expected HRM/PSE/PHIL twice-weekly and STRAT once-weekly note schedule. The audit detects missing, unexpected, and duplicate dated notes and uses the existing privacy-safe FluxPrompt path for its report.
 
 ## Last verified state
 
@@ -56,6 +58,10 @@ No credentials are stored in this document.
 - A manual interactive `worker.py --once` launch while the `SYSTEM` worker was active exited 0 in 1.53 seconds with the expected duplicate-worker message, proving the global cross-session mutex blocks a second worker.
 - PowerShell parsing, Python compilation, and all 13 worker helper tests passed. The ignored `.worker-state`, `.worker-secrets`, and `.env.worker.local` paths remain untracked.
 - Worker heartbeat: online and idle on version 1.5.0 after an idle-queue scheduled-task restart. The ignored local FluxPrompt key remains configured, and the current worker process was started by the `SYSTEM` task. FFmpeg decoding bypasses the PyAV native extension blocked by Windows Smart App Control; the launcher reuses the owner's cached Fast, Balanced, and High models.
+- Google Drive/GitHub automation: rclone 1.75.1 authenticated read-only to `jmaximum72@gmail.com` and rooted to `URecorder`; the fine-grained GitHub token validated all four public repositories and both credentials are ACL-restricted under ignored `.worker-secrets`. `ClassScribeDriveAutomation` completed an immediate `SYSTEM` run with result 0; `ClassScribeGitHubAudit` is registered for Thursday 8:00 AM.
+- Live automation cutover: midnight Mountain Time on 2026-09-14. The importer linked today's Drive HRM recording to its already-running browser job instead of retranscribing it. A duplicate created during the cross-source-deduplication test was canceled before claim, its eight Storage parts and database rows were removed, and zero duplicate objects/rows remain.
+- Live GitHub automation export: `HRM-391/notes/2026/2026-09-14.md` passed the repetition/timestamp gate, was published and SHA-256 read back, returned anonymous HTTP 200, embedded the result UUID, and ordered Summary, Key Points, Action Items, then Transcript.
+- Known maintenance: rclone's shared Google OAuth client ID is scheduled for retirement during 2026. The current connection works, but the owner must replace it with a personal Google OAuth desktop client ID for dependable long-term operation; see `docs/DRIVE-GITHUB-AUTOMATION.md`.
 - Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.

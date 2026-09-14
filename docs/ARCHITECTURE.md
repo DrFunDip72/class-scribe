@@ -22,6 +22,10 @@ Windows startup task -> worker.py
 GitHub Actions schedule -> Vercel /api/worker-health
   -> Boolean-only Supabase RPC
   -> assigned GitHub outage issue -> owner email notification
+
+Google Drive URecorder -> hourly SYSTEM importer -> private Supabase queue
+  -> existing worker result -> integrity gate -> public course GitHub repository
+  -> Thursday repository-count audit -> generic FluxPrompt report
 ```
 
 ## Web application
@@ -56,6 +60,8 @@ The Windows scheduled task starts Ollama if needed, verifies its localhost API a
 System FFmpeg decodes each downloaded part to mono 16 kHz float audio before inference. The job's persisted profile selects pinned faster-whisper behavior on CPU INT8: Fast is `small`/beam 1 with automatic language detection, Balanced is `distil-large-v3`/beam 5 with fixed English and previous-text conditioning disabled, and High is `medium.en`/beam 5 with fixed English. The worker retains only one Whisper model in memory and releases it before loading a different tier. The `SYSTEM` launcher points `HF_HOME` at the owner's verified model cache, avoiding duplicate multi-gigabyte downloads. Bypassing PyAV avoids an unsigned native extension blocked by Windows Smart App Control and uses the already installed FFmpeg runtime instead.
 
 A global cross-session Windows named mutex prevents duplicate worker processes even when the scheduled task runs as `SYSTEM` and a manual launch runs in the owner's desktop session. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
+
+The separate `class_scribe_automation.py` process also runs outbound-only as `SYSTEM`. rclone lists/downloads only the configured `URecorder` root. The importer converts sources into ten-minute M4A parts, uses worker-only RPCs and Storage policies, and records Drive identity plus queue/export state in `drive_ingestions`. It links one matching owner browser job rather than creating a cross-source duplicate. The exporter reads only worker-authorized owner results, applies a repetition/timestamp/completeness gate, writes a summary-first Markdown note through a repository-scoped token, and verifies remote bytes before committing export state. See `docs/DRIVE-GITHUB-AUTOMATION.md`.
 
 ## External worker monitoring
 

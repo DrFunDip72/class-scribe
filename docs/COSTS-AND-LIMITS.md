@@ -15,8 +15,11 @@
 | Custom domain | Not used | $0 |
 | Email delivery | Existing FluxPrompt Email Agent | $0 added by Class Scribe; account allowance applies |
 | Web Push | Browser/vendor push services + local signing | $0 |
+| Drive-to-GitHub automation | rclone, FFmpeg, local worker, GitHub Contents API | $0 incremental |
 
 No paid AI API is used.
+
+The Google Drive importer and GitHub course-note exporter add no paid service at the current scale. They use the owner's existing Drive storage, GitHub Free repositories, local CPU/electricity, and one lightweight hourly metadata scan on Monday and Wednesday. Repository notes are text files, so their storage and API usage are negligible relative to GitHub's practical limits. The automation currently uses rclone's shared Google OAuth client, which rclone says will be retired during 2026; moving to a personal Google OAuth desktop client ID is a required reliability maintenance step but does not add a fee.
 
 Web Push adds a few small Postgres rows per browser and delivery but no paid API or Vercel Function. Its practical limits are browser/OS policy and the existing Supabase database quota, not a per-notification bill. Delivery is best-effort: battery-saving, Focus/Do Not Disturb, revoked permission, browser background restrictions, or a vendor outage can delay or suppress the visible toast.
 

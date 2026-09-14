@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-14
+
+### Google Drive to GitHub class automation
+
+- Installed rclone 1.75.1 and authorized a replacement read-only credential for `jmaximum72@gmail.com`, rooted the remote to `URecorder`, ACL-restricted it under ignored `.worker-secrets`, and immediately revoked the first setup credential after rclone printed it to setup output.
+- Added tolerant class/date/part filename parsing, a Mountain Time Monday/Wednesday schedule, Tuesday/Thursday missed-scan catch-up, a midnight September 14 cutover, Drive-version idempotency, and cross-source matching that links an existing browser upload instead of retranscribing it.
+- Added native FFmpeg preparation into ten-minute mono 16 kHz 48 kbps M4A parts, retryable private uploads, and worker-only Supabase begin/link/queue RPCs backed by the new `drive_ingestions` ledger.
+- Added owner-only result readback, transcript integrity checks, summary-first public GitHub rendering, UUID conflict protection, repository API retries, and SHA-256 readback verification.
+- Added a Thursday 8:00 AM weekly audit for two HRM/PSE/PHIL notes and one STRAT note, including missing, unexpected, and duplicate-date detection plus a privacy-safe FluxPrompt report.
+- Registered startup/hourly `ClassScribeDriveAutomation` and weekly `ClassScribeGitHubAudit` tasks as `SYSTEM`; an immediate unattended automation pass returned task result 0.
+- Linked the September 14 HRM Drive file to its already-completed High browser job and published `HRM-391/notes/2026/2026-09-14.md`. Anonymous HTTP, document ordering, UUID metadata, and remote content verification passed.
+- Canceled and fully removed one duplicate automation job and its eight Storage parts after the first live pass exposed the cross-source case; added permanent matching before download and confirmed zero duplicate rows/objects remain.
+- Documented that rclone's shared Google OAuth client is being retired during 2026 and must be replaced near-term with an owner-created Google OAuth desktop client ID.
+- Isolated cross-source matching failures to the affected Drive item, hardened the publication quality gate against malformed segment entries, and documented the automation's $0 incremental service cost.
+
 ## 2026-09-11
 
 ### High-tier course archive refresh

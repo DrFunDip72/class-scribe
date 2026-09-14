@@ -12,6 +12,8 @@ Committed migrations under `supabase/migrations/` are authoritative and have bee
 - `worker_heartbeats` — worker state, active job, version, and last seen.
 - `completion_events` — worker-only durable FluxPrompt email outbox with event keys, recipient, generic payload, attempts, backoff, safe errors, and delivery state.
 
+- `drive_ingestions` — owner, immutable Drive file/version metadata, parsed course/date/part, linked queue job, import/export state, safe error, and verified GitHub repository/path/SHA. Unique Drive-version and job constraints prevent repeated hourly and cross-source imports.
+
 ## RPCs
 
 Notification tables added by `web_push_notifications`:
@@ -27,6 +29,9 @@ Notification tables added by `web_push_notifications`:
 - `fail_recording_upload(job_id)` can change only the caller's own `uploading` placeholder to a terminal upload failure. It cannot alter queued or worker-owned processing state.
 - `retry_transcription_job(job_id)` checks ownership, failed status, and remaining attempts.
 - `claim_next_job(worker_id)` requires the dedicated worker JWT role (or service role), recovers stale leases, and atomically claims the oldest eligible row with `SKIP LOCKED`.
+- `begin_drive_ingestion(...)` is worker-only, resolves the confirmed owner, deduplicates the Drive version, and creates one non-claimable upload job.
+- `queue_drive_ingestion(ingestion_id, parts)` is worker-only and validates uploaded M4A objects, exact owner/job paths, size/count limits, and the complete manifest before changing the job to `queued`.
+- `link_drive_ingestion_to_existing_job(...)` is worker-only and links a Drive version to one eligible existing owner job so a prior browser upload is exported without retranscription.
 
 These functions intentionally use SECURITY DEFINER to perform narrow validated mutations. Anonymous execution is revoked, and each function validates the caller before writing.
 
@@ -38,7 +43,11 @@ Authenticated users can see only rows where `user_id = auth.uid()`. They cannot 
 
 Bucket `recordings` is private, accepts supported audio MIME types (plus legacy video types), and enforces a 50 MB object limit. Multipart paths are exactly `<user UUID>/<job UUID>/part-NNNN.<audio extension>`. User policies validate the owner prefix; the batch RPC validates the full ordered manifest. Worker policies permit authenticated read/delete only when `is_worker()` is true.
 
+The Drive importer also receives insert/update permission only when `is_worker()` passes. `queue_drive_ingestion` independently verifies that every declared private M4A object exists before making the job claimable.
+
 ## Migration history
+
+The 2026-09-14 Drive/GitHub automation migrations add the ingestion ledger, owner/worker read policy, worker-only import/link/queue RPCs, private worker Storage upload/update, worker result readback, and consolidated result/ingestion SELECT policies. Forward corrective migrations add the owner foreign-key index and remove duplicate permissive SELECT policies reported by the advisor.
 
 1. `initial_schema` — types, tables, constraints, functions, RLS, bucket, and storage policies.
 2. `advisor_indexes` — foreign-key and heartbeat indexes.

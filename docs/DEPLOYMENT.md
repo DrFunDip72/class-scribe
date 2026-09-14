@@ -70,6 +70,16 @@ Email recovery also requires restoring `FLUXPROMPT_API_KEY` to the replacement c
 
 Queued jobs survive web/worker restarts in Supabase. Expired worker leases are automatically recovered on the next claim.
 
+## Drive and course-archive automation
+
+The automation is local and does not require a Vercel deployment. Install or repair it from Administrator PowerShell:
+
+```powershell
+.\install-drive-automation-tasks.ps1 -StartAndVerify
+```
+
+The installer registers `ClassScribeDriveAutomation` as `SYSTEM` at startup and hourly, plus `ClassScribeGitHubAudit` as `SYSTEM` every Thursday at 8:00 AM. Restore `.worker-secrets/rclone.conf` and `.worker-secrets/github-course-export.token` from a secure credential backup on a replacement computer, or reauthorize/recreate them. Rerun `audit --dry-run` before enabling automatic publication. Full setup, filename behavior, cutover, credential rotation, and recovery are in `docs/DRIVE-GITHUB-AUTOMATION.md`.
+
 ## Unattended Windows recovery
 
 `install-worker-task.ps1` is the authoritative task definition. It may be rerun safely to repair configuration drift. It requires administrator approval because the worker runs as `SYSTEM` before any user signs in. The persistent launcher and the task's one-minute restart policy recover process crashes; the repeating five-minute trigger recovers the task if its normal restart attempts are bypassed.

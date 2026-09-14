@@ -6,3 +6,4 @@ pydantic-settings==2.15.0
 pywebpush==2.4.0
 supabase==2.31.0
 tenacity==9.1.4
+tzdata==2026.4

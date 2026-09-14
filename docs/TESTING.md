@@ -1,5 +1,25 @@
 # Testing and Verification
 
+## Google Drive to public GitHub automation — PASS WITH OAUTH MAINTENANCE REQUIRED
+
+**Date:** 2026-09-14
+**Environment:** production Supabase, `jmaximum72@gmail.com` Google Drive `URecorder`, four public `DrFunDip72` course repositories, and Windows Task Scheduler under `SYSTEM`.
+
+1. Installed rclone 1.75.1, completed read-only Google OAuth, found and rooted the remote to the exact `URecorder` folder, and listed 13 audio files. Four existing names were safely parseable; the September 14 midnight cutover excluded the already-exported September 2 set while retaining one current file.
+2. rclone's first default config command printed the new credential. The credential was immediately revoked through Google's revocation endpoint and deleted. A replacement OAuth flow used output suppression; only that replacement remains active. ACLs grant the owner, Administrators, and `SYSTEM` access to the ignored config.
+3. The fine-grained GitHub token was entered through a local hidden prompt, validated as `DrFunDip72` against all four public repositories, stored without terminal/chat output, and ACL-restricted under ignored `.worker-secrets`.
+4. Created five committed forward migrations. Each migration passed a production transaction-and-rollback syntax check before application. The final schema has the `drive_ingestions` ledger, worker-only begin/link/queue RPCs, worker Storage insert/update, worker result readback, owner indexes, and consolidated SELECT policies.
+5. Eight automation unit tests pass for separator/case/month/date/part variants, ambiguity and schedule rejection, Drive/Postgres timestamp equality, repetition detection, malformed segment tolerance, summary-before-transcript rendering, expected weekly counts, and missed-day catch-up.
+6. The first controlled import downloaded and prepared the current HRM file into eight private ten-minute parts. It exposed that the same lecture had already been submitted through the browser. The new duplicate was canceled before claim; all eight objects plus its batch/job/ingestion rows were removed. Production confirms zero duplicate rows and zero duplicate Storage objects.
+7. Added cross-source matching before download. The next pass linked the Drive version to the existing owner's High job and a later idempotency pass created no duplicate.
+8. The completed HRM result passed transcript/summary/timestamp/repetition checks and published to `HRM-391/notes/2026/2026-09-14.md`. GitHub API readback matched SHA-256; anonymous raw access returned HTTP 200; the 54,007-byte document has a Class Scribe UUID and orders Summary, Key Points, Action Items, then Transcript.
+9. `ClassScribeDriveAutomation` and `ClassScribeGitHubAudit` registered under `SYSTEM`. The immediate unattended run ended `Ready` with `LastTaskResult=0`; its safe log shows Drive scan and export pass completion. The audit is scheduled Thursday at 8:00 AM.
+10. A live no-email weekly audit successfully read all four repositories and reported the current partial Monday state: HRM 1/1, PSE 0/1, PHIL 0/1, and STRAT 0/0. This validates counting without sending a premature warning before Wednesday.
+11. Anonymous Data API probes returned 404 for the worker RPC and 401 for direct ingestion-table reads. Post-change advisors report no new missing-index or multiple-policy finding. Remaining warnings are the documented guarded SECURITY DEFINER RPCs, intentional Boolean health RPC, unavailable Free-plan password protection, and expected unused-index information.
+12. Python compilation, all eight automation tests, the existing 16-test worker suite, and `git diff --check` were run. The final production worker-health request returned HTTP 200 with `{"status":"online"}`, and public GitHub readback again returned the 54,007-byte note with Summary before Transcript. Secrets remain ignored and untracked.
+
+**Result:** PASS for live Drive discovery, cross-source deduplication, queue linkage, automatic public export, GitHub verification, weekly audit logic, and unattended task execution. Near-term owner maintenance remains required because rclone reports that its shared Google OAuth client ID will be retired during 2026; replace it with a personal desktop client ID as documented before relying on this indefinitely.
+
 ## Client-facing workflow and progressive per-recording queue admission — PASS
 
 **Date:** 2026-09-09

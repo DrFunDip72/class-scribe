@@ -23,7 +23,7 @@ GitHub Actions schedule -> Vercel /api/worker-health
   -> Boolean-only Supabase RPC
   -> assigned GitHub outage issue -> owner email notification
 
-Google Drive URecorder -> hourly SYSTEM importer -> private Supabase queue
+Google Drive URecorder -> Drive for desktop -> owner logon/hourly importer -> private Supabase queue
   -> existing worker result -> integrity gate -> public course GitHub repository
   -> Thursday repository-count audit -> generic FluxPrompt report
 ```
@@ -61,7 +61,7 @@ System FFmpeg decodes each downloaded part to mono 16 kHz float audio before inf
 
 A global cross-session Windows named mutex prevents duplicate worker processes even when the scheduled task runs as `SYSTEM` and a manual launch runs in the owner's desktop session. Database atomic claiming is a second safeguard. The same worker owns the VAPID private key and sends Web Push after committing the transcription result. Push and email use separate retryable outboxes, so a notification-provider failure cannot fail or roll back a transcription.
 
-The separate `class_scribe_automation.py` process also runs outbound-only as `SYSTEM`. rclone lists/downloads only the configured `URecorder` root. The importer converts sources into ten-minute M4A parts, uses worker-only RPCs and Storage policies, and records Drive identity plus queue/export state in `drive_ingestions`. It links one matching owner browser job rather than creating a cross-source duplicate. The exporter reads only worker-authorized owner results, applies a repetition/timestamp/completeness gate, writes a summary-first Markdown note through a repository-scoped token, and verifies remote bytes before committing export state. See `docs/DRIVE-GITHUB-AUTOMATION.md`.
+The separate `class_scribe_automation.py` process remains outbound-only but its importer runs in the owner's interactive Windows session because Google's streamed `G:` filesystem is session-scoped. Google Drive for desktop hydrates `URecorder` sources into an isolated temporary staging path; the importer verifies size and modification time before converting them into ten-minute M4A parts. Worker-only RPCs and Storage policies record source identity plus queue/export state in `drive_ingestions`, including compatibility deduplication against prior rclone and browser submissions. The continuously running inference worker remains a pre-login `SYSTEM` task. The exporter reads only worker-authorized owner results, applies a repetition/timestamp/completeness gate, writes a summary-first Markdown note through a repository-scoped token, and verifies remote bytes before committing export state. See `docs/DRIVE-GITHUB-AUTOMATION.md`.
 
 ## External worker monitoring
 

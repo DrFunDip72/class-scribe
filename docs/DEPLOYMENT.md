@@ -78,7 +78,7 @@ The automation is local and does not require a Vercel deployment. Install or rep
 .\install-drive-automation-tasks.ps1 -StartAndVerify
 ```
 
-The installer registers `ClassScribeDriveAutomation` as `SYSTEM` at startup and hourly, plus `ClassScribeGitHubAudit` as `SYSTEM` every Thursday at 8:00 AM. Restore `.worker-secrets/rclone.conf` and `.worker-secrets/github-course-export.token` from a secure credential backup on a replacement computer, or reauthorize/recreate them. Rerun `audit --dry-run` before enabling automatic publication. Full setup, filename behavior, cutover, credential rotation, and recovery are in `docs/DRIVE-GITHUB-AUTOMATION.md`.
+Install Google Drive for desktop, sign into the owner account, and confirm `URecorder` is visible before running the automation installer. It registers `ClassScribeDriveDesktopAutomation` under the owner at logon and hourly, removes the obsolete SYSTEM importer, and registers `ClassScribeGitHubAudit` as `SYSTEM` every Thursday at 8:00 AM. Restore `.worker-secrets/github-course-export.token` from secure backup on a replacement computer or recreate it. The ignored rclone config is rollback-only and should not be restored for a new installation. Rerun `audit --dry-run` before enabling automatic publication. Full setup, filename behavior, cutover, credential rotation, and recovery are in `docs/DRIVE-GITHUB-AUTOMATION.md`.
 
 ## Unattended Windows recovery
 

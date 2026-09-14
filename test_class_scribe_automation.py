@@ -1,8 +1,12 @@
+import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from class_scribe_automation import (
     AutomationError,
+    Settings,
+    desktop_drive_json,
     expected_week_dates,
     parse_recording_name,
     quality_issues,
@@ -20,7 +24,9 @@ class FilenameParsingTests(unittest.TestCase):
             "HRM-391_2026-09-14.mp3": ("HRM-391", "2026-09-14", None),
             "hrm 391 lecture 9-14-26.MP3": ("HRM-391", "2026-09-14", None),
             "PSE390 September 14 2026.m4a": ("PSE-390", "2026-09-14", None),
+            "pse 9-14.m4a": ("PSE-390", "2026-09-14", None),
             "PHIL_201 class 9.14.mp3": ("PHIL-201", "2026-09-14", None),
+            "philo 201 9-14.m4a": ("PHIL-201", "2026-09-14", None),
             "strategy 392 sept-16-2026 pt2.mp3": ("STRAT-392", "2026-09-16", 2),
         }
         for filename, expected in cases.items():
@@ -35,6 +41,33 @@ class FilenameParsingTests(unittest.TestCase):
 
 
 class PublishingTests(unittest.TestCase):
+    def test_desktop_drive_listing_is_stable_and_respects_minimum_age(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            recording = folder / "PSE 9-14.m4a"
+            recording.write_bytes(b"audio")
+            settings = Settings(
+                supabase_url="https://example.supabase.co",
+                supabase_publishable_key="test",
+                worker_email="worker@example.com",
+                worker_password="test",
+                owner_email="owner@example.com",
+                transcription_tier="high",
+                drive_source="desktop",
+                drive_desktop_folder=folder,
+                rclone_path=None,
+                fluxprompt_api_key=None,
+                fluxprompt_api_url="https://example.com",
+                fluxprompt_flow_id="test",
+                site_url="https://example.com",
+            )
+            future = datetime.now(timezone.utc) + timedelta(days=3650)
+            first = desktop_drive_json(settings, now=future)
+            second = desktop_drive_json(settings, now=future)
+            self.assertEqual(first, second)
+            self.assertEqual(first[0]["Path"], recording.name)
+            self.assertTrue(first[0]["ID"].startswith("desktop:"))
+
     def test_drive_version_comparison_handles_postgres_timestamp_format(self) -> None:
         row = {"drive_file_id": "abc", "drive_modified_time": "2026-09-14T16:45:22.732+00:00"}
         drive_file = {"ID": "abc", "ModTime": "2026-09-14T16:45:22.732Z"}

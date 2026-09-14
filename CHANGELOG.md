@@ -2,6 +2,15 @@
 
 ## 2026-09-14
 
+### Google Drive for desktop source
+
+- Detected Google Drive for desktop 130.0.2.0 in its default streaming layout and verified all 14 `URecorder` files through `G:\My Drive\URecorder`.
+- Replaced the active shared-rclone import path with the first-party Drive desktop view, including a ten-minute stability window, hydration into isolated staging, and before/after size and modification checks.
+- Added stable local source identities, compatibility deduplication against prior rclone ingestions, and filename aliases for `pse <date>` and `philo 201 <date>`.
+- Registered `ClassScribeDriveDesktopAutomation` for the owner's interactive session with logon/hourly triggers and retained the continuously running transcription worker plus weekly audit under `SYSTEM`.
+- Imported today's shortened-name PSE recording from the live desktop folder, completed High processing, and published the validated summary-first note to `PSE-390/notes/2026/2026-09-14.md`.
+- Updated the administrator installer to remove the obsolete `ClassScribeDriveAutomation` task on its next approved run; because that cleanup prompt was canceled during this session, the launcher now makes any legacy SYSTEM import invocation exit successfully before touching `G:`.
+
 ### Google Drive to GitHub class automation
 
 - Installed rclone 1.75.1 and authorized a replacement read-only credential for `jmaximum72@gmail.com`, rooted the remote to `URecorder`, ACL-restricted it under ignored `.worker-secrets`, and immediately revoked the first setup credential after rclone printed it to setup output.

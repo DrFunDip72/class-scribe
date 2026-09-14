@@ -8,6 +8,11 @@ $mode = if ($args.Count -gt 0) { $args[0] } else { "run" }
 if ($mode -notin @("run", "audit")) {
     throw "Automation mode must be run or audit."
 }
+if ($mode -eq "run" -and [System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
+    # Google Drive for desktop exposes G: only inside the owner's signed-in session.
+    # Retired SYSTEM importer tasks exit cleanly until the administrator installer removes them.
+    exit 0
+}
 if (-not (Test-Path -LiteralPath $python)) {
     throw "The worker Python environment is missing."
 }

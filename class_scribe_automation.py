@@ -52,13 +52,14 @@ COURSE_PATTERNS = {
     ),
     "PSE-390": (
         r"(?<![A-Z0-9])PSE[\W_]*390(?![A-Z0-9])",
+        r"(?<![A-Z0-9])PSE(?![A-Z0-9])",
     ),
     "STRAT-392": (
         r"(?<![A-Z0-9])STRAT(?:EGY)?[\W_]*392(?![A-Z0-9])",
         r"(?<![A-Z0-9])STRATEGIC[\W_]+MANAGEMENT[\W_]*392(?![A-Z0-9])",
     ),
     "PHIL-201": (
-        r"(?<![A-Z0-9])PHIL(?:OSOPHY)?[\W_]*201(?![A-Z0-9])",
+        r"(?<![A-Z0-9])PHIL(?:O|OSOPHY)?[\W_]*201(?![A-Z0-9])",
     ),
 }
 MONTHS = {
@@ -95,7 +96,9 @@ class Settings:
     worker_password: str
     owner_email: str
     transcription_tier: str
-    rclone_path: Path
+    drive_source: str
+    drive_desktop_folder: Path
+    rclone_path: Path | None
     fluxprompt_api_key: str | None
     fluxprompt_api_url: str
     fluxprompt_flow_id: str
@@ -157,6 +160,9 @@ def load_settings() -> Settings:
     tier = env.get("DRIVE_IMPORT_TRANSCRIPTION_TIER", "high").lower()
     if tier not in {"fast", "balanced", "high"}:
         raise AutomationError("DRIVE_IMPORT_TRANSCRIPTION_TIER must be fast, balanced, or high")
+    drive_source = env.get("DRIVE_IMPORT_SOURCE", "rclone").lower()
+    if drive_source not in {"desktop", "rclone"}:
+        raise AutomationError("DRIVE_IMPORT_SOURCE must be desktop or rclone")
     return Settings(
         supabase_url=env["SUPABASE_URL"],
         supabase_publishable_key=env["SUPABASE_PUBLISHABLE_KEY"],
@@ -164,7 +170,9 @@ def load_settings() -> Settings:
         worker_password=env["WORKER_PASSWORD"],
         owner_email=env.get("DRIVE_IMPORT_OWNER_EMAIL", "jmaximum72@gmail.com").lower(),
         transcription_tier=tier,
-        rclone_path=find_rclone(),
+        drive_source=drive_source,
+        drive_desktop_folder=Path(env.get("DRIVE_DESKTOP_FOLDER", r"G:\My Drive\URecorder")),
+        rclone_path=find_rclone() if drive_source == "rclone" else None,
         fluxprompt_api_key=env.get("FLUXPROMPT_API_KEY") or None,
         fluxprompt_api_url=env.get("FLUXPROMPT_API_URL", "https://api.fluxprompt.ai/flux/api-v2"),
         fluxprompt_flow_id=env.get("FLUXPROMPT_FLOW_ID", "2000e2ec-450e-4da3-9d7f-0061adfe1c17"),
@@ -287,6 +295,8 @@ def parse_timestamp(value: str) -> datetime:
 def rclone_json(settings: Settings) -> list[dict[str, Any]]:
     if not RCLONE_CONFIG.exists():
         raise AutomationError("Google Drive authorization is missing")
+    if settings.rclone_path is None:
+        raise AutomationError("rclone is not configured as the Drive source")
     command = [
         str(settings.rclone_path), "--config", str(RCLONE_CONFIG), "lsjson", "urecorder:",
         "--recursive", "--files-only", "--hash", "--min-age", "10m",
@@ -302,7 +312,49 @@ def rclone_json(settings: Settings) -> list[dict[str, Any]]:
     return rows if isinstance(rows, list) else []
 
 
+def desktop_drive_json(settings: Settings, now: datetime | None = None) -> list[dict[str, Any]]:
+    folder = settings.drive_desktop_folder
+    try:
+        available = folder.is_dir()
+    except OSError as error:
+        raise AutomationError("Google Drive for desktop is not running or URecorder is unavailable") from error
+    if not available:
+        raise AutomationError("Google Drive for desktop is not running or URecorder is unavailable")
+    minimum_age = (now or datetime.now(timezone.utc)) - timedelta(minutes=10)
+    rows: list[dict[str, Any]] = []
+    try:
+        paths = sorted((path for path in folder.rglob("*") if path.is_file()), key=lambda path: str(path).casefold())
+    except OSError as error:
+        raise AutomationError("Google Drive for desktop could not list URecorder") from error
+    for path in paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        modified = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
+        if modified > minimum_age:
+            continue
+        relative = path.relative_to(folder).as_posix()
+        stable_id = hashlib.sha256(relative.casefold().encode("utf-8")).hexdigest()
+        rows.append({
+            "Path": relative,
+            "ID": f"desktop:{stable_id}",
+            "Size": stat.st_size,
+            "ModTime": modified.isoformat(),
+            "LocalPath": str(path),
+        })
+    return rows
+
+
+def list_drive_files(settings: Settings) -> list[dict[str, Any]]:
+    if settings.drive_source == "desktop":
+        return desktop_drive_json(settings)
+    return rclone_json(settings)
+
+
 def download_drive_file(settings: Settings, remote_path: str, destination: Path) -> None:
+    if settings.rclone_path is None:
+        raise AutomationError("rclone is not configured as the Drive source")
     command = [
         str(settings.rclone_path), "--config", str(RCLONE_CONFIG), "copyto",
         f"urecorder:{remote_path}", str(destination), "--retries", "5",
@@ -312,6 +364,23 @@ def download_drive_file(settings: Settings, remote_path: str, destination: Path)
     completed = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=3 * 60 * 60, check=False)
     if completed.returncode != 0 or not destination.exists():
         raise AutomationError("Google Drive download failed")
+
+
+def materialize_drive_file(settings: Settings, drive_file: dict[str, Any], destination: Path) -> None:
+    local_path = drive_file.get("LocalPath")
+    if not local_path:
+        download_drive_file(settings, str(drive_file["Path"]), destination)
+        return
+    source = Path(str(local_path))
+    try:
+        before = source.stat()
+        shutil.copyfile(source, destination)
+        after = source.stat()
+    except OSError as error:
+        raise AutomationError("Google Drive for desktop could not hydrate the recording") from error
+    if before.st_size != after.st_size or before.st_mtime_ns != after.st_mtime_ns:
+        destination.unlink(missing_ok=True)
+        raise AutomationError("The Google Drive recording changed while it was being copied")
 
 
 def find_ffmpeg() -> str:
@@ -419,7 +488,7 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
         cutoff = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
         state["import_not_before"] = cutoff.isoformat()
         save_state(state)
-    files = rclone_json(settings)
+    files = list_drive_files(settings)
     for drive_file in files:
         remote_path = str(drive_file.get("Path") or "")
         drive_id = str(drive_file.get("ID") or "")
@@ -443,6 +512,21 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
             .eq("drive_file_id", drive_id).execute()
         ).data or []
         if any(same_drive_version(row, drive_file) for row in existing):
+            continue
+
+        logical_existing = retry(
+            lambda: db.table("drive_ingestions")
+            .select("id,source_filename,drive_size_bytes,source_part,status")
+            .eq("course_code", parsed.course_code)
+            .eq("lecture_date", parsed.lecture_date.isoformat())
+            .execute()
+        ).data or []
+        if any(
+            normalize_name(str(row.get("source_filename") or "")) == normalize_name(Path(remote_path).name)
+            and int(row.get("drive_size_bytes") or 0) == size
+            and row.get("source_part") == parsed.source_part
+            for row in logical_existing
+        ):
             continue
 
         try:
@@ -478,7 +562,7 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
             temp_root = Path(temporary)
             source = temp_root / f"source{Path(remote_path).suffix.lower()}"
             try:
-                download_drive_file(settings, remote_path, source)
+                materialize_drive_file(settings, drive_file, source)
                 if source.stat().st_size != size:
                     raise AutomationError("The downloaded Drive file size did not match its metadata")
                 parts = prepare_audio(source, temp_root / "parts")

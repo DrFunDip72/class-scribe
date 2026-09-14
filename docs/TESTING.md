@@ -1,5 +1,22 @@
 # Testing and Verification
 
+## Google Drive for desktop source cutover — PASS WITH LEGACY TASK CLEANUP PENDING
+
+**Date:** 2026-09-14
+**Environment:** Google Drive for desktop 130.0.2.0, production Supabase, `jmaximum72@gmail.com` streamed `URecorder`, public course repositories, and Windows Task Scheduler.
+
+1. Confirmed two live `GoogleDriveFS` processes, the default `G:` Google Drive filesystem, `G:\My Drive\URecorder`, and 14 visible source files. Google Drive for desktop is registered to start with the owner session.
+2. Confirmed the user did not explicitly select streaming, but Drive for desktop chose its default streamed virtual-drive layout. No mirroring change or bulk local copy was requested.
+3. Added an explicit desktop source configuration, ten-minute minimum age, deterministic path identity, isolated hydration copy, and source size/modification stability checks. The rclone code remains a selectable rollback path but is no longer active.
+4. Expanded parser coverage for the observed `pse 9-14.m4a` and `philo 201 <date>` variants. Nine automation tests pass, including stable desktop enumeration and all prior parsing/publishing behavior.
+5. A real forced pass read the streamed folder, skipped the already-linked HRM recording through compatibility deduplication, hydrated the 67,419,642-byte PSE source, prepared and uploaded private parts, and queued exactly one High job.
+6. The production worker completed that PSE job at High. A following pass passed the publishing gate and wrote `PSE-390/notes/2026/2026-09-14.md`; no second HRM job was created.
+7. Registered `ClassScribeDriveDesktopAutomation` under the owner with interactive logon/hourly triggers. An immediate scheduled run reached `Ready` with `LastTaskResult=0`. The main worker remains pre-login SYSTEM.
+8. Updated the administrator installer to remove the obsolete `ClassScribeDriveAutomation` SYSTEM task and retain the Thursday audit as SYSTEM. The UAC cleanup attempt was canceled, so the obsolete task remains registered; a launcher identity guard makes it exit 0 before touching `G:` or queueing work. Run the installer once as Administrator to complete housekeeping.
+9. Python compilation and the combined 25-test worker/automation suite passed. The working desktop task also completed its next naturally scheduled run with result 0. Anonymous GitHub readback returned HTTP 200 for the 61,552-byte PSE note and confirmed Summary precedes Transcript.
+
+**Result:** PASS for the active desktop path, actual large-file hydration, deduplication, High queue processing, GitHub publication, and owner-session scheduling. One guarded legacy SYSTEM task remains pending administrator removal; it exits successfully and does not block or duplicate the working importer.
+
 ## Google Drive to public GitHub automation — PASS WITH OAUTH MAINTENANCE REQUIRED
 
 **Date:** 2026-09-14

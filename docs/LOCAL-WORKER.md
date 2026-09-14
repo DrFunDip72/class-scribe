@@ -120,7 +120,7 @@ Confirm the installer is official and Authenticode-valid before running it. Do n
 
 ## Drive and GitHub automation
 
-`ClassScribeDriveAutomation` is separate from the continuously running inference worker. It runs as `SYSTEM` at startup and hourly, scans Drive only on Monday/Wednesday or one missed-day catch-up, and checks completed ingestions for GitHub export every hour. `ClassScribeGitHubAudit` runs Thursday at 8:00 AM. Both use `drive-automation-launcher.ps1`; repair them with `install-drive-automation-tasks.ps1 -StartAndVerify` from Administrator PowerShell.
+`ClassScribeDriveDesktopAutomation` is separate from the continuously running inference worker. It runs under the owner at Windows logon and hourly because the Google Drive desktop `G:` mount is user-session scoped. It scans `URecorder` only on Monday/Wednesday or one missed-day catch-up and checks completed ingestions for GitHub export every hour. The main `AudioTranscriberWorker` and Thursday 8:00 AM `ClassScribeGitHubAudit` remain under `SYSTEM`. Repair the automation tasks with `install-drive-automation-tasks.ps1 -StartAndVerify` from Administrator PowerShell; that installer also removes the obsolete `ClassScribeDriveAutomation` task.
 
 Safe automation logs are under `.worker-state/class-scribe-automation.log`; task installation/status evidence is under `.worker-state/`. Credentials are ignored under `.worker-secrets/`. Full operations and recovery are in `docs/DRIVE-GITHUB-AUTOMATION.md`.
 

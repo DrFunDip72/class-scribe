@@ -91,9 +91,12 @@ Operator commands:
 ```powershell
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py parse "HRM 391 9-14.mp3"
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py run --force-import
+.\.venv-worker\Scripts\python.exe .\class_scribe_automation.py import-path "HRM 391 9-8.m4a" --force-new
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py audit --dry-run
 Get-Content .\.worker-state\class-scribe-automation.log -Tail 50
 ```
+
+`import-path` is the narrow historical-recovery path. It considers only the exact case-insensitive relative path supplied by the owner, still requires the Drive file to be at least ten minutes old, and bypasses the initial cutover and weekday rule only for that explicit source. Use `--force-new` only when a matching Class Scribe result is known to be unusable and a fresh transcription is required. It does not delete or overwrite the older private result; the normal quality gate still controls GitHub publication.
 
 ## Credentials
 
@@ -114,5 +117,6 @@ The 2026 rclone shared-client retirement therefore cannot interrupt the active d
 - If transcription fails, the ingestion is marked failed and the normal private result remains available for owner action.
 - If GitHub is unavailable, `completed` remains durable and the next hourly pass retries.
 - If a public path contains a different job UUID, publication stops at `needs_review` rather than overwriting it.
+- For an owner-approved older or off-schedule source, use the exact-path operator command instead of lowering the global cutoff or schedule rules.
 
 Do not manually delete `drive_ingestions` rows to retry. Diagnose the safe local log and repair the underlying Drive, queue, or GitHub condition first.

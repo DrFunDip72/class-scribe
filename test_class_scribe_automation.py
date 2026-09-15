@@ -39,6 +39,15 @@ class FilenameParsingTests(unittest.TestCase):
             with self.subTest(filename=filename), self.assertRaises(AutomationError):
                 parse_recording_name(filename, self.modified)
 
+    def test_explicit_backfill_can_accept_an_off_schedule_date(self) -> None:
+        parsed = parse_recording_name(
+            "HRM 391 9-8.m4a",
+            self.modified,
+            enforce_schedule=False,
+        )
+        self.assertEqual(parsed.course_code, "HRM-391")
+        self.assertEqual(parsed.lecture_date.isoformat(), "2026-09-08")
+
 
 class PublishingTests(unittest.TestCase):
     def test_desktop_drive_listing_is_stable_and_respects_minimum_age(self) -> None:

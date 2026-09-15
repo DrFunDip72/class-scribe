@@ -241,3 +241,11 @@ Supersede ADR-035's active rclone source with the owner's Google Drive for deskt
 **Reason:** The first-party client is already signed into the correct account, removes dependency on rclone's retiring shared OAuth client, requires no new cloud credential in Class Scribe, and exposes the exact durable phone-upload folder. Google's streamed drive is scoped to the signed-in Windows session, so a pre-login SYSTEM importer cannot reliably access it.
 
 **Consequence:** New Drive ingestion begins only after the owner has logged into Windows and Google Drive for desktop is running; locking the session does not stop it. The pre-login inference worker can continue processing already-queued work. Local source IDs derive from normalized relative paths and version identity still includes modification time; compatibility checks prevent already-linked rclone content from being duplicated. The obsolete SYSTEM importer must be removed with the administrator installer, and the old Google OAuth grant should be revoked after a one-week rollback window.
+
+## ADR-037 — Use Exact-Source Overrides for Historical or Off-Schedule Backfills
+
+Keep the scheduled importer’s global cutover and Monday/Wednesday validation intact. For an owner-approved exception, admit only one explicitly named Drive-relative path through an operator command. Allow that command to skip cross-source matching when a known matching result is corrupt, while retaining the existing private result and all publication quality checks.
+
+**Reason:** The September 8 HRM and PHIL recordings predate the automation cutover and use a Tuesday date, so broadening the recurring importer would also make unrelated historical files eligible. HRM already has a nominally completed but badly repetitive result, so normal matching would link the bad job instead of retranscribing the preserved Drive source.
+
+**Consequence:** Historical recovery is deliberate, auditable, and limited to the exact stable file the owner names. It does not change normal discovery, scheduling, privacy, FIFO processing, source retention, or public publication safeguards. `--force-new` may create a second private result only when explicitly invoked; the exporter publishes only the newly linked ingestion after it independently passes integrity checks.

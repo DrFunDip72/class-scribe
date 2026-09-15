@@ -210,7 +210,12 @@ def _safe_date(year: int, month: int, day: int) -> date | None:
         return None
 
 
-def parse_recording_name(name: str, modified_time: datetime) -> ParsedRecording:
+def parse_recording_name(
+    name: str,
+    modified_time: datetime,
+    *,
+    enforce_schedule: bool = True,
+) -> ParsedRecording:
     stem = normalize_name(Path(name).stem)
     course_hits: list[tuple[str, tuple[int, int]]] = []
     for code, patterns in COURSE_PATTERNS.items():
@@ -266,7 +271,7 @@ def parse_recording_name(name: str, modified_time: datetime) -> ParsedRecording:
         raise AutomationError("The filename does not contain one unambiguous lecture date")
     lecture_date = next(iter(candidates))
     allowed_weekdays = {2} if course_code == "STRAT-392" else {0, 2}
-    if lecture_date.weekday() not in allowed_weekdays:
+    if enforce_schedule and lecture_date.weekday() not in allowed_weekdays:
         raise AutomationError("The filename date does not match the configured class schedule")
     return ParsedRecording(course_code, lecture_date, source_part)
 
@@ -478,17 +483,32 @@ def issue_once(settings: Settings, state: dict[str, Any], key: str, message: str
     save_state(state)
 
 
-def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) -> int:
+def import_drive_files(
+    settings: Settings,
+    db: Client,
+    state: dict[str, Any],
+    *,
+    only_paths: set[str] | None = None,
+    force_new: bool = False,
+) -> int:
     imported = 0
-    cutoff_raw = state.get("import_not_before")
-    if cutoff_raw:
-        cutoff = parse_timestamp(str(cutoff_raw)).astimezone(timezone.utc)
-    else:
-        local_now = datetime.now(MOUNTAIN)
-        cutoff = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-        state["import_not_before"] = cutoff.isoformat()
-        save_state(state)
+    cutoff: datetime | None = None
+    if only_paths is None:
+        cutoff_raw = state.get("import_not_before")
+        if cutoff_raw:
+            cutoff = parse_timestamp(str(cutoff_raw)).astimezone(timezone.utc)
+        else:
+            local_now = datetime.now(MOUNTAIN)
+            cutoff = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+            state["import_not_before"] = cutoff.isoformat()
+            save_state(state)
     files = list_drive_files(settings)
+    requested = {path.replace("\\", "/").casefold() for path in only_paths or set()}
+    if requested:
+        available = {str(row.get("Path") or "").replace("\\", "/").casefold() for row in files}
+        missing = sorted(requested - available)
+        if missing:
+            raise AutomationError(f"Requested Drive recording was not found or is less than 10 minutes old: {missing[0]}")
     for drive_file in files:
         remote_path = str(drive_file.get("Path") or "")
         drive_id = str(drive_file.get("ID") or "")
@@ -496,12 +516,18 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
         modified_raw = str(drive_file.get("ModTime") or "")
         if not remote_path or not drive_id or size < 1 or Path(remote_path).suffix.lower() not in SUPPORTED_SOURCE_EXTENSIONS:
             continue
+        if requested and remote_path.replace("\\", "/").casefold() not in requested:
+            continue
         issue_key = f"drive:{drive_id}:{modified_raw}"
         try:
             modified = parse_timestamp(modified_raw)
-            if modified.astimezone(timezone.utc) < cutoff:
+            if cutoff is not None and modified.astimezone(timezone.utc) < cutoff:
                 continue
-            parsed = parse_recording_name(Path(remote_path).name, modified)
+            parsed = parse_recording_name(
+                Path(remote_path).name,
+                modified,
+                enforce_schedule=not requested,
+            )
         except Exception as error:
             issue_once(settings, state, issue_key, str(error))
             continue
@@ -511,7 +537,7 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
             .select("id,drive_file_id,drive_modified_time,status")
             .eq("drive_file_id", drive_id).execute()
         ).data or []
-        if any(same_drive_version(row, drive_file) for row in existing):
+        if not force_new and any(same_drive_version(row, drive_file) for row in existing):
             continue
 
         logical_existing = retry(
@@ -521,7 +547,7 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
             .eq("lecture_date", parsed.lecture_date.isoformat())
             .execute()
         ).data or []
-        if any(
+        if not force_new and any(
             normalize_name(str(row.get("source_filename") or "")) == normalize_name(Path(remote_path).name)
             and int(row.get("drive_size_bytes") or 0) == size
             and row.get("source_part") == parsed.source_part
@@ -530,7 +556,7 @@ def import_drive_files(settings: Settings, db: Client, state: dict[str, Any]) ->
             continue
 
         try:
-            matching_jobs = matching_existing_jobs(db, parsed)
+            matching_jobs = [] if force_new else matching_existing_jobs(db, parsed)
             if len(matching_jobs) > 1:
                 issue_once(settings, state, issue_key, "More than one existing Class Scribe job matches this Drive recording")
                 continue
@@ -955,6 +981,16 @@ def main() -> int:
     run_parser.add_argument("--force-import", action="store_true")
     parse_parser = subparsers.add_parser("parse", help="Preview filename parsing")
     parse_parser.add_argument("filename")
+    import_parser = subparsers.add_parser(
+        "import-path",
+        help="Import one exact Drive path, including an owner-approved off-schedule backfill",
+    )
+    import_parser.add_argument("path")
+    import_parser.add_argument(
+        "--force-new",
+        action="store_true",
+        help="Queue a fresh job instead of linking matching Class Scribe work",
+    )
     audit_parser = subparsers.add_parser("audit", help="Run the weekly GitHub audit")
     audit_parser.add_argument("--dry-run", action="store_true", help="Check repositories without sending email")
     args = parser.parse_args()
@@ -969,6 +1005,17 @@ def main() -> int:
             }))
             return 0
         settings = load_settings()
+        if args.command == "import-path":
+            state = load_state()
+            imported = import_drive_files(
+                settings,
+                connect_supabase(settings),
+                state,
+                only_paths={args.path},
+                force_new=args.force_new,
+            )
+            print(json.dumps({"imported": imported}))
+            return 0
         if args.command == "audit":
             print(json.dumps(audit_repositories(settings, send_email=not args.dry_run), indent=2))
             return 0

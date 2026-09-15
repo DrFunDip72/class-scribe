@@ -1,5 +1,18 @@
 # Testing and Verification
 
+## September 8 exact-path recovery — PROCESSING
+
+**Date:** 2026-09-14
+**Environment:** production Supabase, live Drive-for-desktop `URecorder`, High local worker, and public HRM/PHIL repositories.
+
+1. Confirmed `hrm 391 9-8.m4a` (71,245,768 bytes) and `Phil 201 - 9-8.m4a` (70,349,819 bytes) are visible in the live Drive folder and each has zero prior `drive_ingestions` rows.
+2. Confirmed the older HRM High result is not a missing job: it completed with only 1,187 words across 73 minutes and fails the repetition gate. Its GitHub path remains absent.
+3. Added an exact-path recovery command. Default parsing still rejects a class-day mismatch; its explicit backfill mode accepts the owner-approved September 8 date. Python compilation and all ten automation tests pass.
+4. Prepared and privately queued fresh High jobs for both sources. HRM job `0110c354-04fe-4025-8731-b90e64325083` was claimed by the running worker; PHIL job `009aa858-2fce-4be2-8f02-a23374f53d8a` is FIFO behind it.
+5. No September 14 PHIL file is currently visible in Drive and no matching queued, active, or completed Class Scribe job exists.
+
+**Result:** Processing. GitHub publication is not claimed until each new result passes the integrity gate and remote readback verification.
+
 ## Google Drive for desktop source cutover — PASS WITH LEGACY TASK CLEANUP PENDING
 
 **Date:** 2026-09-14

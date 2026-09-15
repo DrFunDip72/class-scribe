@@ -2,6 +2,12 @@
 
 ## 2026-09-14
 
+### Exact-path historical backfills
+
+- Added an owner-operated `import-path` command that can select one exact stable Drive recording, bypass the normal cutover and class-day checks only for that explicit path, and optionally queue a fresh job instead of linking a known-bad result.
+- Used the command to prepare and privately queue fresh High jobs for `hrm 391 9-8.m4a` and `Phil 201 - 9-8.m4a`; the prior corrupted HRM result remains preserved and unpublished.
+- Confirmed no September 14 PHIL recording is currently visible in `URecorder` or active in Class Scribe; the normal hourly importer will admit it after it appears and remains unchanged for ten minutes.
+
 ### Google Drive for desktop source
 
 - Detected Google Drive for desktop 130.0.2.0 in its default streaming layout and verified all 14 `URecorder` files through `G:\My Drive\URecorder`.

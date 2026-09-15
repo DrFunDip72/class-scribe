@@ -1,6 +1,19 @@
 # Testing and Verification
 
-## September 8 exact-path recovery — PROCESSING
+## Hybrid Drive discovery and missed recordings — PROCESSING
+
+**Date:** 2026-09-15
+**Environment:** live Drive-for-desktop `URecorder`, read-only cloud Drive fallback, production Supabase, High local worker, and public STRAT/PHIL repositories.
+
+1. The desktop view contained `strat 392 9-8.m4a` (69,190,299 bytes) but not the claimed PHIL September 14 recording. A read-only cloud listing of the owner’s actual `URecorder` remote found both STRAT and `Phil 9-14.m4a` (71,696,431 bytes).
+2. Confirmed neither course/date had a prior Class Scribe job or `drive_ingestions` row. The connected ChatGPT Google Drive plugin belongs to `justin.m@enhanced.ai`, not the owner inbox, so it was not used as evidence for or access to `jmaximum72@gmail.com`.
+3. Added hybrid listing merge/fallback behavior, standalone PHIL aliases, one-day-early schedule tolerance, matching weekly-audit coverage, and a parsed-lecture-date cutover guard. Python compilation and the combined 28-test suite pass.
+4. A live corrected discovery preview resolved STRAT September 8 from the desktop source and PHIL September 14 from the cloud source with their exact expected class/date and byte counts.
+5. Prepared and privately queued both High jobs. STRAT job `9732d1fd-4545-4ded-9e6d-5f5be4b23daf` was claimed on attempt 1; PHIL job `f5d509ae-ddac-4d17-8c8a-057adc107ccc` is FIFO behind it.
+
+**Result:** Processing. Publication remains gated and will be verified after both jobs complete.
+
+## September 8 exact-path recovery — PASS
 
 **Date:** 2026-09-14
 **Environment:** production Supabase, live Drive-for-desktop `URecorder`, High local worker, and public HRM/PHIL repositories.
@@ -8,10 +21,10 @@
 1. Confirmed `hrm 391 9-8.m4a` (71,245,768 bytes) and `Phil 201 - 9-8.m4a` (70,349,819 bytes) are visible in the live Drive folder and each has zero prior `drive_ingestions` rows.
 2. Confirmed the older HRM High result is not a missing job: it completed with only 1,187 words across 73 minutes and fails the repetition gate. Its GitHub path remains absent.
 3. Added an exact-path recovery command. Default parsing still rejects a class-day mismatch; its explicit backfill mode accepts the owner-approved September 8 date. Python compilation and all ten automation tests pass.
-4. Prepared and privately queued fresh High jobs for both sources. HRM job `0110c354-04fe-4025-8731-b90e64325083` was claimed by the running worker; PHIL job `009aa858-2fce-4be2-8f02-a23374f53d8a` is FIFO behind it.
-5. No September 14 PHIL file is currently visible in Drive and no matching queued, active, or completed Class Scribe job exists.
+4. Prepared and privately queued fresh High jobs for both sources. HRM job `0110c354-04fe-4025-8731-b90e64325083` and PHIL job `009aa858-2fce-4be2-8f02-a23374f53d8a` each completed on attempt 1.
+5. HRM produced 8,952 words and 1,073 segments; PHIL produced 10,710 words and 1,312 segments. Both passed the completeness, timestamp, and repetition gates, were exported to `notes/2026/2026-09-08.md`, and returned anonymous HTTP 200.
 
-**Result:** Processing. GitHub publication is not claimed until each new result passes the integrity gate and remote readback verification.
+**Result:** PASS. Both recovered September 8 notes are publicly available with summary-first ordering; the old corrupt HRM result remains unpublished.
 
 ## Google Drive for desktop source cutover — PASS WITH LEGACY TASK CLEANUP PENDING
 

@@ -60,6 +60,7 @@ COURSE_PATTERNS = {
     ),
     "PHIL-201": (
         r"(?<![A-Z0-9])PHIL(?:O|OSOPHY)?[\W_]*201(?![A-Z0-9])",
+        r"(?<![A-Z0-9])PHIL(?:O|OSOPHY)?(?![A-Z0-9])",
     ),
 }
 MONTHS = {
@@ -161,8 +162,8 @@ def load_settings() -> Settings:
     if tier not in {"fast", "balanced", "high"}:
         raise AutomationError("DRIVE_IMPORT_TRANSCRIPTION_TIER must be fast, balanced, or high")
     drive_source = env.get("DRIVE_IMPORT_SOURCE", "rclone").lower()
-    if drive_source not in {"desktop", "rclone"}:
-        raise AutomationError("DRIVE_IMPORT_SOURCE must be desktop or rclone")
+    if drive_source not in {"desktop", "rclone", "hybrid"}:
+        raise AutomationError("DRIVE_IMPORT_SOURCE must be desktop, rclone, or hybrid")
     return Settings(
         supabase_url=env["SUPABASE_URL"],
         supabase_publishable_key=env["SUPABASE_PUBLISHABLE_KEY"],
@@ -172,7 +173,7 @@ def load_settings() -> Settings:
         transcription_tier=tier,
         drive_source=drive_source,
         drive_desktop_folder=Path(env.get("DRIVE_DESKTOP_FOLDER", r"G:\My Drive\URecorder")),
-        rclone_path=find_rclone() if drive_source == "rclone" else None,
+        rclone_path=find_rclone() if drive_source in {"rclone", "hybrid"} else None,
         fluxprompt_api_key=env.get("FLUXPROMPT_API_KEY") or None,
         fluxprompt_api_url=env.get("FLUXPROMPT_API_URL", "https://api.fluxprompt.ai/flux/api-v2"),
         fluxprompt_flow_id=env.get("FLUXPROMPT_FLOW_ID", "2000e2ec-450e-4da3-9d7f-0061adfe1c17"),
@@ -270,10 +271,18 @@ def parse_recording_name(
     if len(candidates) != 1:
         raise AutomationError("The filename does not contain one unambiguous lecture date")
     lecture_date = next(iter(candidates))
-    allowed_weekdays = {2} if course_code == "STRAT-392" else {0, 2}
-    if enforce_schedule and lecture_date.weekday() not in allowed_weekdays:
+    if enforce_schedule and canonical_class_date(lecture_date, course_code) is None:
         raise AutomationError("The filename date does not match the configured class schedule")
     return ParsedRecording(course_code, lecture_date, source_part)
+
+
+def canonical_class_date(lecture_date: date, course_code: str) -> date | None:
+    """Map an observed recording date to its scheduled day, tolerating a one-day-early label."""
+    allowed_weekdays = {2} if course_code == "STRAT-392" else {0, 2}
+    if lecture_date.weekday() in allowed_weekdays:
+        return lecture_date
+    next_day = lecture_date + timedelta(days=1)
+    return next_day if next_day.weekday() in allowed_weekdays else None
 
 
 def load_state() -> dict[str, Any]:
@@ -351,10 +360,56 @@ def desktop_drive_json(settings: Settings, now: datetime | None = None) -> list[
     return rows
 
 
+def merge_drive_files(
+    desktop_rows: list[dict[str, Any]],
+    cloud_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge the two views by relative path, preferring the newest complete version."""
+    merged: dict[str, dict[str, Any]] = {}
+    for row in [*cloud_rows, *desktop_rows]:
+        path = str(row.get("Path") or "").replace("\\", "/")
+        if not path:
+            continue
+        key = path.casefold()
+        current = merged.get(key)
+        if current is None:
+            merged[key] = row
+            continue
+        try:
+            current_time = parse_timestamp(str(current.get("ModTime") or ""))
+            candidate_time = parse_timestamp(str(row.get("ModTime") or ""))
+        except ValueError:
+            current_time = candidate_time = datetime.min.replace(tzinfo=timezone.utc)
+        if candidate_time > current_time or (
+            candidate_time == current_time and row.get("LocalPath") and not current.get("LocalPath")
+        ):
+            merged[key] = row
+    return [merged[key] for key in sorted(merged)]
+
+
 def list_drive_files(settings: Settings) -> list[dict[str, Any]]:
     if settings.drive_source == "desktop":
         return desktop_drive_json(settings)
-    return rclone_json(settings)
+    if settings.drive_source == "rclone":
+        return rclone_json(settings)
+
+    desktop_rows: list[dict[str, Any]] = []
+    cloud_rows: list[dict[str, Any]] = []
+    desktop_error: Exception | None = None
+    cloud_error: Exception | None = None
+    try:
+        desktop_rows = desktop_drive_json(settings)
+    except Exception as error:
+        desktop_error = error
+        logging.warning("Drive desktop listing unavailable; using cloud fallback")
+    try:
+        cloud_rows = rclone_json(settings)
+    except Exception as error:
+        cloud_error = error
+        logging.warning("Drive cloud fallback unavailable; using desktop listing")
+    if desktop_error and cloud_error:
+        raise AutomationError("Both Google Drive discovery sources are unavailable")
+    return merge_drive_files(desktop_rows, cloud_rows)
 
 
 def download_drive_file(settings: Settings, remote_path: str, destination: Path) -> None:
@@ -528,6 +583,8 @@ def import_drive_files(
                 modified,
                 enforce_schedule=not requested,
             )
+            if cutoff is not None and parsed.lecture_date < cutoff.astimezone(MOUNTAIN).date():
+                continue
         except Exception as error:
             issue_once(settings, state, issue_key, str(error))
             continue
@@ -914,17 +971,24 @@ def audit_repositories(
                     continue
                 if monday <= path_date <= sunday:
                     dated_paths.setdefault(path_date, []).append(path)
-            actual = set(dated_paths)
-            missing = sorted(expected - actual)
-            unexpected = sorted(actual - expected)
+            covered: dict[date, list[str]] = {}
+            unexpected: list[date] = []
+            for actual_day, items in dated_paths.items():
+                class_day = canonical_class_date(actual_day, course_code)
+                if class_day in expected:
+                    covered.setdefault(class_day, []).extend(items)
+                else:
+                    unexpected.append(actual_day)
+            missing = sorted(expected - set(covered))
+            unexpected.sort()
             duplicates = {
                 day.isoformat(): len(items)
-                for day, items in dated_paths.items()
-                if day in expected and len(items) > 1
+                for day, items in covered.items()
+                if len(items) > 1
             }
             problems += len(missing) + len(unexpected) + sum(count - 1 for count in duplicates.values())
             results[course_code] = {
-                "expected": len(expected), "found": sum(len(items) for day, items in dated_paths.items() if day in expected),
+                "expected": len(expected), "found": sum(len(items) for items in covered.values()),
                 "missing": [day.isoformat() for day in missing],
                 "unexpected": [day.isoformat() for day in unexpected],
                 "duplicates": duplicates,

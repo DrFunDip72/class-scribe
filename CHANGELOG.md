@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-15
+
+### Resilient Drive discovery and observed filename variants
+
+- Found `strat 392 9-8.m4a` in both Drive views and `Phil 9-14.m4a` in cloud Drive even though Google Drive for desktop had not surfaced the PHIL file on `G:`.
+- Added a desktop-first hybrid discovery mode that merges cloud and local listings by case-insensitive relative path, prefers the newest version, prefers a local hydrated source on exact ties, and continues with either source if the other is temporarily unavailable.
+- Added the unambiguous standalone `Phil`/`Philo`/`Philosophy` alias and one-day-early filename tolerance for the configured class schedule. Updated the weekly audit so those observed date labels satisfy the intended class day instead of appearing as both missing and unexpected.
+- Applied the initial import cutover to both source modification time and parsed lecture date so old cloud items whose metadata changes cannot become unintended new backfills.
+- Queued fresh High jobs for STRAT September 8 and PHIL September 14 in FIFO order.
+
 ## 2026-09-14
 
 ### Exact-path historical backfills

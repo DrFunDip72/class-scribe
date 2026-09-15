@@ -6,8 +6,10 @@ from pathlib import Path
 from class_scribe_automation import (
     AutomationError,
     Settings,
+    canonical_class_date,
     desktop_drive_json,
     expected_week_dates,
+    merge_drive_files,
     parse_recording_name,
     quality_issues,
     render_note,
@@ -27,6 +29,8 @@ class FilenameParsingTests(unittest.TestCase):
             "pse 9-14.m4a": ("PSE-390", "2026-09-14", None),
             "PHIL_201 class 9.14.mp3": ("PHIL-201", "2026-09-14", None),
             "philo 201 9-14.m4a": ("PHIL-201", "2026-09-14", None),
+            "Phil 9-14.m4a": ("PHIL-201", "2026-09-14", None),
+            "strat 392 9-8.m4a": ("STRAT-392", "2026-09-08", None),
             "strategy 392 sept-16-2026 pt2.mp3": ("STRAT-392", "2026-09-16", 2),
         }
         for filename, expected in cases.items():
@@ -50,6 +54,23 @@ class FilenameParsingTests(unittest.TestCase):
 
 
 class PublishingTests(unittest.TestCase):
+    def test_hybrid_listing_prefers_newest_version_and_local_ties(self) -> None:
+        cloud_old = {"Path": "PHIL 9-14.m4a", "ModTime": "2026-09-14T23:00:00Z", "ID": "cloud-old"}
+        cloud_only = {"Path": "cloud-only.m4a", "ModTime": "2026-09-14T23:00:00Z", "ID": "cloud-only"}
+        desktop_new = {
+            "Path": "phil 9-14.m4a", "ModTime": "2026-09-14T23:01:00+00:00",
+            "ID": "desktop-new", "LocalPath": "G:/My Drive/URecorder/phil 9-14.m4a",
+        }
+        merged = merge_drive_files([desktop_new], [cloud_old, cloud_only])
+        self.assertEqual([row["ID"] for row in merged], ["cloud-only", "desktop-new"])
+
+    def test_one_day_early_recording_covers_scheduled_class(self) -> None:
+        self.assertEqual(
+            canonical_class_date(datetime(2026, 9, 8).date(), "STRAT-392"),
+            datetime(2026, 9, 9).date(),
+        )
+        self.assertIsNone(canonical_class_date(datetime(2026, 9, 14).date(), "STRAT-392"))
+
     def test_desktop_drive_listing_is_stable_and_respects_minimum_age(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

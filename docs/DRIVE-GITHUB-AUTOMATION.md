@@ -8,7 +8,7 @@ The owner records a Monday/Wednesday class, saves the audio in the Google Drive 
 
 ```text
 URecorder in jmaximum72@gmail.com
-  -> Google Drive for desktop streamed G: view
+  -> Google Drive for desktop streamed G: view + read-only cloud fallback
   -> owner-session logon/hourly Monday/Wednesday read
   -> native FFmpeg mono 16 kHz / 48 kbps M4A / ten-minute parts
   -> private Supabase Storage + drive_ingestions ledger
@@ -33,21 +33,21 @@ philo 201 9-14.m4a
 strategy 392 sept-16-2026 pt2.mp3
 ```
 
-Accepted course aliases include `HRM 391`, `PSE 390`, standalone `PSE`, `STRAT 392`, `STRATEGY 392`, `PHIL 201`, `PHILO 201`, and `PHILOSOPHY 201`, with spaces, `_`, `-`, or punctuation between components. Dates may be ISO, US numeric, abbreviated/full month names, two-digit years, or month/day without a year. A missing year is inferred from Drive modification time. Explicit `part` or `pt` suffixes are supported.
+Accepted course aliases include `HRM 391`, `PSE 390`, standalone `PSE`, `STRAT 392`, `STRATEGY 392`, `PHIL 201`, `PHILO 201`, `PHILOSOPHY 201`, and standalone `Phil`/`Philo`/`Philosophy`, with spaces, `_`, `-`, or punctuation between components. Dates may be ISO, US numeric, abbreviated/full month names, two-digit years, or month/day without a year. A missing year is inferred from Drive modification time. Explicit `part` or `pt` suffixes are supported.
 
-The parser refuses an ambiguous/missing class or date and refuses dates outside the configured schedule: HRM/PSE/PHIL on Monday or Wednesday, STRAT on Wednesday. It emails one generic attention notice instead of guessing or publishing to a public repository.
+The parser refuses an ambiguous/missing class or date. It accepts the configured schedule—HRM/PSE/PHIL on Monday or Wednesday and STRAT on Wednesday—plus an observed one-day-early filename label. The weekly audit maps that label to the following scheduled class day for coverage while preserving the owner’s date in the note path. Other schedule mismatches still produce one generic attention notice instead of being guessed or published publicly.
 
 ## Duplicate handling and cutover
 
 - The active desktop source derives a stable identity from the normalized path under `URecorder`; version identity adds the modification timestamp. Prior rclone rows retain their Google file IDs.
 - Repeated hourly scans are idempotent.
 - Before hydrating, the importer compares the parsed class/date/part against eligible existing owner jobs and checks filename/size compatibility against prior rclone ingestions. A single matching browser-created job is linked instead of retranscribed; multiple matches require review.
-- The initial cutover is midnight Mountain Time on 2026-09-14. Older Drive files are ignored so existing September 2 notes are not duplicated.
+- The initial cutover is midnight Mountain Time on 2026-09-14. Both source modification time and parsed lecture date must meet it during scheduled discovery, so touched cloud metadata cannot make an older lecture eligible. Explicit exact-path backfills bypass the cutover.
 - A file changed after import is a new Drive version, but GitHub refuses to overwrite a different Class Scribe UUID at an occupied path.
 
 ## Preparation and queue handoff
 
-`class_scribe_automation.py` lists the first-party Drive desktop view at `G:\My Drive\URecorder`. It ignores files changed within the last ten minutes, copies each eligible source into an isolated temporary directory so Drive can hydrate it, and confirms size and modification time did not change during the copy. Native FFmpeg then discards video, creates mono 16 kHz 48 kbps AAC/M4A, and segments at ten minutes. Ten-minute output is normally well below 6 MB, allowing individual retry through standard private Storage upload while preserving the existing 50 MB/object and 32-part database limits.
+`class_scribe_automation.py` lists the first-party Drive desktop view at `G:\My Drive\URecorder` and the existing read-only cloud view. It merges them by case-insensitive relative path, uses the newest metadata version, and prefers a local hydrated source on an exact tie. If either view is temporarily unavailable, the other continues discovery; both must fail before the scan fails. It ignores files changed within the last ten minutes, copies/downloads each eligible source into an isolated temporary directory, and confirms desktop size and modification time do not change during hydration. Native FFmpeg then discards video, creates mono 16 kHz 48 kbps AAC/M4A, and segments at ten minutes. Ten-minute output is normally well below 6 MB, allowing individual retry through standard private Storage upload while preserving the existing 50 MB/object and 32-part database limits.
 
 The importer signs in as the existing dedicated worker Auth user. Worker-only RPCs create/link the owner job and validate the complete M4A manifest. Normal users cannot call those paths successfully because every RPC checks protected `app_metadata.role=worker`; anonymous access is revoked. Audio is deleted by the existing worker after result commit. The original remains in Drive.
 
@@ -105,9 +105,9 @@ Get-Content .\.worker-state\class-scribe-automation.log -Tail 50
 
 All are ignored. Never copy their values into logs, chat, GitHub, Vercel, or Supabase.
 
-Google Drive for desktop manages the active Google login; Class Scribe receives no Google password, OAuth client secret, or Drive API token. `.worker-secrets/rclone.conf` remains ignored only for a short rollback window and is no longer used when `DRIVE_IMPORT_SOURCE=desktop`. After one healthy week, revoke the old rclone Google authorization and remove the local rollback config.
+Google Drive for desktop manages the primary Google login; Class Scribe receives no Google password. The ignored `.worker-secrets/rclone.conf` supplies the current read-only cloud fallback while `DRIVE_IMPORT_SOURCE=hybrid`. It prevents a cloud file missed by the `G:` mirror from being lost, but its retiring shared OAuth client is not a permanent credential strategy. Replace it with an owner-created Google OAuth desktop client before Google disables the shared client; after that replacement is verified, revoke the old authorization.
 
-The 2026 rclone shared-client retirement therefore cannot interrupt the active desktop source. Drive discovery can still pause when Windows has restarted without an owner login, Drive for desktop is signed out/stopped, or `G:` is unavailable.
+The 2026 rclone shared-client retirement cannot interrupt files already visible through the desktop source. Hybrid discovery still works from `G:` if the cloud fallback fails, and from cloud if the desktop view lags or is unavailable. Complete discovery requires at least one healthy source.
 
 ## Recovery
 

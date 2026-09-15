@@ -257,3 +257,11 @@ Use the owner-session Google Drive for desktop view as the preferred local sourc
 **Reason:** `Phil 9-14.m4a` existed in the owner’s cloud `URecorder` folder but remained absent from the streamed `G:` view many hours later, so desktop-only discovery silently missed a valid recording. `strat 392 9-8.m4a` was present but intentionally excluded because its filename was one day earlier than Wednesday and older than the initial cutover. The observed recorder filenames therefore require both source redundancy and narrow date/name tolerance.
 
 **Consequence:** Either Drive view can keep discovery operating when the other is unavailable, and duplicate paths still produce one logical candidate before database idempotency checks. The cloud fallback retains the retiring shared rclone OAuth dependency until it is replaced with an owner-created client, but its failure does not disable desktop discovery. Exact historical files before cutover still require the explicit backfill command. Public note dates preserve the filename date, while the weekly audit counts a one-day-early label against its intended scheduled day.
+
+## ADR-039 — Repository-Local AI Reading Indexes
+
+Place a root `AGENTS.md` in each public course repository and title it as that course’s AI Repository Index. Keep it procedural rather than maintaining a static lecture list: agents enumerate dated note paths, read summaries for orientation, verify material claims against timestamped transcript passages, cite lecture dates and timestamps, disclose missing coverage, and treat non-dated materials as supplemental.
+
+**Reason:** The repositories are intended for friends and future AI-assisted study. A root `AGENTS.md` is automatically discoverable by many coding agents, while dynamic path rules remain accurate as Class Scribe publishes new lectures without another index-writing step.
+
+**Consequence:** Every course archive has self-contained reading and safety instructions. HRM explicitly distinguishes its Week 1 primer from transcripts, and each course records its expected weekly frequency. The indexes contain no credentials or private database data and prohibit adding source media or unpublished Class Scribe content. Generated lecture files remain automation-owned unless the owner explicitly authorizes a correction.

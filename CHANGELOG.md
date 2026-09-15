@@ -2,6 +2,12 @@
 
 ## 2026-09-15
 
+### AI repository indexes
+
+- Added a root `AGENTS.md` AI Repository Index to HRM 391, PSE 390, STRAT 392, and PHIL 201.
+- Each index teaches agents to discover dated lectures dynamically, interpret metadata and Summary/Key Points/Action Items/Transcript sections, verify claims against timestamped transcript evidence, cite dates and timestamps, disclose gaps, and avoid treating generated summaries as quotations.
+- Tailored weekly expectations per course and marked the HRM Week 1 primer as supplemental rather than a transcript. All four public raw documents returned HTTP 200 after push.
+
 ### Resilient Drive discovery and observed filename variants
 
 - Found `strat 392 9-8.m4a` in both Drive views and `Phil 9-14.m4a` in cloud Drive even though Google Drive for desktop had not surfaced the PHIL file on `G:`.

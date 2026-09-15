@@ -73,6 +73,10 @@ Repository mapping:
 
 The exporter verifies GitHub readback by SHA-256 before marking an ingestion `exported`.
 
+## AI repository index
+
+Each public course repository has a root `AGENTS.md` titled `AI Repository Index — <course>`. AI coding/research agents should read it before using the archive. It defines the dated lecture path patterns, document-section semantics, transcript-first evidence hierarchy, timestamp citation method, uncertainty rules, and safe edit boundaries. The indexes instruct agents to enumerate `notes/` dynamically rather than depend on a static transcript catalog, so no index update is required when the exporter adds a lecture. HRM’s index explicitly excludes its Week 1 primer from transcript counts.
+
 ## Scheduled tasks
 
 - `ClassScribeDriveDesktopAutomation` — owner interactive principal, owner logon plus hourly repetition. The `G:` mount requires this signed-in session. It imports only on class days/catch-up conditions and checks for completed exports every hour.

@@ -1,6 +1,19 @@
 # Testing and Verification
 
-## Hybrid Drive discovery and missed recordings — PROCESSING
+## Public course AI repository indexes — PASS
+
+**Date:** 2026-09-15
+**Environment:** four public `DrFunDip72` course repositories and their local clean worktrees.
+
+1. Fast-forwarded all four local course worktrees to public `main`, including the newly exported STRAT September 8 and PHIL September 14 notes.
+2. Added a root `AGENTS.md` titled `AI Repository Index — <course>` to HRM 391, PSE 390, STRAT 392, and PHIL 201.
+3. Verified every index defines dynamic dated-note discovery, metadata/section semantics, transcript-first evidence priority, date-and-timestamp citation, cross-lecture synthesis, gap disclosure, transcription uncertainty, and safe maintenance rules. HRM uniquely identifies its Week 1 primer as supplemental.
+4. `git diff --check` passed in every course repository before commit. Pushed commits were HRM `3b87aa8`, PSE `dca84cc`, STRAT `35f6d7c`, and PHIL `7832a8c`.
+5. Anonymous raw GitHub readback returned HTTP 200 for all four indexes, with content lengths from 2,763 to 2,797 bytes. All four local worktrees match their pushed `main` branches.
+
+**Result:** PASS. Any agent entering a course repository now has a repository-local, automatically discoverable reading index that stays accurate as dated lectures are added.
+
+## Hybrid Drive discovery and missed recordings — PASS
 
 **Date:** 2026-09-15
 **Environment:** live Drive-for-desktop `URecorder`, read-only cloud Drive fallback, production Supabase, High local worker, and public STRAT/PHIL repositories.
@@ -9,9 +22,10 @@
 2. Confirmed neither course/date had a prior Class Scribe job or `drive_ingestions` row. The connected ChatGPT Google Drive plugin belongs to `justin.m@enhanced.ai`, not the owner inbox, so it was not used as evidence for or access to `jmaximum72@gmail.com`.
 3. Added hybrid listing merge/fallback behavior, standalone PHIL aliases, one-day-early schedule tolerance, matching weekly-audit coverage, and a parsed-lecture-date cutover guard. Python compilation and the combined 28-test suite pass.
 4. A live corrected discovery preview resolved STRAT September 8 from the desktop source and PHIL September 14 from the cloud source with their exact expected class/date and byte counts.
-5. Prepared and privately queued both High jobs. STRAT job `9732d1fd-4545-4ded-9e6d-5f5be4b23daf` was claimed on attempt 1; PHIL job `f5d509ae-ddac-4d17-8c8a-057adc107ccc` is FIFO behind it.
+5. Prepared and privately queued both High jobs. STRAT job `9732d1fd-4545-4ded-9e6d-5f5be4b23daf` and PHIL job `f5d509ae-ddac-4d17-8c8a-057adc107ccc` each completed on attempt 1.
+6. STRAT produced 10,165 transcript words and 1,043 timestamped segments; PHIL produced 11,610 words and 1,256 segments. Both returned zero quality-gate issues and were marked exported with verified GitHub SHAs at their dated note paths.
 
-**Result:** Processing. Publication remains gated and will be verified after both jobs complete.
+**Result:** PASS. The previously missed recordings were recovered, quality-checked, and publicly published; future discovery now covers the observed source and filename failure modes.
 
 ## September 8 exact-path recovery — PASS
 

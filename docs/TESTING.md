@@ -1,5 +1,19 @@
 # Testing and Verification
 
+## Owner-only production transcript formatter — PASS
+
+**Date:** 2026-09-16
+**Scope:** `class_scribe_automation.py`, owner GitHub publication, live Supabase queue read, and local Ollama `qwen3:4b` structure response.
+
+1. Python compilation passed.
+2. All 15 `test_class_scribe_automation.py` tests passed, including a formatter test that requires every source timestamp/text pair exactly once, a simulated Ollama failure that must retain all source content through deterministic fallback, and a circuit-breaker test that prevents repeated calls after the first model failure.
+3. A live worker-authenticated Supabase query returned the current queue as idle through the same status check used to prevent CPU contention. No rows were changed.
+4. A live Ollama request using the production JSON schema returned a non-empty topic heading and valid paragraph-start indexes. The test supplied synthetic text and did not expose a private lecture.
+5. The production renderer completed a full-length no-write dry run against the September 14 HRM result: 1,102 segments, 7,298 words, 13 windows, 51 size-bounded paragraphs, and 56,174 Markdown characters. Ordered source identity SHA-256 was `bce17915574f9b52d0ccaa4da0ac14379adb919aa6456d4a8b9f283a52cef559`. No GitHub or database write occurred.
+6. The combined worker and owner-automation suite passed all 30 tests. `git diff --check` passed, and `.env.worker.local` plus `.worker-secrets/` remained ignored and untracked.
+
+**Result:** PASS for compilation, full-result reconstruction, deterministic preservation/fallback, live queue access, and the live model schema. Future owner exports will use the formatter only after the inference queue is idle.
+
 ## Local-AI formatted transcript email — PASS WITH DELIVERY CONFIRMATION PENDING
 
 **Date:** 2026-09-16

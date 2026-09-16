@@ -118,6 +118,8 @@ The web UI is designed from a 320 CSS-pixel minimum viewport upward. Flex and gr
 
 No inbound port, public tunnel, or router rule is required. Ollama remains at localhost. Original videos and oversized source audio never upload. Derived parts and direct audio objects are private and deleted after a successful result is saved. Transcript text is never written to worker logs.
 
+The owner-only Drive-to-GitHub exporter adds a second, queue-idle Ollama pass after result integrity checks. It divides timestamped segments into approximately six-minute windows and accepts only topic headings and paragraph-start indexes. Markdown is reconstructed from the original segments, and an ordered identity check must prove that each timestamp/text pair appears exactly once. Invalid structure falls back deterministically. This formatting does not alter Supabase results and does not apply to other accounts.
+
 ## Separate private OpenWhispr API
 
 The computer also hosts a separate OpenAI-compatible Speaches container for private Tailscale clients. This is not part of the Class Scribe request path or FIFO queue. Docker publishes container port 8000 only on `100.79.197.76`, and `/v1/models` must include `Systran/faster-whisper-base.en`.

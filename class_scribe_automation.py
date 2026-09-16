@@ -104,6 +104,16 @@ class Settings:
     fluxprompt_api_url: str
     fluxprompt_flow_id: str
     site_url: str
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3:4b"
+
+
+@dataclass(frozen=True)
+class FormattedTranscript:
+    markdown: str
+    section_count: int
+    paragraph_count: int
+    used_ai: bool
 
 
 class AutomationError(RuntimeError):
@@ -178,6 +188,8 @@ def load_settings() -> Settings:
         fluxprompt_api_url=env.get("FLUXPROMPT_API_URL", "https://api.fluxprompt.ai/flux/api-v2"),
         fluxprompt_flow_id=env.get("FLUXPROMPT_FLOW_ID", "2000e2ec-450e-4da3-9d7f-0061adfe1c17"),
         site_url=env.get("SITE_URL", "https://class-scribe-ruddy.vercel.app"),
+        ollama_url=env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
+        ollama_model=env.get("OLLAMA_MODEL", "qwen3:4b"),
     )
 
 
@@ -739,7 +751,209 @@ def yaml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def render_note(ingestion: dict[str, Any], result: dict[str, Any]) -> str:
+def transcript_segments(result: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_segments = result.get("segments") if isinstance(result.get("segments"), list) else []
+    normalized: list[dict[str, Any]] = []
+    for segment in raw_segments:
+        if not isinstance(segment, dict):
+            continue
+        text = str(segment.get("text") or "").strip()
+        if not text:
+            continue
+        normalized.append({
+            "start": float(segment.get("start") or 0),
+            "end": float(segment.get("end") or segment.get("start") or 0),
+            "text": text,
+        })
+    return normalized
+
+
+def chunk_transcript_segments(
+    segments: list[dict[str, Any]],
+    *,
+    window_seconds: float = 360,
+) -> list[list[dict[str, Any]]]:
+    chunks: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    chunk_start = 0.0
+    for segment in segments:
+        start = float(segment["start"])
+        if current and start - chunk_start >= window_seconds:
+            chunks.append(current)
+            current = []
+        if not current:
+            chunk_start = start
+        current.append(segment)
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _parse_json_object(text: str) -> dict[str, Any]:
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE).strip()
+    if "</think>" in cleaned:
+        cleaned = cleaned.split("</think>", 1)[1].strip()
+    fence = chr(96) * 3
+    cleaned = cleaned.removeprefix(fence + "json").removesuffix(fence).strip()
+    try:
+        value = json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            raise AutomationError("The transcript formatter returned invalid JSON") from None
+        try:
+            value = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            raise AutomationError("The transcript formatter returned invalid JSON") from None
+    if not isinstance(value, dict):
+        raise AutomationError("The transcript formatter returned an invalid result")
+    return value
+
+
+def request_transcript_structure(
+    settings: Settings,
+    segments: list[dict[str, Any]],
+    section_number: int,
+    section_count: int,
+) -> dict[str, Any]:
+    schema = {
+        "type": "object",
+        "properties": {
+            "heading": {"type": "string"},
+            "paragraph_starts": {"type": "array", "items": {"type": "integer"}},
+        },
+        "required": ["heading", "paragraph_starts"],
+    }
+    source = "\n".join(
+        f"{index}|{format_timestamp(float(segment['start']))}|{segment['text']}"
+        for index, segment in enumerate(segments)
+    )
+    prompt = (
+        "Organize this class-transcript window without rewriting, correcting, summarizing, or omitting any words. "
+        "Return JSON only. Supply a short factual topic heading and 3-8 paragraph_starts indexes. Indexes refer "
+        "to the numbered source segments, must include 0, and should mark natural topic or paragraph boundaries. "
+        "Do not return transcript text.\n\n"
+        f"WINDOW {section_number}/{section_count}:\n{source}\n/no_think"
+    )
+    payload = {
+        "model": settings.ollama_model,
+        "prompt": prompt,
+        "stream": False,
+        "think": False,
+        "format": schema,
+        "options": {"temperature": 0.1, "num_ctx": 8192},
+    }
+
+    def request() -> dict[str, Any]:
+        with httpx.Client(timeout=httpx.Timeout(180, connect=10)) as client:
+            response = client.post(f"{settings.ollama_url.rstrip('/')}/api/generate", json=payload)
+            response.raise_for_status()
+            return response.json()
+
+    raw = str(retry(request, attempts=2).get("response") or "").strip()
+    if not raw:
+        raise AutomationError("The transcript formatter returned no response")
+    return _parse_json_object(raw)
+
+
+def _validated_structure(plan: dict[str, Any], segment_count: int, fallback_heading: str) -> tuple[str, list[int]]:
+    heading = re.sub(r"[\r\n#*_`]+", " ", str(plan.get("heading") or "")).strip()
+    heading = re.sub(r"\s+", " ", heading)[:90].strip()
+    if not heading:
+        heading = fallback_heading
+    raw_starts = plan.get("paragraph_starts")
+    if not isinstance(raw_starts, list):
+        raise AutomationError("The transcript formatter omitted paragraph boundaries")
+    starts = sorted({
+        value for value in raw_starts
+        if isinstance(value, int) and not isinstance(value, bool) and 0 <= value < segment_count
+    })
+    if 0 not in starts:
+        starts.insert(0, 0)
+    if len(starts) > 10:
+        raise AutomationError("The transcript formatter returned too many paragraph boundaries")
+    return heading, starts
+
+
+def _enforce_paragraph_size(
+    segments: list[dict[str, Any]],
+    requested_starts: list[int],
+    *,
+    max_words: int = 170,
+) -> list[int]:
+    starts = set(requested_starts)
+    starts.add(0)
+    words_in_paragraph = 0
+    for index, segment in enumerate(segments):
+        segment_words = max(1, len(str(segment["text"]).split()))
+        if index in starts and index != 0:
+            words_in_paragraph = 0
+        elif words_in_paragraph and words_in_paragraph + segment_words > max_words:
+            starts.add(index)
+            words_in_paragraph = 0
+        words_in_paragraph += segment_words
+    return sorted(starts)
+
+
+def format_transcript_markdown(
+    result: dict[str, Any],
+    planner: Callable[[list[dict[str, Any]], int, int], dict[str, Any]],
+) -> FormattedTranscript:
+    segments = transcript_segments(result)
+    if not segments:
+        fallback = str(result.get("transcript") or "").strip()
+        return FormattedTranscript(fallback, 0, 1 if fallback else 0, False)
+
+    chunks = chunk_transcript_segments(segments)
+    markdown: list[str] = []
+    rendered_identity: list[tuple[float, str]] = []
+    paragraph_count = 0
+    used_ai = True
+    planner_available = True
+    for section_index, chunk in enumerate(chunks, start=1):
+        fallback_heading = f"Lecture discussion — {format_timestamp(float(chunk[0]['start']))}"
+        try:
+            if not planner_available:
+                raise AutomationError("The transcript formatter is unavailable for this document")
+            heading, requested_starts = _validated_structure(
+                planner(chunk, section_index, len(chunks)), len(chunk), fallback_heading
+            )
+        except Exception as error:
+            used_ai = False
+            planner_available = False
+            heading, requested_starts = fallback_heading, [0]
+            logging.warning(
+                "Transcript formatting section %d/%d used deterministic fallback (%s)",
+                section_index,
+                len(chunks),
+                type(error).__name__,
+            )
+        starts = _enforce_paragraph_size(chunk, requested_starts)
+        markdown.extend([f"### {heading}", ""])
+        for start_index, end_index in zip(starts, starts[1:] + [len(chunk)], strict=True):
+            paragraph: list[str] = []
+            for segment in chunk[start_index:end_index]:
+                text = str(segment["text"])
+                timestamp = format_timestamp(float(segment["start"]))
+                paragraph.append(f"**({timestamp})** {text}")
+                rendered_identity.append((float(segment["start"]), text))
+            markdown.extend([" ".join(paragraph), ""])
+            paragraph_count += 1
+
+    source_identity = [(float(segment["start"]), str(segment["text"])) for segment in segments]
+    if rendered_identity != source_identity:
+        raise AutomationError("Formatted transcript identity verification failed")
+    return FormattedTranscript(
+        "\n".join(markdown).rstrip(), len(chunks), paragraph_count, used_ai
+    )
+
+
+def render_note(
+    ingestion: dict[str, Any],
+    result: dict[str, Any],
+    *,
+    formatted_transcript: FormattedTranscript | None = None,
+) -> str:
     course_title = str(ingestion["course_code"]).replace("-", " ")
     lecture_date = date.fromisoformat(str(ingestion["lecture_date"]))
     lines = [
@@ -750,6 +964,7 @@ def render_note(ingestion: dict[str, Any], result: dict[str, Any]) -> str:
         "source: google-drive-automation",
         f"transcription_model: {yaml_string(str(result.get('transcription_model') or 'unknown'))}",
         f"summary_model: {yaml_string(str(result.get('summary_model') or 'unknown'))}",
+        f"transcript_formatting: {yaml_string('local-ai-structure-preserving' if formatted_transcript else 'raw-segments')}",
         "---",
         "",
         f"# {course_title} — {lecture_date.strftime('%B')} {lecture_date.day}, {lecture_date.year}",
@@ -771,11 +986,11 @@ def render_note(ingestion: dict[str, Any], result: dict[str, Any]) -> str:
     if not action_items:
         lines.append("- No explicit assignments or action items were identified.")
     lines.extend(["", "## Transcript", ""])
-    segments = result.get("segments") if isinstance(result.get("segments"), list) else []
-    if segments:
+    segments = transcript_segments(result)
+    if formatted_transcript:
+        lines.append(formatted_transcript.markdown)
+    elif segments:
         for segment in segments:
-            if not isinstance(segment, dict) or not str(segment.get("text") or "").strip():
-                continue
             lines.append(f"({format_timestamp(float(segment.get('start') or 0))}) {str(segment['text']).strip()}")
     else:
         lines.append(str(result.get("transcript") or "").strip())
@@ -848,6 +1063,14 @@ def note_path(ingestion: dict[str, Any]) -> str:
     return f"notes/{lecture_date.year}/{lecture_date.isoformat()}{suffix}.md"
 
 
+def inference_queue_is_busy(db: Client) -> bool:
+    rows = retry(
+        lambda: db.table("transcription_jobs").select("id")
+        .in_("status", ["queued", "transcribing", "summarizing"]).limit(1).execute()
+    ).data or []
+    return bool(rows)
+
+
 def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> int:
     if not GITHUB_TOKEN_PATH.exists():
         raise AutomationError("The GitHub automation token is missing")
@@ -855,6 +1078,9 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
     github = GitHubClient(token)
     exported = 0
     try:
+        queue_busy = inference_queue_is_busy(db)
+        if queue_busy:
+            logging.info("Deferring owner transcript formatting while the inference queue is active")
         ingestions = retry(
             lambda: db.table("drive_ingestions").select("*")
             .in_("status", ["queued", "processing", "completed"]).order("created_at").execute()
@@ -890,10 +1116,18 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
                 db.table("drive_ingestions").update({"status": "needs_review", "error_message": message}).eq("id", ingestion["id"]).execute()
                 issue_once(settings, state, f"job:{ingestion['job_id']}:quality", "A completed transcription failed the publishing quality check")
                 continue
+            if queue_busy:
+                continue
             repository = COURSE_REPOSITORIES[str(ingestion["course_code"])]
             path = note_path(ingestion)
             try:
-                content = render_note(ingestion, result)
+                formatted = format_transcript_markdown(
+                    result,
+                    lambda chunk, section_number, section_count: request_transcript_structure(
+                        settings, chunk, section_number, section_count
+                    ),
+                )
+                content = render_note(ingestion, result, formatted_transcript=formatted)
                 sha = retry(lambda: github.publish(repository, path, content, str(ingestion["job_id"])), attempts=3)
             except PublicNoteConflict as error:
                 db.table("drive_ingestions").update({"status": "needs_review", "error_message": str(error)}).eq("id", ingestion["id"]).execute()
@@ -904,7 +1138,13 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
                 "github_path": path, "github_sha": sha, "error_message": None,
             }).eq("id", ingestion["id"]).execute()
             exported += 1
-            logging.info("Published %s note for %s", repository, ingestion["lecture_date"])
+            logging.info(
+                "Published %s note for %s with %d transcript sections and %d paragraphs",
+                repository,
+                ingestion["lecture_date"],
+                formatted.section_count,
+                formatted.paragraph_count,
+            )
     finally:
         github.close()
         token = ""

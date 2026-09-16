@@ -9,6 +9,7 @@ from class_scribe_automation import (
     canonical_class_date,
     desktop_drive_json,
     expected_week_dates,
+    format_transcript_markdown,
     merge_drive_files,
     parse_recording_name,
     quality_issues,
@@ -132,6 +133,76 @@ class PublishingTests(unittest.TestCase):
         note = render_note(ingestion, result)
         self.assertLess(note.index("## Summary"), note.index("## Transcript"))
         self.assertIn("class_scribe_id:", note)
+
+    def test_ai_formatted_transcript_preserves_every_source_segment(self) -> None:
+        result = {
+            "transcript": "Alpha one. Beta two. Gamma three. Delta four.",
+            "segments": [
+                {"start": 0, "end": 2, "text": "Alpha one."},
+                {"start": 2, "end": 4, "text": "Beta two."},
+                {"start": 4, "end": 6, "text": "Gamma three."},
+                {"start": 6, "end": 8, "text": "Delta four."},
+            ],
+        }
+
+        formatted = format_transcript_markdown(
+            result,
+            lambda _segments, _section, _total: {
+                "heading": "Opening concepts",
+                "paragraph_starts": [0, 2],
+            },
+        )
+
+        self.assertTrue(formatted.used_ai)
+        self.assertEqual(formatted.section_count, 1)
+        self.assertEqual(formatted.paragraph_count, 2)
+        self.assertIn("### Opening concepts", formatted.markdown)
+        expected = (
+            ("0:00:00", "Alpha one."),
+            ("0:00:02", "Beta two."),
+            ("0:00:04", "Gamma three."),
+            ("0:00:06", "Delta four."),
+        )
+        for timestamp, text in expected:
+            self.assertEqual(formatted.markdown.count(f"**({timestamp})** {text}"), 1)
+
+    def test_formatted_transcript_falls_back_without_losing_content(self) -> None:
+        result = {
+            "transcript": "Alpha one. Beta two.",
+            "segments": [
+                {"start": 0, "end": 2, "text": "Alpha one."},
+                {"start": 2, "end": 4, "text": "Beta two."},
+            ],
+        }
+
+        def unavailable(_segments, _section, _total):
+            raise RuntimeError("offline")
+
+        formatted = format_transcript_markdown(result, unavailable)
+        self.assertFalse(formatted.used_ai)
+        self.assertIn("### Lecture discussion", formatted.markdown)
+        self.assertEqual(formatted.markdown.count("Alpha one."), 1)
+        self.assertEqual(formatted.markdown.count("Beta two."), 1)
+
+    def test_formatter_stops_calling_model_after_first_failure(self) -> None:
+        calls = 0
+        result = {
+            "transcript": "First window. Second window.",
+            "segments": [
+                {"start": 0, "end": 2, "text": "First window."},
+                {"start": 400, "end": 402, "text": "Second window."},
+            ],
+        }
+
+        def unavailable(_segments, _section, _total):
+            nonlocal calls
+            calls += 1
+            raise RuntimeError("offline")
+
+        formatted = format_transcript_markdown(result, unavailable)
+        self.assertEqual(calls, 1)
+        self.assertEqual(formatted.section_count, 2)
+        self.assertEqual(formatted.markdown.count("window."), 2)
 
     def test_weekly_expectations(self) -> None:
         reference = datetime(2026, 9, 17).date()

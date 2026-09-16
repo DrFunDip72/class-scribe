@@ -2,6 +2,13 @@
 
 ## 2026-09-16
 
+### Owner-only formatted GitHub transcript exports
+
+- Added a production formatting pass only to the owner's Drive-to-GitHub workflow; other Class Scribe accounts and stored results are unchanged.
+- Local `qwen3:4b` now supplies only headings and paragraph-start indexes for approximately six-minute transcript windows. The exporter reconstructs every paragraph from canonical timestamped segments and verifies exact one-time ordered identity before publishing.
+- Added deterministic fallback headings, paragraph-size enforcement, and a per-document failure circuit breaker for unavailable or invalid model responses, plus an idle-queue guard so formatting cannot compete with Whisper or normal summarization.
+- Added unit coverage for exact segment preservation and fallback behavior, and verified both the live Supabase queue read and Ollama structure schema.
+
 ### Local-AI transcript formatting experiment
 
 - Sent the most recent HRM 391 transcript through local Ollama `qwen3:4b` in thirteen six-minute topic windows and accepted only section headings plus paragraph-start indexes from the model.

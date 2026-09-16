@@ -273,3 +273,11 @@ For transcript-formatting experiments and any future implementation, let the loc
 **Reason:** Asking a model to rewrite a 60–90 minute transcript can silently paraphrase, correct, omit, or invent content. The September 14 HRM experiment showed that `qwen3:4b` can add useful organization without receiving authority to alter the transcript text.
 
 **Consequence:** Formatting may improve headings, paragraph grouping, and timestamp density without changing evidentiary wording. Invalid model structure must fall back to deterministic grouping. The experiment adds no production behavior yet; a deployed version still needs latency measurement, failure handling, database representation, web/GitHub rendering decisions, and user-facing controls.
+
+## ADR-041 — Format Only Owner GitHub Exports at an Idle Inference Boundary
+
+Apply ADR-040's structure-only method to the owner Drive-to-GitHub exporter, not to normal account results. Split source segments into approximately six-minute windows, ask local `qwen3:4b` only for a short heading and paragraph-start indexes, enforce paragraph-size limits, reconstruct the document from canonical timestamp/text pairs, and verify exact ordered identity before publication. If a model call or structure check fails, stop calling the model for that document and use deterministic headings and paragraph grouping for the remaining windows. Defer completed exports while any transcription job is queued, transcribing, or summarizing.
+
+**Reason:** The owner wants public course documents that are readable without turning a long lecture into one block, but transcript wording is evidence and cannot be delegated to a generative rewrite. Formatting also uses the same CPU and Ollama runtime as the one-at-a-time worker, so it must not compete with class processing.
+
+**Consequence:** Future owner automation notes retain Summary, Key Points, and Action Items first, followed by a topic-organized complete transcript. Supabase remains the unchanged canonical source, other users keep their current private output, and formatting failure cannot lose content or block a valid export. Existing published notes are not automatically backfilled by this change.

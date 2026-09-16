@@ -14,6 +14,8 @@ URecorder in jmaximum72@gmail.com
   -> private Supabase Storage + drive_ingestions ledger
   -> existing FIFO Windows worker, High tier by default
   -> repetition/timestamp/completeness gate
+  -> queue-idle local qwen3:4b headings + paragraph boundaries
+  -> exact ordered timestamp/text reconstruction check
   -> DrFunDip72/<course>/notes/<year>/<YYYY-MM-DD[-part-N]>.md
 ```
 
@@ -62,6 +64,10 @@ Documents contain YAML source metadata followed by:
 3. Action Items
 4. Complete timestamped Transcript
 
+For this owner-only path, the Transcript is divided into approximately six-minute topic sections and readable paragraphs. Ollama receives numbered source segments and may return only a heading plus paragraph-start indexes. The exporter rebuilds Markdown exclusively from the original stored timestamp/text pairs and refuses the result if their complete ordered identity changes. Invalid or unavailable model output trips a per-document circuit breaker and uses deterministic section headings and paragraph-size boundaries for the remaining windows, so formatting cannot block publication or rewrite lecture evidence.
+
+Formatting waits until no job is queued, transcribing, or summarizing. This keeps the CPU-only Ollama pass from competing with Whisper or the normal summary stage. The raw `transcription_results` row remains canonical and unchanged; formatting exists only in the owner-owned public GitHub document. Normal Class Scribe users do not enter this path.
+
 Repository mapping:
 
 | Course | Repository | Weekly expectation |
@@ -72,6 +78,10 @@ Repository mapping:
 | STRAT-392 | `DrFunDip72/STRAT-392` | Wednesday |
 
 The exporter verifies GitHub readback by SHA-256 before marking an ingestion `exported`.
+
+## Public MP3 archive — not enabled
+
+No recording audio is currently published to GitHub. All four course repositories are public, so adding an MP3 would make classroom voices and discussion publicly downloadable. The recommended implementation, if the owner explicitly approves that privacy boundary, is to rehydrate the original Drive source after a result passes the quality gate, use native FFmpeg to create a mono 16 kHz 32 kbps speech MP3, upload it as a GitHub Release asset keyed by course/date/job ID, verify the uploaded asset, and add its download link to the dated note. Release assets keep binaries out of Git history and avoid Git LFS download quotas. The original Drive recording remains the durable source of truth.
 
 ## AI repository index
 
@@ -120,6 +130,7 @@ The 2026 rclone shared-client retirement cannot interrupt files already visible 
 - If preparation/upload fails, the same Drive version remains eligible; small Storage parts use upsert on retry.
 - If transcription fails, the ingestion is marked failed and the normal private result remains available for owner action.
 - If GitHub is unavailable, `completed` remains durable and the next hourly pass retries.
+- If Ollama formatting is unavailable or returns invalid structure, the exporter preserves the exact transcript and uses deterministic headings/paragraph boundaries. It never asks the model to rewrite transcript text.
 - If a public path contains a different job UUID, publication stops at `needs_review` rather than overwriting it.
 - For an owner-approved older or off-schedule source, use the exact-path operator command instead of lowering the global cutoff or schedule rules.
 

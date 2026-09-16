@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-16
+
+### Local-AI transcript formatting experiment
+
+- Sent the most recent HRM 391 transcript through local Ollama `qwen3:4b` in thirteen six-minute topic windows and accepted only section headings plus paragraph-start indexes from the model.
+- Reassembled the email exclusively from the original 1,102 timestamped segments, producing 13 sections and 81 paragraphs while an exact ordered-segment identity check preserved all 7,298 transcript words.
+- Submitted the 55 KB branded HTML transcript to `jmaximum72@gmail.com` through the authorized FluxPrompt Email Agent. The API request completed successfully, but its response echoed the HTML rather than returning an explicit delivery receipt.
+
 ## 2026-09-15
 
 ### AI repository indexes

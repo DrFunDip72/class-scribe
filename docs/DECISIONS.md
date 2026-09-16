@@ -265,3 +265,11 @@ Place a root `AGENTS.md` in each public course repository and title it as that c
 **Reason:** The repositories are intended for friends and future AI-assisted study. A root `AGENTS.md` is automatically discoverable by many coding agents, while dynamic path rules remain accurate as Class Scribe publishes new lectures without another index-writing step.
 
 **Consequence:** Every course archive has self-contained reading and safety instructions. HRM explicitly distinguishes its Week 1 primer from transcripts, and each course records its expected weekly frequency. The indexes contain no credentials or private database data and prohibit adding source media or unpublished Class Scribe content. Generated lecture files remain automation-owned unless the owner explicitly authorizes a correction.
+
+## ADR-040 — AI Transcript Formatting Must Preserve Source Segments
+
+For transcript-formatting experiments and any future implementation, let the local language model return only structural metadata such as topic headings and paragraph-start segment indexes. Reconstruct the displayed transcript from the original timestamped segments, validate that every segment appears exactly once in its original order, and retain the raw stored result as the canonical source.
+
+**Reason:** Asking a model to rewrite a 60–90 minute transcript can silently paraphrase, correct, omit, or invent content. The September 14 HRM experiment showed that `qwen3:4b` can add useful organization without receiving authority to alter the transcript text.
+
+**Consequence:** Formatting may improve headings, paragraph grouping, and timestamp density without changing evidentiary wording. Invalid model structure must fall back to deterministic grouping. The experiment adds no production behavior yet; a deployed version still needs latency measurement, failure handling, database representation, web/GitHub rendering decisions, and user-facing controls.

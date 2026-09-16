@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-15
+**Last updated:** 2026-09-16
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -51,6 +51,7 @@ No credentials are stored in this document.
 - Added an exact-path owner backfill command for older or off-schedule Drive recordings. It preserves the recurring schedule/cutover safeguards and supports a deliberate fresh job when a matching result is known to be corrupt.
 - Added a Thursday 8:00 AM `SYSTEM` GitHub audit for the expected HRM/PSE/PHIL twice-weekly and STRAT once-weekly note schedule. The audit detects missing, unexpected, and duplicate dated notes and uses the existing privacy-safe FluxPrompt path for its report.
 - Added a root `AGENTS.md` AI Repository Index to every public course repository so future AI agents dynamically discover dated lectures, understand note structure and evidence priority, cite timestamped passages, distinguish supplemental material, and preserve generated-note safety rules.
+- Completed a local-only formatted-transcript email experiment on the September 14 HRM lecture: `qwen3:4b` supplied topic headings and paragraph boundaries for thirteen windows, deterministic reconstruction preserved all original segments exactly, and the resulting HTML was submitted through FluxPrompt. This is not yet a production pipeline feature.
 
 ## Last verified state
 
@@ -68,6 +69,7 @@ No credentials are stored in this document.
 - September 8 recovery: `hrm 391 9-8.m4a` and `Phil 201 - 9-8.m4a` were found in Drive, processed as fresh High jobs, passed the quality gate, and were exported to their dated repository paths. The old repetitive HRM result remains preserved privately and unpublished.
 - September 15 discovery correction: cloud Drive contained `Phil 9-14.m4a` even though the desktop `G:` view did not, while `strat 392 9-8.m4a` had been excluded by the initial cutover and one-day date mismatch. Hybrid discovery, standalone `Phil`, and one-day-early schedule/audit tolerance are active. Both fresh High jobs completed on attempt 1, passed quality checks, and were exported to `STRAT-392/notes/2026/2026-09-08.md` and `PHIL-201/notes/2026/2026-09-14.md`.
 - Course AI indexes: all four repository-root `AGENTS.md` files were committed independently, pushed to public `main`, and returned anonymous HTTP 200. Their inventories are deliberately dynamic so weekly transcript publication cannot make a static list stale.
+- Formatted transcript test: the September 14 HRM result produced 13 AI-labeled sections and 81 readable paragraphs from 1,102 segments/7,298 words. The ordered timestamp-and-text identity SHA-256 matched after reconstruction. FluxPrompt accepted the email submission for `jmaximum72@gmail.com`; the provider response did not explicitly confirm mailbox delivery.
 - Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.

@@ -1,5 +1,19 @@
 # Testing and Verification
 
+## Local-AI formatted transcript email — PASS WITH DELIVERY CONFIRMATION PENDING
+
+**Date:** 2026-09-16
+**Scope:** most recent published HRM 391 transcript (`2026-09-14`), local Ollama `qwen3:4b`, and the authorized FluxPrompt Email Agent.
+
+1. Confirmed the durable transcription queue was empty and the Windows worker remained Running before using local Ollama, so the experiment did not delay class processing.
+2. Parsed 1,102 timestamped segments and 7,298 words from the published HRM transcript, then divided them into thirteen approximately six-minute windows.
+3. For each window, `qwen3:4b` returned structured JSON containing a topic heading and paragraph-start indexes only. Deterministic reconstruction produced 13 sections and 81 paragraphs, with forced paragraph-size limits for readability.
+4. Compared the complete ordered `timestamp + text` identity before and after formatting. The strings matched exactly and produced SHA-256 `a1365d3eb697af762e8abf40e62dca48b9ce6618dcb077252617c75eabbc90d4`; no segment was rewritten, omitted, duplicated, or reordered.
+5. Generated a responsive 55 KB HTML email containing only the formatted transcript, a preservation/transcription warning, and the public original-note link. Recipient, subject, empty attachments, and configured API key presence were verified before sending.
+6. The FluxPrompt send command exited 0 and returned a non-empty API response. The response echoed the submitted HTML instead of explicitly confirming delivery, so API submission is verified while inbox receipt remains owner-confirmed.
+
+**Result:** PASS for local AI structure generation, exact transcript preservation, HTML creation, and FluxPrompt API submission. Physical inbox delivery and subjective formatting preference still require owner confirmation.
+
 ## Public course AI repository indexes — PASS
 
 **Date:** 2026-09-15

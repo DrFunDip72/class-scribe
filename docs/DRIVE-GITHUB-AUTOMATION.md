@@ -16,6 +16,8 @@ URecorder in jmaximum72@gmail.com
   -> repetition/timestamp/completeness gate
   -> queue-idle local qwen3:4b headings + paragraph boundaries
   -> exact ordered timestamp/text reconstruction check
+  -> metadata-stripped mono 16 kHz / 32 kbps public MP3
+  -> verified annual GitHub Release asset
   -> DrFunDip72/<course>/notes/<year>/<YYYY-MM-DD[-part-N]>.md
 ```
 
@@ -79,9 +81,15 @@ Repository mapping:
 
 The exporter verifies GitHub readback by SHA-256 before marking an ingestion `exported`.
 
-## Public MP3 archive — not enabled
+## Public MP3 archive
 
-No recording audio is currently published to GitHub. All four course repositories are public, so adding an MP3 would make classroom voices and discussion publicly downloadable. The recommended implementation, if the owner explicitly approves that privacy boundary, is to rehydrate the original Drive source after a result passes the quality gate, use native FFmpeg to create a mono 16 kHz 32 kbps speech MP3, upload it as a GitHub Release asset keyed by course/date/job ID, verify the uploaded asset, and add its download link to the dated note. Release assets keep binaries out of Git history and avoid Git LFS download quotas. The original Drive recording remains the durable source of truth.
+The owner explicitly approved public publication of the four course archives, including classroom audio and voices. This exception applies only to the owner account and these repositories; all other users' source media remain private and follow normal deletion behavior.
+
+After a result passes the quality gate and the inference queue is idle, the exporter rehydrates the matching original from Drive and creates a mono 16 kHz 32 kbps MP3. FFmpeg strips source metadata, chapters, and video. FFprobe must verify MP3 codec, one channel, 16 kHz sample rate, and a nonzero duration before publication. The exporter uploads the file to the repository's annual `class-audio-<year>` GitHub Release as `<YYYY-MM-DD[-part-N]>.mp3`, verifies byte size and GitHub's SHA-256 digest, and records the URL, digest, and byte count in the note front matter. The visible audio link appears below the note title, while Summary remains the first content section.
+
+Release assets keep binaries out of Git history and avoid Git LFS storage/bandwidth quotas. The original Drive file remains the durable source of truth. An existing asset is reused only when both size and SHA-256 match; a same-name/different-content asset stops as a conflict instead of being overwritten.
+
+Historical notes are handled by the idempotent `backfill-published` command. The normal hourly owner task also resumes any incomplete historical backfill only while the transcription queue is empty, then records `public_archive_backfill_complete` in ignored local state and stops scanning old notes.
 
 ## AI repository index
 
@@ -106,6 +114,8 @@ Operator commands:
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py parse "HRM 391 9-14.mp3"
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py run --force-import
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py import-path "HRM 391 9-8.m4a" --force-new
+.\.venv-worker\Scripts\python.exe .\class_scribe_automation.py backfill-published
+.\.venv-worker\Scripts\python.exe .\class_scribe_automation.py backfill-published --course HRM-391 --date 2026-09-08 --force
 .\.venv-worker\Scripts\python.exe .\class_scribe_automation.py audit --dry-run
 Get-Content .\.worker-state\class-scribe-automation.log -Tail 50
 ```
@@ -131,6 +141,7 @@ The 2026 rclone shared-client retirement cannot interrupt files already visible 
 - If transcription fails, the ingestion is marked failed and the normal private result remains available for owner action.
 - If GitHub is unavailable, `completed` remains durable and the next hourly pass retries.
 - If Ollama formatting is unavailable or returns invalid structure, the exporter preserves the exact transcript and uses deterministic headings/paragraph boundaries. It never asks the model to rewrite transcript text.
+- If public-audio conversion, verification, or upload fails, the note is not marked exported. A verified existing asset is reused on retry; conflicting bytes require review.
 - If a public path contains a different job UUID, publication stops at `needs_review` rather than overwriting it.
 - For an owner-approved older or off-schedule source, use the exact-path operator command instead of lowering the global cutoff or schedule rules.
 

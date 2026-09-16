@@ -116,11 +116,31 @@ class FormattedTranscript:
     used_ai: bool
 
 
+@dataclass(frozen=True)
+class PublishedAudio:
+    browser_download_url: str
+    sha256: str
+    size_bytes: int
+    asset_name: str
+
+
 class AutomationError(RuntimeError):
     pass
 
 
 class PublicNoteConflict(AutomationError):
+    pass
+
+
+class PublicAudioConflict(AutomationError):
+    pass
+
+
+class InferenceQueueBusy(AutomationError):
+    pass
+
+
+class TranscriptFormatterUnavailable(AutomationError):
     pass
 
 
@@ -489,6 +509,116 @@ def prepare_audio(source: Path, output_root: Path) -> list[Path]:
     return parts
 
 
+def prepare_public_mp3(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        find_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+        "-map_metadata", "-1", "-map_chapters", "-1", "-vn", "-ac", "1", "-ar", "16000",
+        "-c:a", "libmp3lame", "-b:a", "32k", "-id3v2_version", "3", str(destination),
+    ]
+    completed = subprocess.run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=4 * 60 * 60,
+        check=False,
+    )
+    if completed.returncode != 0 or not destination.exists() or destination.stat().st_size < 1:
+        raise AutomationError("FFmpeg could not create the public speech MP3")
+
+    ffprobe = Path(find_ffmpeg()).with_name("ffprobe.exe")
+    if not ffprobe.exists():
+        raise AutomationError("FFprobe is not installed beside FFmpeg")
+    checked = subprocess.run(
+        [
+            str(ffprobe), "-v", "error", "-select_streams", "a:0",
+            "-show_entries", "stream=codec_name,channels,sample_rate:format=duration",
+            "-of", "json", str(destination),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=5 * 60,
+        check=False,
+    )
+    try:
+        metadata = json.loads(checked.stdout) if checked.returncode == 0 else {}
+        streams = metadata.get("streams") if isinstance(metadata, dict) else None
+        stream = streams[0] if isinstance(streams, list) and streams and isinstance(streams[0], dict) else {}
+        duration = float(metadata.get("format", {}).get("duration") or 0)
+    except (AttributeError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+        stream, duration = {}, 0
+    if (
+        stream.get("codec_name") != "mp3"
+        or int(stream.get("channels") or 0) != 1
+        or int(stream.get("sample_rate") or 0) != 16_000
+        or duration <= 1
+    ):
+        destination.unlink(missing_ok=True)
+        raise AutomationError("The public MP3 failed media verification")
+
+
+def filename_identity(name: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", "", normalize_name(Path(name).stem))
+
+
+def resolve_drive_recording(
+    drive_files: list[dict[str, Any]],
+    ingestion: dict[str, Any],
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    drive_id = str(ingestion.get("drive_file_id") or "")
+    if drive_id:
+        exact = [row for row in drive_files if str(row.get("ID") or "") == drive_id]
+        if len(exact) == 1:
+            return exact[0]
+
+    course_code = str(ingestion["course_code"])
+    lecture_date = date.fromisoformat(str(ingestion["lecture_date"]))
+    source_part = ingestion.get("source_part")
+    candidates: list[dict[str, Any]] = []
+    for row in drive_files:
+        path = str(row.get("Path") or "")
+        if Path(path).suffix.lower() not in SUPPORTED_SOURCE_EXTENSIONS:
+            continue
+        try:
+            parsed = parse_recording_name(
+                Path(path).name,
+                parse_timestamp(str(row.get("ModTime") or "")),
+                enforce_schedule=False,
+            )
+        except Exception:
+            continue
+        if (
+            parsed.course_code == course_code
+            and parsed.lecture_date == lecture_date
+            and parsed.source_part == source_part
+        ):
+            candidates.append(row)
+    if len(candidates) == 1:
+        return candidates[0]
+
+    preferred_names = {
+        filename_identity(str(value))
+        for value in (ingestion.get("source_filename"), job.get("original_filename"))
+        if value
+    }
+    named = [
+        row for row in candidates
+        if filename_identity(Path(str(row.get("Path") or "")).name) in preferred_names
+    ]
+    if len(named) == 1:
+        return named[0]
+    if not candidates:
+        raise AutomationError("The owner recording is no longer available in URecorder")
+    raise AutomationError("More than one Drive recording matches this public lecture")
+
+
+def public_audio_asset_name(ingestion: dict[str, Any]) -> str:
+    lecture_date = date.fromisoformat(str(ingestion["lecture_date"]))
+    suffix = f"-part-{int(ingestion['source_part'])}" if ingestion.get("source_part") else ""
+    return f"{lecture_date.isoformat()}{suffix}.mp3"
+
+
 def connect_supabase(settings: Settings) -> Client:
     db = create_client(settings.supabase_url, settings.supabase_publishable_key)
     retry(lambda: db.auth.sign_in_with_password({"email": settings.worker_email, "password": settings.worker_password}))
@@ -850,7 +980,11 @@ def request_transcript_structure(
             response.raise_for_status()
             return response.json()
 
-    raw = str(retry(request, attempts=2).get("response") or "").strip()
+    try:
+        response_data = retry(request, attempts=2)
+    except (httpx.HTTPError, OSError) as error:
+        raise TranscriptFormatterUnavailable("The local transcript formatter is unavailable") from error
+    raw = str(response_data.get("response") or "").strip()
     if not raw:
         raise AutomationError("The transcript formatter returned no response")
     return _parse_json_object(raw)
@@ -871,7 +1005,8 @@ def _validated_structure(plan: dict[str, Any], segment_count: int, fallback_head
     if 0 not in starts:
         starts.insert(0, 0)
     if len(starts) > 10:
-        raise AutomationError("The transcript formatter returned too many paragraph boundaries")
+        last = len(starts) - 1
+        starts = sorted({starts[round(index * last / 9)] for index in range(10)})
     return heading, starts
 
 
@@ -914,13 +1049,24 @@ def format_transcript_markdown(
         fallback_heading = f"Lecture discussion — {format_timestamp(float(chunk[0]['start']))}"
         try:
             if not planner_available:
-                raise AutomationError("The transcript formatter is unavailable for this document")
+                raise TranscriptFormatterUnavailable("The transcript formatter is unavailable for this document")
             heading, requested_starts = _validated_structure(
                 planner(chunk, section_index, len(chunks)), len(chunk), fallback_heading
             )
-        except Exception as error:
+        except InferenceQueueBusy:
+            raise
+        except TranscriptFormatterUnavailable as error:
             used_ai = False
             planner_available = False
+            heading, requested_starts = fallback_heading, [0]
+            logging.warning(
+                "Transcript formatting section %d/%d used deterministic fallback (%s)",
+                section_index,
+                len(chunks),
+                type(error).__name__,
+            )
+        except Exception as error:
+            used_ai = False
             heading, requested_starts = fallback_heading, [0]
             logging.warning(
                 "Transcript formatting section %d/%d used deterministic fallback (%s)",
@@ -953,6 +1099,7 @@ def render_note(
     result: dict[str, Any],
     *,
     formatted_transcript: FormattedTranscript | None = None,
+    published_audio: PublishedAudio | None = None,
 ) -> str:
     course_title = str(ingestion["course_code"]).replace("-", " ")
     lecture_date = date.fromisoformat(str(ingestion["lecture_date"]))
@@ -965,17 +1112,27 @@ def render_note(
         f"transcription_model: {yaml_string(str(result.get('transcription_model') or 'unknown'))}",
         f"summary_model: {yaml_string(str(result.get('summary_model') or 'unknown'))}",
         f"transcript_formatting: {yaml_string('local-ai-structure-preserving' if formatted_transcript else 'raw-segments')}",
+        f"public_audio_url: {yaml_string(published_audio.browser_download_url) if published_audio else 'null'}",
+        f"public_audio_sha256: {yaml_string(published_audio.sha256) if published_audio else 'null'}",
+        f"public_audio_size_bytes: {published_audio.size_bytes if published_audio else 'null'}",
         "---",
         "",
         f"# {course_title} — {lecture_date.strftime('%B')} {lecture_date.day}, {lecture_date.year}",
         "",
+    ]
+    if published_audio:
+        lines.extend([
+            f"[Listen to or download the public MP3 recording]({published_audio.browser_download_url})",
+            "",
+        ])
+    lines.extend([
         "## Summary",
         "",
         str(result.get("summary") or "").strip(),
         "",
         "## Key Points",
         "",
-    ]
+    ])
     key_points = result.get("key_points") if isinstance(result.get("key_points"), list) else []
     lines.extend(f"- {str(point).strip()}" for point in key_points if str(point).strip())
     if not key_points:
@@ -995,6 +1152,13 @@ def render_note(
     else:
         lines.append(str(result.get("transcript") or "").strip())
     return "\n".join(lines).rstrip() + "\n"
+
+
+def note_class_scribe_id(content: str) -> str | None:
+    match = re.search(r"^class_scribe_id:\s*([^\r\n]+)", content, flags=re.MULTILINE)
+    if not match:
+        return None
+    return match.group(1).strip().strip('"').strip("'") or None
 
 
 class GitHubClient:
@@ -1029,7 +1193,7 @@ class GitHubClient:
         }
         if existing:
             existing_text = base64.b64decode(existing.get("content", "")).decode("utf-8")
-            if f"class_scribe_id: {job_id}" not in existing_text:
+            if note_class_scribe_id(existing_text) != job_id:
                 raise PublicNoteConflict("A different note already exists at the target GitHub path")
             if existing_text == content:
                 return str(existing["sha"])
@@ -1047,6 +1211,143 @@ class GitHubClient:
         if hashlib.sha256(readback_bytes).digest() != hashlib.sha256(content.encode("utf-8")).digest():
             raise AutomationError("GitHub content verification failed")
         return sha
+
+    def publish_text_file(self, repository: str, path: str, content: str, message: str) -> str:
+        existing = self.get_note(repository, path)
+        payload: dict[str, Any] = {
+            "message": message,
+            "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+            "branch": "main",
+        }
+        if existing:
+            existing_text = base64.b64decode(existing.get("content", "")).decode("utf-8")
+            if existing_text == content:
+                return str(existing["sha"])
+            payload["sha"] = existing["sha"]
+        response = self.client.put(
+            f"/repos/{GITHUB_OWNER}/{repository}/contents/{quote(path, safe='/')}", json=payload
+        )
+        response.raise_for_status()
+        sha = str(response.json()["content"]["sha"])
+        readback = self.get_note(repository, path)
+        if not readback:
+            raise AutomationError("GitHub text-file readback failed")
+        readback_bytes = base64.b64decode(readback.get("content", ""))
+        if hashlib.sha256(readback_bytes).digest() != hashlib.sha256(content.encode("utf-8")).digest():
+            raise AutomationError("GitHub text-file verification failed")
+        return sha
+
+    def get_or_create_audio_release(self, repository: str, year: int) -> dict[str, Any]:
+        tag = f"class-audio-{year}"
+        response = self.client.get(
+            f"/repos/{GITHUB_OWNER}/{repository}/releases/tags/{quote(tag, safe='')}"
+        )
+        if response.status_code == 200:
+            return response.json()
+        if response.status_code != 404:
+            response.raise_for_status()
+        created = self.client.post(
+            f"/repos/{GITHUB_OWNER}/{repository}/releases",
+            json={
+                "tag_name": tag,
+                "target_commitish": "main",
+                "name": f"Class audio — {year}",
+                "body": (
+                    "Owner-approved public MP3 recordings for the dated Class Scribe notes in this repository. "
+                    "Each asset is speech-compressed for study use; the matching Markdown note remains the index."
+                ),
+                "draft": False,
+                "prerelease": False,
+            },
+        )
+        created.raise_for_status()
+        return created.json()
+
+    def release_assets(self, repository: str, release_id: int) -> list[dict[str, Any]]:
+        response = self.client.get(
+            f"/repos/{GITHUB_OWNER}/{repository}/releases/{release_id}/assets",
+            params={"per_page": "100"},
+        )
+        response.raise_for_status()
+        value = response.json()
+        return value if isinstance(value, list) else []
+
+    @staticmethod
+    def _metadata_digest(asset: dict[str, Any]) -> str | None:
+        digest = str(asset.get("digest") or "")
+        return digest.removeprefix("sha256:") if digest.startswith("sha256:") else None
+
+    @staticmethod
+    def _download_digest(url: str) -> tuple[str, int]:
+        digest = hashlib.sha256()
+        size = 0
+        with httpx.Client(timeout=httpx.Timeout(600, connect=10), follow_redirects=True) as client:
+            with client.stream("GET", url) as response:
+                response.raise_for_status()
+                for chunk in response.iter_bytes():
+                    digest.update(chunk)
+                    size += len(chunk)
+        return digest.hexdigest(), size
+
+    def publish_audio_asset(
+        self,
+        repository: str,
+        lecture_date: date,
+        asset_name: str,
+        audio_path: Path,
+        job_id: str,
+    ) -> PublishedAudio:
+        audio_bytes = audio_path.read_bytes()
+        expected_size = len(audio_bytes)
+        expected_digest = hashlib.sha256(audio_bytes).hexdigest()
+        release = self.get_or_create_audio_release(repository, lecture_date.year)
+        release_id = int(release["id"])
+        matching = [asset for asset in self.release_assets(repository, release_id) if asset.get("name") == asset_name]
+        if len(matching) > 1:
+            raise PublicAudioConflict("More than one public audio asset has the target name")
+        if matching:
+            existing = matching[0]
+            if existing.get("state") != "uploaded":
+                deleted = self.client.delete(
+                    f"/repos/{GITHUB_OWNER}/{repository}/releases/assets/{int(existing['id'])}"
+                )
+                deleted.raise_for_status()
+            else:
+                actual_digest = self._metadata_digest(existing)
+                actual_size = int(existing.get("size") or 0)
+                if actual_digest is None:
+                    actual_digest, downloaded_size = self._download_digest(str(existing["browser_download_url"]))
+                    if actual_size == 0:
+                        actual_size = downloaded_size
+                if actual_digest != expected_digest or actual_size != expected_size:
+                    raise PublicAudioConflict("A different public audio asset already exists for this lecture")
+                return PublishedAudio(
+                    str(existing["browser_download_url"]), expected_digest, expected_size, asset_name
+                )
+
+        upload_url = str(release["upload_url"]).split("{", 1)[0]
+        response = self.client.post(
+            upload_url,
+            params={"name": asset_name, "label": f"Class Scribe recording — {job_id}"},
+            headers={"Content-Type": "audio/mpeg"},
+            content=audio_bytes,
+            timeout=httpx.Timeout(600, connect=10),
+        )
+        response.raise_for_status()
+        asset = response.json()
+        if asset.get("state") != "uploaded":
+            raise AutomationError("GitHub did not finish the public audio upload")
+        actual_digest = self._metadata_digest(asset)
+        actual_size = int(asset.get("size") or 0)
+        if actual_digest is None:
+            actual_digest, downloaded_size = self._download_digest(str(asset["browser_download_url"]))
+            if actual_size == 0:
+                actual_size = downloaded_size
+        if actual_digest != expected_digest or actual_size != expected_size:
+            raise AutomationError("GitHub public audio verification failed")
+        return PublishedAudio(
+            str(asset["browser_download_url"]), expected_digest, expected_size, asset_name
+        )
 
     def note_paths(self, repository: str) -> list[str]:
         response = self.client.get(f"/repos/{GITHUB_OWNER}/{repository}/git/trees/main", params={"recursive": "1"})
@@ -1071,6 +1372,72 @@ def inference_queue_is_busy(db: Client) -> bool:
     return bool(rows)
 
 
+def published_note_is_complete(content: str, job_id: str) -> bool:
+    return (
+        note_class_scribe_id(content) == job_id
+        and 'transcript_formatting: "local-ai-structure-preserving"' in content
+        and re.search(r'^public_audio_url:\s*"https://', content, flags=re.MULTILINE) is not None
+        and re.search(r'^public_audio_sha256:\s*"[0-9a-f]{64}"', content, flags=re.MULTILINE) is not None
+    )
+
+
+def publish_owner_archive(
+    settings: Settings,
+    db: Client,
+    github: GitHubClient,
+    drive_files: list[dict[str, Any]],
+    ingestion: dict[str, Any],
+    job: dict[str, Any],
+    result: dict[str, Any],
+) -> tuple[str, FormattedTranscript, PublishedAudio]:
+    if inference_queue_is_busy(db):
+        raise InferenceQueueBusy("The transcription queue became active")
+
+    def plan(chunk: list[dict[str, Any]], section_number: int, section_count: int) -> dict[str, Any]:
+        if inference_queue_is_busy(db):
+            raise InferenceQueueBusy("The transcription queue became active")
+        return request_transcript_structure(settings, chunk, section_number, section_count)
+
+    formatted = format_transcript_markdown(result, plan)
+    drive_file = resolve_drive_recording(drive_files, ingestion, job)
+    if inference_queue_is_busy(db):
+        raise InferenceQueueBusy("The transcription queue became active")
+    STATE_ROOT.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="class-scribe-public-audio-", dir=STATE_ROOT) as temporary:
+        temp_root = Path(temporary)
+        source = temp_root / f"source{Path(str(drive_file['Path'])).suffix.lower()}"
+        materialize_drive_file(settings, drive_file, source)
+        expected_source_size = int(drive_file.get("Size") or 0)
+        if expected_source_size and source.stat().st_size != expected_source_size:
+            raise AutomationError("The public-audio source size did not match Drive metadata")
+        mp3 = temp_root / public_audio_asset_name(ingestion)
+        prepare_public_mp3(source, mp3)
+        if inference_queue_is_busy(db):
+            raise InferenceQueueBusy("The transcription queue became active")
+        repository = COURSE_REPOSITORIES[str(ingestion["course_code"])]
+        audio = github.publish_audio_asset(
+            repository,
+            date.fromisoformat(str(ingestion["lecture_date"])),
+            mp3.name,
+            mp3,
+            str(ingestion["job_id"]),
+        )
+
+    content = render_note(
+        ingestion,
+        result,
+        formatted_transcript=formatted,
+        published_audio=audio,
+    )
+    sha = github.publish(
+        COURSE_REPOSITORIES[str(ingestion["course_code"])],
+        note_path(ingestion),
+        content,
+        str(ingestion["job_id"]),
+    )
+    return sha, formatted, audio
+
+
 def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> int:
     if not GITHUB_TOKEN_PATH.exists():
         raise AutomationError("The GitHub automation token is missing")
@@ -1079,6 +1446,7 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
     exported = 0
     try:
         queue_busy = inference_queue_is_busy(db)
+        drive_files: list[dict[str, Any]] | None = None
         if queue_busy:
             logging.info("Deferring owner transcript formatting while the inference queue is active")
         ingestions = retry(
@@ -1088,7 +1456,7 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
         for ingestion in ingestions:
             job_rows = retry(
                 lambda job_id=ingestion["job_id"]: db.table("transcription_jobs")
-                .select("id,status,duration_seconds,error_code").eq("id", job_id).execute()
+                .select("id,status,duration_seconds,error_code,original_filename").eq("id", job_id).execute()
             ).data or []
             if not job_rows:
                 continue
@@ -1120,16 +1488,26 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
                 continue
             repository = COURSE_REPOSITORIES[str(ingestion["course_code"])]
             path = note_path(ingestion)
+            existing = github.get_note(repository, path)
+            if existing:
+                existing_text = base64.b64decode(existing.get("content", "")).decode("utf-8")
+                if published_note_is_complete(existing_text, str(ingestion["job_id"])):
+                    db.table("drive_ingestions").update({
+                        "status": "exported", "github_repository": repository,
+                        "github_path": path, "github_sha": str(existing["sha"]), "error_message": None,
+                    }).eq("id", ingestion["id"]).execute()
+                    exported += 1
+                    continue
             try:
-                formatted = format_transcript_markdown(
-                    result,
-                    lambda chunk, section_number, section_count: request_transcript_structure(
-                        settings, chunk, section_number, section_count
-                    ),
+                if drive_files is None:
+                    drive_files = list_drive_files(settings)
+                sha, formatted, audio = publish_owner_archive(
+                    settings, db, github, drive_files, ingestion, job, result
                 )
-                content = render_note(ingestion, result, formatted_transcript=formatted)
-                sha = retry(lambda: github.publish(repository, path, content, str(ingestion["job_id"])), attempts=3)
-            except PublicNoteConflict as error:
+            except InferenceQueueBusy:
+                logging.info("Deferring owner archive publication because the inference queue became active")
+                break
+            except (PublicNoteConflict, PublicAudioConflict) as error:
                 db.table("drive_ingestions").update({"status": "needs_review", "error_message": str(error)}).eq("id", ingestion["id"]).execute()
                 issue_once(settings, state, f"job:{ingestion['job_id']}:conflict", str(error))
                 continue
@@ -1139,8 +1517,9 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
             }).eq("id", ingestion["id"]).execute()
             exported += 1
             logging.info(
-                "Published %s note for %s with %d transcript sections and %d paragraphs",
+                "Published %s note and %d-byte public audio for %s with %d transcript sections and %d paragraphs",
                 repository,
+                audio.size_bytes,
                 ingestion["lecture_date"],
                 formatted.section_count,
                 formatted.paragraph_count,
@@ -1149,6 +1528,159 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
         github.close()
         token = ""
     return exported
+
+
+def update_course_indexes_for_public_audio(github: GitHubClient) -> dict[str, str]:
+    old_rule = (
+        "Do not hand-edit generated lecture files or add audio/video unless the owner explicitly requests it. "
+        "Never add credentials, private student information, or unpublished Class Scribe data."
+    )
+    new_rule = (
+        "The owner has explicitly authorized the automation-managed MP3 assets linked from dated notes as public "
+        "GitHub Release downloads. Do not hand-edit generated lecture files or add other audio/video manually. "
+        "Never add credentials, private student information outside the authorized recordings, or unpublished "
+        "Class Scribe data."
+    )
+    shas: dict[str, str] = {}
+    for repository in COURSE_REPOSITORIES.values():
+        item = github.get_note(repository, "AGENTS.md")
+        if not item:
+            raise AutomationError(f"{repository} is missing its AI repository index")
+        content = base64.b64decode(item.get("content", "")).decode("utf-8")
+        if old_rule in content:
+            content = content.replace(old_rule, new_rule)
+        elif new_rule not in content:
+            raise AutomationError(f"{repository} has an unexpected AI repository index rule")
+        shas[repository] = github.publish_text_file(
+            repository,
+            "AGENTS.md",
+            content,
+            "Authorize automation-managed public class audio",
+        )
+    return shas
+
+
+def backfill_published_archives(
+    settings: Settings,
+    *,
+    course_code: str | None = None,
+    lecture_date_filter: date | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    if not GITHUB_TOKEN_PATH.exists():
+        raise AutomationError("The GitHub automation token is missing")
+    db = connect_supabase(settings)
+    if inference_queue_is_busy(db):
+        raise InferenceQueueBusy("The transcription queue is active")
+    drive_files = list_drive_files(settings)
+    owner_rows = retry(
+        lambda: db.table("drive_ingestions").select("user_id").limit(100).execute()
+    ).data or []
+    owner_ids = {str(row.get("user_id") or "") for row in owner_rows if row.get("user_id")}
+    if len(owner_ids) != 1:
+        raise AutomationError("The owner account could not be identified unambiguously")
+    owner_user_id = next(iter(owner_ids))
+
+    token = GITHUB_TOKEN_PATH.read_text(encoding="utf-8").strip()
+    github = GitHubClient(token)
+    report: dict[str, Any] = {"published": [], "already_complete": [], "failed": [], "deferred": False}
+    try:
+        for current_course, repository in COURSE_REPOSITORIES.items():
+            if course_code and current_course != course_code:
+                continue
+            for path in sorted(github.note_paths(repository)):
+                match = re.fullmatch(
+                    r"notes/(\d{4})/(\d{4}-\d{2}-\d{2})(?:-part-(\d+))?\.md",
+                    path,
+                )
+                if not match:
+                    continue
+                lecture_date = date.fromisoformat(match.group(2))
+                if lecture_date_filter and lecture_date != lecture_date_filter:
+                    continue
+                item = github.get_note(repository, path)
+                if not item:
+                    continue
+                existing_text = base64.b64decode(item.get("content", "")).decode("utf-8")
+                job_id = note_class_scribe_id(existing_text)
+                label = f"{current_course}:{lecture_date.isoformat()}"
+                if not job_id:
+                    report["failed"].append({"lecture": label, "error": "missing Class Scribe ID"})
+                    continue
+                if not force and published_note_is_complete(existing_text, job_id):
+                    report["already_complete"].append(label)
+                    continue
+                try:
+                    job_rows = retry(
+                        lambda current_job_id=job_id: db.table("transcription_jobs")
+                        .select("id,user_id,status,duration_seconds,error_code,original_filename")
+                        .eq("id", current_job_id).execute()
+                    ).data or []
+                    if len(job_rows) != 1:
+                        raise AutomationError("The source transcription job is missing")
+                    job = job_rows[0]
+                    if str(job.get("user_id") or "") != owner_user_id:
+                        raise AutomationError("The source transcription does not belong to the owner")
+                    if job.get("status") != "completed":
+                        raise AutomationError("The source transcription is not completed")
+                    result_rows = retry(
+                        lambda current_job_id=job_id: db.table("transcription_results")
+                        .select("*").eq("job_id", current_job_id).execute()
+                    ).data or []
+                    if len(result_rows) != 1:
+                        raise AutomationError("The completed transcription result is missing")
+                    result = result_rows[0]
+                    issues = quality_issues(job, result)
+                    if issues:
+                        raise AutomationError("; ".join(issues))
+                    ingestion_rows = retry(
+                        lambda current_job_id=job_id: db.table("drive_ingestions")
+                        .select("*").eq("job_id", current_job_id).execute()
+                    ).data or []
+                    if len(ingestion_rows) > 1:
+                        raise AutomationError("More than one Drive ingestion references the lecture")
+                    ingestion = ingestion_rows[0] if ingestion_rows else {
+                        "job_id": job_id,
+                        "drive_file_id": None,
+                        "source_filename": job.get("original_filename"),
+                        "course_code": current_course,
+                        "lecture_date": lecture_date.isoformat(),
+                        "source_part": int(match.group(3)) if match.group(3) else None,
+                    }
+                    if (
+                        str(ingestion.get("course_code")) != current_course
+                        or str(ingestion.get("lecture_date")) != lecture_date.isoformat()
+                    ):
+                        raise AutomationError("The Drive ledger does not match the public note")
+                    sha, formatted, audio = publish_owner_archive(
+                        settings, db, github, drive_files, ingestion, job, result
+                    )
+                    if ingestion_rows:
+                        db.table("drive_ingestions").update({
+                            "github_repository": repository,
+                            "github_path": path,
+                            "github_sha": sha,
+                            "error_message": None,
+                        }).eq("id", ingestion["id"]).execute()
+                    report["published"].append({
+                        "lecture": label,
+                        "sections": formatted.section_count,
+                        "paragraphs": formatted.paragraph_count,
+                        "audio_bytes": audio.size_bytes,
+                        "audio_sha256": audio.sha256,
+                    })
+                    logging.info("Backfilled formatted transcript and public audio for %s", label)
+                except InferenceQueueBusy:
+                    report["deferred"] = True
+                    return report
+                except Exception as error:
+                    report["failed"].append({"lecture": label, "error": str(error)[:240]})
+                    logging.exception("Archive backfill failed for %s", label)
+        report["index_shas"] = update_course_indexes_for_public_audio(github)
+        return report
+    finally:
+        github.close()
+        token = ""
 
 
 def send_automation_email(settings: Settings, subject: str, message: str) -> None:
@@ -1274,8 +1806,23 @@ def run_hourly(settings: Settings, force_import: bool = False) -> dict[str, int]
     if scan_drive:
         imported = import_drive_files(settings, db, state)
     exported = export_completed(settings, db, state)
-    logging.info("Hourly automation pass completed; imported=%d exported=%d", imported, exported)
-    return {"imported": imported, "exported": exported}
+    backfilled = 0
+    if not state.get("public_archive_backfill_complete"):
+        try:
+            report = backfill_published_archives(settings)
+            backfilled = len(report["published"])
+            if not report["failed"] and not report["deferred"]:
+                state["public_archive_backfill_complete"] = datetime.now(timezone.utc).isoformat()
+                save_state(state)
+        except InferenceQueueBusy:
+            logging.info("Deferring historical public archive backfill while the inference queue is active")
+    logging.info(
+        "Hourly automation pass completed; imported=%d exported=%d backfilled=%d",
+        imported,
+        exported,
+        backfilled,
+    )
+    return {"imported": imported, "exported": exported, "backfilled": backfilled}
 
 
 def main() -> int:
@@ -1297,6 +1844,13 @@ def main() -> int:
     )
     audit_parser = subparsers.add_parser("audit", help="Run the weekly GitHub audit")
     audit_parser.add_argument("--dry-run", action="store_true", help="Check repositories without sending email")
+    backfill_parser = subparsers.add_parser(
+        "backfill-published",
+        help="Add formatted transcripts and public MP3 assets to existing owner course notes",
+    )
+    backfill_parser.add_argument("--course", choices=sorted(COURSE_REPOSITORIES))
+    backfill_parser.add_argument("--date", type=date.fromisoformat)
+    backfill_parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     configure_logging()
     try:
@@ -1323,6 +1877,15 @@ def main() -> int:
         if args.command == "audit":
             print(json.dumps(audit_repositories(settings, send_email=not args.dry_run), indent=2))
             return 0
+        if args.command == "backfill-published":
+            report = backfill_published_archives(
+                settings,
+                course_code=args.course,
+                lecture_date_filter=args.date,
+                force=args.force,
+            )
+            print(json.dumps(report, indent=2))
+            return 1 if report["failed"] else 0
         print(json.dumps(run_hourly(settings, force_import=args.force_import)))
         return 0
     except Exception as error:

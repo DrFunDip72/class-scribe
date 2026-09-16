@@ -5,15 +5,20 @@ from pathlib import Path
 
 from class_scribe_automation import (
     AutomationError,
+    InferenceQueueBusy,
+    PublishedAudio,
+    TranscriptFormatterUnavailable,
     Settings,
     canonical_class_date,
     desktop_drive_json,
     expected_week_dates,
     format_transcript_markdown,
     merge_drive_files,
+    note_class_scribe_id,
     parse_recording_name,
     quality_issues,
     render_note,
+    resolve_drive_recording,
     same_drive_version,
     should_scan_drive,
 )
@@ -134,6 +139,30 @@ class PublishingTests(unittest.TestCase):
         self.assertLess(note.index("## Summary"), note.index("## Transcript"))
         self.assertIn("class_scribe_id:", note)
 
+    def test_note_accepts_legacy_quoted_class_scribe_id(self) -> None:
+        self.assertEqual(
+            note_class_scribe_id('---\nclass_scribe_id: "00000000-0000-0000-0000-000000000001"\n---\n'),
+            "00000000-0000-0000-0000-000000000001",
+        )
+
+    def test_note_includes_verified_public_audio(self) -> None:
+        ingestion = {
+            "job_id": "00000000-0000-0000-0000-000000000001",
+            "course_code": "HRM-391",
+            "lecture_date": "2026-09-14",
+        }
+        result = {
+            "summary": "Summary text.", "key_points": ["Point"], "action_items": [],
+            "transcript": "Transcript text.", "segments": [{"start": 0, "text": "Transcript text."}],
+        }
+        audio = PublishedAudio(
+            "https://github.com/example/audio.mp3", "a" * 64, 12345, "2026-09-14.mp3"
+        )
+        note = render_note(ingestion, result, published_audio=audio)
+        self.assertIn('public_audio_sha256: "' + ("a" * 64) + '"', note)
+        self.assertIn("[Listen to or download the public MP3 recording]", note)
+        self.assertLess(note.index("public MP3 recording"), note.index("## Summary"))
+
     def test_ai_formatted_transcript_preserves_every_source_segment(self) -> None:
         result = {
             "transcript": "Alpha one. Beta two. Gamma three. Delta four.",
@@ -184,7 +213,7 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual(formatted.markdown.count("Alpha one."), 1)
         self.assertEqual(formatted.markdown.count("Beta two."), 1)
 
-    def test_formatter_stops_calling_model_after_first_failure(self) -> None:
+    def test_formatter_retries_next_section_after_invalid_structure(self) -> None:
         calls = 0
         result = {
             "transcript": "First window. Second window.",
@@ -200,9 +229,54 @@ class PublishingTests(unittest.TestCase):
             raise RuntimeError("offline")
 
         formatted = format_transcript_markdown(result, unavailable)
-        self.assertEqual(calls, 1)
+        self.assertEqual(calls, 2)
         self.assertEqual(formatted.section_count, 2)
         self.assertEqual(formatted.markdown.count("window."), 2)
+
+    def test_formatter_stops_calling_model_after_unavailability(self) -> None:
+        calls = 0
+        result = {
+            "transcript": "First window. Second window.",
+            "segments": [
+                {"start": 0, "end": 2, "text": "First window."},
+                {"start": 400, "end": 402, "text": "Second window."},
+            ],
+        }
+
+        def unavailable(_segments, _section, _total):
+            nonlocal calls
+            calls += 1
+            raise TranscriptFormatterUnavailable("offline")
+
+        format_transcript_markdown(result, unavailable)
+        self.assertEqual(calls, 1)
+
+    def test_formatter_does_not_swallow_queue_deferral(self) -> None:
+        result = {
+            "transcript": "First window.",
+            "segments": [{"start": 0, "end": 2, "text": "First window."}],
+        }
+
+        def deferred(_segments, _section, _total):
+            raise InferenceQueueBusy("busy")
+
+        with self.assertRaises(InferenceQueueBusy):
+            format_transcript_markdown(result, deferred)
+
+    def test_drive_source_resolution_uses_original_filename_to_break_tie(self) -> None:
+        files = [
+            {"ID": "one", "Path": "phil 201 9-2.m4a", "ModTime": "2026-09-02T20:00:00Z"},
+            {"ID": "two", "Path": "philo 201 9-2.m4a", "ModTime": "2026-09-02T20:00:00Z"},
+        ]
+        chosen = resolve_drive_recording(
+            files,
+            {
+                "drive_file_id": None, "source_filename": None, "course_code": "PHIL-201",
+                "lecture_date": "2026-09-02", "source_part": None,
+            },
+            {"original_filename": "philo_201_9-2.m4a"},
+        )
+        self.assertEqual(chosen["ID"], "two")
 
     def test_weekly_expectations(self) -> None:
         reference = datetime(2026, 9, 17).date()

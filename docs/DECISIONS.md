@@ -281,3 +281,11 @@ Apply ADR-040's structure-only method to the owner Drive-to-GitHub exporter, not
 **Reason:** The owner wants public course documents that are readable without turning a long lecture into one block, but transcript wording is evidence and cannot be delegated to a generative rewrite. Formatting also uses the same CPU and Ollama runtime as the one-at-a-time worker, so it must not compete with class processing.
 
 **Consequence:** Future owner automation notes retain Summary, Key Points, and Action Items first, followed by a topic-organized complete transcript. Supabase remains the unchanged canonical source, other users keep their current private output, and formatting failure cannot lose content or block a valid export. Existing published notes are not automatically backfilled by this change.
+
+## ADR-042 — Publish Owner-Approved Course Audio as Verified Release Assets
+
+For the explicitly authorized owner account and four public course repositories only, rehydrate the matching durable Drive source after transcript quality checks and while the inference queue is idle. Strip source metadata, chapters, and video; create a mono 16 kHz 32 kbps MP3; validate it with FFprobe; upload it to an annual GitHub Release; and require matching byte size plus SHA-256 before adding its public link and metadata to the note. Never store these binaries in ordinary Git history or Git LFS.
+
+**Reason:** The owner wants every public course note to include the recording while keeping the workflow fully automatic and on the $0 stack. Release assets are designed for binary distribution, do not inflate Git history, and expose digest metadata that supports deterministic verification. The original Drive file remains the durable source and can recreate the derivative.
+
+**Consequence:** Classroom audio and voices in these four owner archives are intentionally public. Asset naming is date/part based within `class-audio-<year>`, and same-name bytes may be reused only when size and SHA-256 match; conflicts stop rather than overwrite. A note is not considered fully exported until both asset and Markdown readback verify. All other users retain the private-audio boundary. Historical dated notes are backfilled idempotently, yielding whenever real transcription work enters the queue.

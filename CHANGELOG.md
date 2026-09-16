@@ -2,6 +2,15 @@
 
 ## 2026-09-16
 
+### Owner-only public audio automation and archive backfill
+
+- Added explicit owner-only public MP3 publication for the four course repositories. FFmpeg strips source metadata/video and creates mono 16 kHz 32 kbps speech audio; FFprobe validates the derivative before upload.
+- Added annual GitHub Release creation, raw asset upload, size/SHA-256 verification, same-content reuse, and same-name/different-content conflict protection. Notes now record and visibly link the verified public asset.
+- Added resilient Drive-source resolution using ledger ID, parsed course/date/part, and punctuation-insensitive original filename matching; this disambiguates the duplicate September 2 PHIL filenames.
+- Added an idempotent historical backfill command and durable hourly resumption while the real transcription queue is idle. All four repository AI indexes now record the owner's public-audio authorization.
+- Published and anonymously verified the HRM September 14 control, then completed HRM September 2 and corrected/reformatted HRM September 8. Eight remaining historical notes yielded when a real High seven-part job entered the queue and are scheduled to resume automatically.
+- Refined formatter failures so one malformed structure falls back only for that window; genuine Ollama/network unavailability still trips a per-document circuit breaker.
+
 ### Owner-only formatted GitHub transcript exports
 
 - Added a production formatting pass only to the owner's Drive-to-GitHub workflow; other Class Scribe accounts and stored results are unchanged.

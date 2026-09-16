@@ -15,7 +15,7 @@ Give students a simple account-based website that converts class recordings into
 7. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
 8. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
 9. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
-10. For the configured owner, accept a Monday/Wednesday recording from the `URecorder` Google Drive folder, reuse an existing matching upload or queue it automatically, and publish a validated summary-first note to the matching public course repository.
+10. For the configured owner, accept a Monday/Wednesday recording from the `URecorder` Google Drive folder, reuse an existing matching upload or queue it automatically, and publish a validated summary-first note, structure-preserving formatted transcript, and verified public speech MP3 to the matching public course repository.
 
 The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
 
@@ -29,13 +29,13 @@ The same workflow must remain usable on a phone without pinch-zooming or horizon
 - Prepared output: mono 16 kHz AAC at 48 kbps in an M4A container, processed and uploaded one source/part at a time.
 - Batch behavior: all logical jobs are registered before transfer so batch notifications remain accurate, but only a recording with a complete, validated part manifest can become `queued` and claimable.
 - Current browser recommendation: an up-to-date Chrome or Edge, especially for less common source codecs.
-- Audio is private and deleted after successful processing.
+- Audio is private and deleted after successful processing for normal users. The explicitly authorized owner-only Drive archive retains its original in Drive and publishes a metadata-stripped MP3 to the four public course repositories.
 - Text results remain associated with the user.
 - Processing pauses while the Windows computer is unavailable; queued work remains durable.
 - Transcription tiers: Fast uses `small`/beam 1; Balanced uses `distil-large-v3`/beam 5 with previous-text conditioning disabled; High uses `medium.en`/beam 5. All run locally on CPU INT8, and Fast remains the default for old clients and existing jobs.
 - Displayed estimates are rounded from this computer's PHIL 201 benchmark: about 10, 20, and 55 transcription minutes per recorded hour. Queue wait and summarization are additional and actual time varies.
 - Email and browser notifications are independent opt-in channels. Browser pop-ups require browser plus operating-system permission. Completion is never coupled to successful notification delivery.
-- Drive automation is owner-only, checks Drive hourly on Monday/Wednesday with one-day missed-scan catch-up, preserves the Drive source, and defaults to High transcription. Automated GitHub export is intentionally public only for HRM-391, PSE-390, STRAT-392, and PHIL-201.
+- Drive automation is owner-only, checks Drive hourly on Monday/Wednesday with one-day missed-scan catch-up, preserves the Drive source, and defaults to High transcription. Automated formatted-note and MP3 export is intentionally public only for HRM-391, PSE-390, STRAT-392, and PHIL-201.
 
 ## Required result
 

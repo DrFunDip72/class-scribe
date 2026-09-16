@@ -120,6 +120,8 @@ No inbound port, public tunnel, or router rule is required. Ollama remains at lo
 
 The owner-only Drive-to-GitHub exporter adds a second, queue-idle Ollama pass after result integrity checks. It divides timestamped segments into approximately six-minute windows and accepts only topic headings and paragraph-start indexes. Markdown is reconstructed from the original segments, and an ordered identity check must prove that each timestamp/text pair appears exactly once. Invalid structure falls back deterministically. This formatting does not alter Supabase results and does not apply to other accounts.
 
+For this same owner-only public archive, the exporter resolves the durable Drive source, stages it in an isolated temporary directory, strips metadata/video, and generates a verified mono 16 kHz 32 kbps MP3. The binary is stored as a GitHub Release asset rather than a Git blob or LFS object. Asset name, size, and SHA-256 make retries idempotent; the note is committed only after the asset verifies. Other accounts never enter this code path, and their private Storage cleanup is unchanged.
+
 ## Separate private OpenWhispr API
 
 The computer also hosts a separate OpenAI-compatible Speaches container for private Tailscale clients. This is not part of the Class Scribe request path or FIFO queue. Docker publishes container port 8000 only on `100.79.197.76`, and `/v1/models` must include `Systran/faster-whisper-base.en`.

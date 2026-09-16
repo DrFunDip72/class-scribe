@@ -1,5 +1,20 @@
 # Testing and Verification
 
+## Owner public MP3 automation and historical backfill — PARTIAL PASS, DURABLE COMPLETION PENDING
+
+**Date:** 2026-09-16
+**Scope:** owner-only Drive source matching, FFmpeg/FFprobe MP3 preparation, GitHub Releases/assets, formatted-note publication, repository indexes, and historical backfill.
+
+1. All 20 automation tests and all 16 worker-helper tests passed (36 combined). New coverage includes legacy quoted note UUIDs, public-audio front matter/link rendering, duplicate PHIL source disambiguation, queue deferral propagation, isolated structural fallback, and whole-document circuit breaking only for genuine formatter unavailability.
+2. A real 9.6-second source passed the production FFmpeg/FFprobe path as a 39,104-byte mono 16 kHz MP3.
+3. The fine-grained GitHub token created `class-audio-2026` in HRM, uploaded `2026-09-14.mp3`, and returned a verified 16,766,144-byte asset with SHA-256 `d2cb1b270ae273cbd44adbcdf69a0757c07d9e09d11bef13a6f3b65bec93e218`.
+4. The refreshed HRM September 14 note has 13 AI-labeled sections and 92 paragraphs, retains Summary before Transcript, records public URL/digest/size, and returned matching GitHub content readback. An anonymous range request to the asset returned HTTP 206 and 1,024 requested bytes.
+5. All four repository `AGENTS.md` indexes were updated and verified through the Contents API to document the owner's explicit public-audio authorization while prohibiting unrelated manual media/private data.
+6. HRM September 2 and 8 also completed. September 8 was force-refreshed after a validation response exposed that malformed structure should affect one window rather than disable later AI headings; the corrected result contains 13 sections and 104 paragraphs and reused its matching 17,622,080-byte asset.
+7. A real High seven-part transcription entered the queue before PSE backfill. The archive process returned `deferred: true` before formatting or publishing PSE, proving real class work retains priority. The hourly owner task now resumes incomplete dated notes only when the queue is empty.
+
+**Result:** PASS for future automated publication, real public release upload/download, cryptographic verification, formatted-note readback, three HRM historical notes, and safe queue preemption. Eight historical PSE/STRAT/PHIL notes remain pending the active transcription and are durable/idempotent rather than lost.
+
 ## Owner-only production transcript formatter — PASS
 
 **Date:** 2026-09-16
@@ -10,7 +25,7 @@
 3. A live worker-authenticated Supabase query returned the current queue as idle through the same status check used to prevent CPU contention. No rows were changed.
 4. A live Ollama request using the production JSON schema returned a non-empty topic heading and valid paragraph-start indexes. The test supplied synthetic text and did not expose a private lecture.
 5. The production renderer completed a full-length no-write dry run against the September 14 HRM result: 1,102 segments, 7,298 words, 13 windows, 51 size-bounded paragraphs, and 56,174 Markdown characters. Ordered source identity SHA-256 was `bce17915574f9b52d0ccaa4da0ac14379adb919aa6456d4a8b9f283a52cef559`. No GitHub or database write occurred.
-6. The combined worker and owner-automation suite passed all 30 tests. `git diff --check` passed, and `.env.worker.local` plus `.worker-secrets/` remained ignored and untracked.
+6. The combined worker and owner-automation suite now passes all 36 tests. `git diff --check` passed, and `.env.worker.local` plus `.worker-secrets/` remained ignored and untracked.
 
 **Result:** PASS for compilation, full-result reconstruction, deterministic preservation/fallback, live queue access, and the live model schema. Future owner exports will use the formatter only after the inference queue is idle.
 

@@ -1,6 +1,6 @@
 # Costs and Limits
 
-**Checked:** 2026-09-02. Platform limits can change; verify official pricing before expanding use.
+**Checked:** 2026-09-16. Platform limits can change; verify official pricing before expanding use.
 
 ## Current monthly cost
 
@@ -15,11 +15,11 @@
 | Custom domain | Not used | $0 |
 | Email delivery | Existing FluxPrompt Email Agent | $0 added by Class Scribe; account allowance applies |
 | Web Push | Browser/vendor push services + local signing | $0 |
-| Drive-to-GitHub automation | Google Drive for desktop, FFmpeg, local worker, GitHub Contents API | $0 incremental |
+| Drive-to-GitHub automation | Google Drive for desktop, FFmpeg, local worker, GitHub Contents/Releases APIs | $0 incremental |
 
 No paid AI API is used.
 
-The Google Drive importer and GitHub course-note exporter add no paid service at the current scale. They use the owner's existing Drive storage, Google Drive for desktop, GitHub Free repositories, local CPU/electricity, and one lightweight hourly folder scan on Monday and Wednesday. Repository notes are text files, so their storage and API usage are negligible relative to GitHub's practical limits. The active path no longer depends on rclone's retiring shared OAuth client.
+The Google Drive importer and GitHub course-note/audio exporter add no paid service at the current scale. They use the owner's existing Drive storage, Google Drive for desktop, GitHub Free public repositories and Release assets, local CPU/electricity, and one lightweight hourly folder scan on Monday and Wednesday. GitHub documents each Release asset below 2 GiB, up to 1,000 assets per release, with no total release-size or bandwidth limit; Class Scribe's 32 kbps speech derivative is roughly 14.4 MB per recorded hour before small container overhead. The active path no longer depends on rclone's retiring shared OAuth client.
 
 Web Push adds a few small Postgres rows per browser and delivery but no paid API or Vercel Function. Its practical limits are browser/OS policy and the existing Supabase database quota, not a per-notification bill. Delivery is best-effort: battery-saving, Focus/Do Not Disturb, revoked permission, browser background restrictions, or a vendor outage can delay or suppress the visible toast.
 
@@ -60,6 +60,8 @@ This app does not upload audio to Vercel or run AI in Functions, so its heaviest
 - 500 MB GitHub Packages storage.
 
 This project does not require GitHub Actions to operate.
+
+The four owner course repositories use one annual public Release per repository. Audio does not enter Git history or Git LFS. Anyone can download these owner-approved public recordings, so bandwidth and privacy—not a configured Class Scribe fee—are the operational considerations.
 
 ### Local worker
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-17
+
+### Drive reconnect-folder recovery
+
+- Diagnosed the weekly three-note gap: PSE, STRAT, and PHIL September 16 recordings were present under Drive Desktop's newly created `URecorder (1)` folder while the importer watched only `URecorder`.
+- Extended desktop discovery to merge numbered `URecorder (n)` reconnect folders into the logical inbox and changed Tuesday/Thursday into unconditional late-sync discovery days.
+- Added same-course/date duplicate suppression unless filenames explicitly declare `part`/`pt`, preventing an extra PSE copy from competing for the same note path.
+- Queued all three missing September 16 High jobs; HRM September 16 was already completed and published.
+
 ## 2026-09-16
 
 ### Owner-only public audio automation and archive backfill

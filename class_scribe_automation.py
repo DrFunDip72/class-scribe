@@ -366,10 +366,29 @@ def desktop_drive_json(settings: Settings, now: datetime | None = None) -> list[
         raise AutomationError("Google Drive for desktop is not running or URecorder is unavailable") from error
     if not available:
         raise AutomationError("Google Drive for desktop is not running or URecorder is unavailable")
+    # Drive for desktop can create a numbered sibling when the local folder is
+    # reconnected (for example, ``URecorder (1)``). Treat those folders as one
+    # logical inbox so a reconnect cannot silently strand recordings.
+    sibling_pattern = re.compile(rf"^{re.escape(folder.name)}(?: \([1-9][0-9]*\))?$")
+    folders = [folder]
+    try:
+        folders.extend(
+            candidate
+            for candidate in folder.parent.iterdir()
+            if candidate.is_dir()
+            and candidate != folder
+            and sibling_pattern.fullmatch(candidate.name)
+        )
+    except OSError:
+        pass
+
     minimum_age = (now or datetime.now(timezone.utc)) - timedelta(minutes=10)
     rows: list[dict[str, Any]] = []
     try:
-        paths = sorted((path for path in folder.rglob("*") if path.is_file()), key=lambda path: str(path).casefold())
+        paths = sorted(
+            (path for source_folder in folders for path in source_folder.rglob("*") if path.is_file()),
+            key=lambda path: str(path).casefold(),
+        )
     except OSError as error:
         raise AutomationError("Google Drive for desktop could not list URecorder") from error
     for path in paths:
@@ -380,7 +399,8 @@ def desktop_drive_json(settings: Settings, now: datetime | None = None) -> list[
         modified = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
         if modified > minimum_age:
             continue
-        relative = path.relative_to(folder).as_posix()
+        source_folder = next(candidate for candidate in folders if path.is_relative_to(candidate))
+        relative = path.relative_to(source_folder).as_posix()
         stable_id = hashlib.sha256(relative.casefold().encode("utf-8")).hexdigest()
         rows.append({
             "Path": relative,
@@ -752,6 +772,17 @@ def import_drive_files(
             and row.get("source_part") == parsed.source_part
             for row in logical_existing
         ):
+            continue
+        if not force_new and any(row.get("source_part") == parsed.source_part for row in logical_existing):
+            # Two unlabeled recordings for one course/date cannot safely become
+            # two public notes at the same path. The first stable candidate wins;
+            # true multipart recordings must use an explicit part/pt suffix.
+            state.setdefault("notified_issues", {}).pop(issue_key, None)
+            save_state(state)
+            logging.info(
+                "Skipped duplicate Drive candidate %s for %s on %s",
+                drive_id[-8:], parsed.course_code, parsed.lecture_date,
+            )
             continue
 
         try:
@@ -1783,18 +1814,10 @@ def audit_repositories(
 
 
 def should_scan_drive(now: datetime, state: dict[str, Any]) -> bool:
-    if now.weekday() in {0, 2}:
-        return True
-    if now.weekday() not in {1, 3}:
-        return False
-    previous_class_day = now.date() - timedelta(days=1)
-    raw = state.get("last_drive_scan")
-    if not raw:
-        return True
-    try:
-        return parse_timestamp(str(raw)).astimezone(MOUNTAIN).date() < previous_class_day
-    except ValueError:
-        return True
+    # Scan class days and the following day. The second-day pass is deliberately
+    # unconditional: Drive uploads can finish after the final class-day scan.
+    # Importing is idempotent, so repeated discovery is safe.
+    return now.weekday() in {0, 1, 2, 3}
 
 
 def run_hourly(settings: Settings, force_import: bool = False) -> dict[str, int]:

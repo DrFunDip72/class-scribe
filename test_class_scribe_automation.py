@@ -104,6 +104,35 @@ class PublishingTests(unittest.TestCase):
             self.assertEqual(first[0]["Path"], recording.name)
             self.assertTrue(first[0]["ID"].startswith("desktop:"))
 
+    def test_desktop_drive_listing_includes_numbered_reconnect_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            drive_root = Path(temporary)
+            folder = drive_root / "URecorder"
+            reconnect = drive_root / "URecorder (1)"
+            folder.mkdir()
+            reconnect.mkdir()
+            (folder / "HRM 9-16.m4a").write_bytes(b"first")
+            (reconnect / "PSE 9-16.m4a").write_bytes(b"second")
+            settings = Settings(
+                supabase_url="https://example.supabase.co",
+                supabase_publishable_key="test",
+                worker_email="worker@example.com",
+                worker_password="test",
+                owner_email="owner@example.com",
+                transcription_tier="high",
+                drive_source="desktop",
+                drive_desktop_folder=folder,
+                rclone_path=None,
+                fluxprompt_api_key=None,
+                fluxprompt_api_url="https://example.com",
+                fluxprompt_flow_id="test",
+                site_url="https://example.com",
+            )
+            rows = desktop_drive_json(settings, now=datetime.now(timezone.utc) + timedelta(days=1))
+            self.assertEqual(sorted(row["Path"] for row in rows), ["HRM 9-16.m4a", "PSE 9-16.m4a"])
+            reconnect_row = next(row for row in rows if row["Path"] == "PSE 9-16.m4a")
+            self.assertIn("URecorder (1)", reconnect_row["LocalPath"])
+
     def test_drive_version_comparison_handles_postgres_timestamp_format(self) -> None:
         row = {"drive_file_id": "abc", "drive_modified_time": "2026-09-14T16:45:22.732+00:00"}
         drive_file = {"ID": "abc", "ModTime": "2026-09-14T16:45:22.732Z"}
@@ -283,10 +312,12 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual(len(expected_week_dates(reference, "HRM-391")), 2)
         self.assertEqual(len(expected_week_dates(reference, "STRAT-392")), 1)
 
-    def test_off_day_only_catches_up_after_missed_scan(self) -> None:
+    def test_following_day_always_scans_for_late_drive_sync(self) -> None:
         tuesday = datetime(2026, 9, 15, 8, tzinfo=timezone.utc)
         self.assertTrue(should_scan_drive(tuesday, {"last_drive_scan": "2026-09-13T12:00:00+00:00"}))
-        self.assertFalse(should_scan_drive(tuesday, {"last_drive_scan": "2026-09-14T12:00:00+00:00"}))
+        self.assertTrue(should_scan_drive(tuesday, {"last_drive_scan": "2026-09-14T12:00:00+00:00"}))
+        friday = datetime(2026, 9, 18, 8, tzinfo=timezone.utc)
+        self.assertFalse(should_scan_drive(friday, {}))
 
 
 if __name__ == "__main__":

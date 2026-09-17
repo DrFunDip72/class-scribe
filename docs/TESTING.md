@@ -1,5 +1,19 @@
 # Testing and Verification
 
+## September 16 missing-note recovery — PASS, PROCESSING IN PROGRESS
+
+**Date:** 2026-09-17
+**Scope:** Drive Desktop discovery, late-sync scheduling, duplicate suppression, and live recovery.
+
+1. Confirmed the weekly audit result against the public repositories: HRM September 16 existed; PSE, STRAT, and PHIL September 16 did not.
+2. Confirmed those three jobs were absent from `drive_ingestions` and `transcription_jobs`, ruling out a failed worker or GitHub publication stage.
+3. Found all three sources under `G:\My Drive\URecorder (1)`, while the configured `G:\My Drive\URecorder` contained only HRM September 16. FFprobe read the normal PSE, STRAT, and PHIL candidates successfully.
+4. All 21 owner-automation unit tests passed after adding numbered-folder and next-day scan coverage.
+5. A live forced scheduled pass queued PHIL, PSE, and STRAT September 16 as High jobs. A second pass imported zero duplicates and logged the extra unlabeled PSE candidate as skipped.
+6. Live database readback showed HRM exported, PHIL transcribing on attempt 1, and PSE/STRAT queued with zero attempts at the verification boundary.
+
+**Result:** PASS for root-cause isolation, repaired discovery, idempotent re-scan, and queue admission. Final transcription, formatting, public MP3, and GitHub publication remain asynchronous and will be handled by the existing worker/export tasks.
+
 ## Owner public MP3 automation and historical backfill — PARTIAL PASS, DURABLE COMPLETION PENDING
 
 **Date:** 2026-09-16

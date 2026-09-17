@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-16
+**Last updated:** 2026-09-17
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -54,6 +54,7 @@ No credentials are stored in this document.
 - Completed a local-only formatted-transcript email experiment on the September 14 HRM lecture: `qwen3:4b` supplied topic headings and paragraph boundaries for thirteen windows, deterministic reconstruction preserved all original segments exactly, and the resulting HTML was submitted through FluxPrompt. This is not yet a production pipeline feature.
 - Promoted structure-preserving transcript formatting into the owner-only Drive-to-GitHub exporter. After the transcription queue is idle, local `qwen3:4b` proposes only topic headings and paragraph-start indexes for approximately six-minute windows; deterministic rendering retains every original timestamped segment in order, enforces readable paragraph sizes, and falls back safely if any model response is invalid. Other users' private Class Scribe results are unchanged.
 - Owner-only public MP3 export is enabled by explicit owner authorization. Future valid Drive ingestions format the transcript, create a metadata-stripped mono 16 kHz 32 kbps MP3, upload and SHA-256-verify it as an annual GitHub Release asset, link it from the note, and only then mark the ingestion exported. Other accounts remain private.
+- Drive Desktop discovery now treats numbered reconnect folders such as `URecorder (1)` as part of the same logical inbox and scans on both class days and their following day. Same-course/date candidates without explicit `part`/`pt` labels are not queued twice.
 
 ## Last verified state
 
@@ -74,6 +75,7 @@ No credentials are stored in this document.
 - Formatted transcript test: the September 14 HRM result produced 13 AI-labeled sections and 81 readable paragraphs from 1,102 segments/7,298 words. The ordered timestamp-and-text identity SHA-256 matched after reconstruction. FluxPrompt accepted the email submission for `jmaximum72@gmail.com`; the provider response did not explicitly confirm mailbox delivery.
 - Production formatter/audio boundary: all 20 owner-automation unit tests pass, including exact segment retention, isolated invalid-structure fallback, whole-document unavailability circuit breaking, quoted legacy UUID parsing, duplicate Drive-name resolution, queue deferral, and public-audio metadata rendering. A real FFmpeg/FFprobe smoke test produced a verified mono 16 kHz MP3.
 - Historical public-archive backfill: all three HRM dated notes (September 2, 8, and 14) now have formatted transcripts and verified public MP3 Release assets. September 14 anonymously returned HTTP 206 for a byte-range download; its 16,766,144-byte asset has SHA-256 `d2cb1b270ae273cbd44adbcdf69a0757c07d9e09d11bef13a6f3b65bec93e218`. The remaining eight PSE/STRAT/PHIL notes deferred when a real High seven-part transcription entered the queue. The hourly owner task now resumes them only when the queue becomes idle and records a durable local completion flag afterward.
+- September 17 missing-note recovery: the weekly audit correctly reported missing PSE/STRAT/PHIL September 16 notes. Their source recordings were found in a newly created `G:\My Drive\URecorder (1)` folder, outside the configured `URecorder` path. The repaired importer discovered and queued PHIL, PSE, and STRAT as High jobs; HRM September 16 was already completed and exported. At handoff PHIL was transcribing, PSE and STRAT were queued FIFO, and no missing source remained.
 - Production health RPC: applied; returned `true`, allowed anonymous function execution, and retained anonymous denial on direct `worker_heartbeats` table reads. Local production build served HTTP 200 with exactly `{"status":"online"}` and `no-store`.
 - Production login: pass.
 - Production dashboard: pass; reports worker online.

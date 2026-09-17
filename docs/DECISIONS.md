@@ -289,3 +289,11 @@ For the explicitly authorized owner account and four public course repositories 
 **Reason:** The owner wants every public course note to include the recording while keeping the workflow fully automatic and on the $0 stack. Release assets are designed for binary distribution, do not inflate Git history, and expose digest metadata that supports deterministic verification. The original Drive file remains the durable source and can recreate the derivative.
 
 **Consequence:** Classroom audio and voices in these four owner archives are intentionally public. Asset naming is date/part based within `class-audio-<year>`, and same-name bytes may be reused only when size and SHA-256 match; conflicts stop rather than overwrite. A note is not considered fully exported until both asset and Markdown readback verify. All other users retain the private-audio boundary. Historical dated notes are backfilled idempotently, yielding whenever real transcription work enters the queue.
+
+## ADR-043 — Treat Drive Reconnect Folders and Late Sync as One Durable Inbox
+
+Merge the configured Drive Desktop folder with numbered siblings matching `URecorder (n)`, and scan on Monday through Thursday. Admit only one unlabeled source for a course/date/part identity; require explicit `part` or `pt` labels when a lecture genuinely has multiple recordings.
+
+**Reason:** On September 16, Drive Desktop wrote PSE, STRAT, and PHIL into `URecorder (1)` while the importer continued watching `URecorder`. Every scheduled pass succeeded, but could not see those recordings, and Thursday's audit correctly reported three missing notes. A prior-success-only catch-up rule also prevented Thursday discovery after a successful Wednesday scan even if files arrived later.
+
+**Consequence:** A Drive reconnect or late sync no longer silently strands a class recording. Repeated next-day scans remain safe because the ingestion ledger is idempotent. Ambiguous same-date duplicates are not published over one another; the operator must label actual multipart sources explicitly or use the exact-path override when deliberate replacement is required.

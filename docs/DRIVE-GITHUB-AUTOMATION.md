@@ -9,7 +9,7 @@ The owner records a Monday/Wednesday class, saves the audio in the Google Drive 
 ```text
 URecorder in jmaximum72@gmail.com
   -> Google Drive for desktop streamed G: view + read-only cloud fallback
-  -> owner-session logon/hourly Monday/Wednesday read
+  -> owner-session logon/hourly Monday-Thursday discovery window
   -> native FFmpeg mono 16 kHz / 48 kbps M4A / ten-minute parts
   -> private Supabase Storage + drive_ingestions ledger
   -> existing FIFO Windows worker, High tier by default
@@ -21,7 +21,7 @@ URecorder in jmaximum72@gmail.com
   -> DrFunDip72/<course>/notes/<year>/<YYYY-MM-DD[-part-N]>.md
 ```
 
-The hourly task still runs on other days so completed work can reach GitHub, but it does not contact Drive. On Tuesday or Thursday it performs one catch-up Drive scan only when the preceding class day had no successful scan. The original Drive recording is never moved or deleted.
+The hourly task still runs on Friday through Sunday so completed work can reach GitHub, but it does not contact Drive on those days. It scans on Monday/Wednesday class days and unconditionally on Tuesday/Thursday so recordings that finish uploading or syncing after the last class-day pass are still discovered. The original Drive recording is never moved or deleted.
 
 ## Filename recognition
 
@@ -45,13 +45,15 @@ The parser refuses an ambiguous/missing class or date. It accepts the configured
 
 - The active desktop source derives a stable identity from the normalized path under `URecorder`; version identity adds the modification timestamp. Prior rclone rows retain their Google file IDs.
 - Repeated hourly scans are idempotent.
+- Google Drive reconnects may create numbered siblings such as `URecorder (1)`. Desktop discovery merges `URecorder` and every numbered sibling into one logical inbox, using the relative recording path as its identity.
 - Before hydrating, the importer compares the parsed class/date/part against eligible existing owner jobs and checks filename/size compatibility against prior rclone ingestions. A single matching browser-created job is linked instead of retranscribed; multiple matches require review.
+- Only one unlabeled source is admitted for a course/date. A real multi-recording lecture must use explicit `part 1`, `part 2` (or `pt1`, `pt2`) labels so it receives distinct note/audio paths; an unlabeled duplicate is skipped safely.
 - The initial cutover is midnight Mountain Time on 2026-09-14. Both source modification time and parsed lecture date must meet it during scheduled discovery, so touched cloud metadata cannot make an older lecture eligible. Explicit exact-path backfills bypass the cutover.
 - A file changed after import is a new Drive version, but GitHub refuses to overwrite a different Class Scribe UUID at an occupied path.
 
 ## Preparation and queue handoff
 
-`class_scribe_automation.py` lists the first-party Drive desktop view at `G:\My Drive\URecorder` and the existing read-only cloud view. It merges them by case-insensitive relative path, uses the newest metadata version, and prefers a local hydrated source on an exact tie. If either view is temporarily unavailable, the other continues discovery; both must fail before the scan fails. It ignores files changed within the last ten minutes, copies/downloads each eligible source into an isolated temporary directory, and confirms desktop size and modification time do not change during hydration. Native FFmpeg then discards video, creates mono 16 kHz 48 kbps AAC/M4A, and segments at ten minutes. Ten-minute output is normally well below 6 MB, allowing individual retry through standard private Storage upload while preserving the existing 50 MB/object and 32-part database limits.
+`class_scribe_automation.py` lists the first-party Drive desktop view at `G:\My Drive\URecorder`, any numbered reconnect siblings such as `URecorder (1)`, and the existing read-only cloud view. It merges them by case-insensitive relative path, uses the newest metadata version, and prefers a local hydrated source on an exact tie. If either desktop/cloud view is temporarily unavailable, the other continues discovery; both must fail before the scan fails. It ignores files changed within the last ten minutes, copies/downloads each eligible source into an isolated temporary directory, and confirms desktop size and modification time do not change during hydration. Native FFmpeg then discards video, creates mono 16 kHz 48 kbps AAC/M4A, and segments at ten minutes. Ten-minute output is normally well below 6 MB, allowing individual retry through standard private Storage upload while preserving the existing 50 MB/object and 32-part database limits.
 
 The importer signs in as the existing dedicated worker Auth user. Worker-only RPCs create/link the owner job and validate the complete M4A manifest. Normal users cannot call those paths successfully because every RPC checks protected `app_metadata.role=worker`; anonymous access is revoked. Audio is deleted by the existing worker after result commit. The original remains in Drive.
 

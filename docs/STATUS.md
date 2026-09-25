@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-24
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -55,6 +55,7 @@ No credentials are stored in this document.
 - Promoted structure-preserving transcript formatting into the owner-only Drive-to-GitHub exporter. After the transcription queue is idle, local `qwen3:4b` proposes only topic headings and paragraph-start indexes for approximately six-minute windows; deterministic rendering retains every original timestamped segment in order, enforces readable paragraph sizes, and falls back safely if any model response is invalid. Other users' private Class Scribe results are unchanged.
 - Owner-only public MP3 export is enabled by explicit owner authorization. Future valid Drive ingestions format the transcript, create a metadata-stripped mono 16 kHz 32 kbps MP3, upload and SHA-256-verify it as an annual GitHub Release asset, link it from the note, and only then mark the ingestion exported. Other accounts remain private.
 - Drive Desktop discovery now treats numbered reconnect folders such as `URecorder (1)` as part of the same logical inbox and scans on both class days and their following day. Same-course/date candidates without explicit `part`/`pt` labels are not queued twice.
+- Added a clean-installation handoff for a new owner that separates the private core transcription service from owner-specific optional automations and includes a ready-to-paste Claude implementation prompt.
 
 ## Last verified state
 

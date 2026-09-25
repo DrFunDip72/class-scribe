@@ -14,6 +14,8 @@ Maintain a free-tier application where authenticated users upload class recordin
 4. `docs/DECISIONS.md`
 5. The task-specific document under `docs/`
 
+For a clean installation owned by someone else, `docs/FRIEND-SETUP-GUIDE.md` is the task-specific authority. Do not reuse this installation's live project identifiers, accounts, credentials, course mappings, or optional automations.
+
 Repository documentation is authoritative over conversation history.
 
 ## Fixed constraints

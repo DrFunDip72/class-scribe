@@ -297,3 +297,11 @@ Merge the configured Drive Desktop folder with numbered siblings matching `UReco
 **Reason:** On September 16, Drive Desktop wrote PSE, STRAT, and PHIL into `URecorder (1)` while the importer continued watching `URecorder`. Every scheduled pass succeeded, but could not see those recordings, and Thursday's audit correctly reported three missing notes. A prior-success-only catch-up rule also prevented Thursday discovery after a successful Wednesday scan even if files arrived later.
 
 **Consequence:** A Drive reconnect or late sync no longer silently strands a class recording. Repeated next-day scans remain safe because the ingestion ledger is idempotent. Ambiguous same-date duplicates are not published over one another; the operator must label actual multipart sources explicitly or use the exact-path override when deliberate replacement is required.
+
+## ADR-044 — Provision the Private Core Before Owner-Specific Automations
+
+For a new independent deployment, provision and accept the GitHub fork, Supabase project, Vercel web app, dedicated worker identity, local Whisper/Ollama runtime, and Windows recovery task before enabling notifications or any external automation. Treat Drive ingestion, public course archives/audio, weekly audits, FluxPrompt email, outage monitoring, and OpenWhispr as separately authorized later phases.
+
+**Reason:** The current installation contains several useful but owner-specific layers with hard-coded course, schedule, repository, account, provider, and privacy decisions. Copying those settings into another person's initial deployment could connect the wrong cloud resources, publish private classroom material, or obscure whether the core transcription path works.
+
+**Consequence:** A new owner receives a smaller acceptance boundary and independent identities at every provider. Optional code and migrations may remain present but inert without credentials. Claude can automate the technical setup, while provider sign-in, secret entry, recording consent, and Windows UAC remain explicit human checkpoints.

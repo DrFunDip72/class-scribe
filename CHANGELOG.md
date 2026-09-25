@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-24
+
+### Independent installation handoff
+
+- Added a shareable clean-installation guide covering the core stack, account boundaries, provisioning order, environment placement, Windows worker setup, verification, and ongoing operation.
+- Added a ready-to-paste Claude prompt that builds only the independent private core first and explicitly excludes owner-specific Drive/GitHub/email/OpenWhispr automations.
+- Documented human-only account/UAC/secret checkpoints and warned against running the original worker-bootstrap defaults against a new owner's environment.
+
 ## 2026-09-17
 
 ### Drive reconnect-folder recovery

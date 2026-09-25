@@ -1,5 +1,18 @@
 # Testing and Verification
 
+## Independent installation handoff review — PASS
+
+**Date:** 2026-09-24
+**Scope:** documentation-only review of a clean GitHub/Supabase/Vercel/Windows installation path.
+
+1. Reconciled the guide against the tracked migrations, web environment template, pinned npm lockfile, pinned Python requirements, worker model mapping, startup installer, and security documentation.
+2. Verified that the initial acceptance boundary includes the complete private browser-to-worker result path and excludes owner-specific email, Drive, public course archive, audit, monitoring, and OpenWhispr setup.
+3. Checked current official Next.js, Supabase, Vercel, Ollama, and faster-whisper installation/deployment guidance. The guide records Node.js 20.9+, Python 3.12 for this worker, committed migration deployment, `web/` as the Vercel root, and CPU INT8 local inference.
+4. Reviewed every documented secret location and included explicit checks that ignored environment and key paths remain untracked.
+5. Included a Claude prompt with preflight project-identity checks, human-only checkpoints, non-destructive migration rules, least-privileged worker Auth, and evidence-based completion criteria.
+
+**Result:** PASS. No application, database, deployment, scheduled task, or live credential was changed.
+
 ## September 16 missing-note recovery — PASS, PROCESSING IN PROGRESS
 
 **Date:** 2026-09-17

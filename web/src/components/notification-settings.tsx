@@ -13,7 +13,7 @@ const TEST_NOTIFICATION = {
   icon: "/class-scribe-icon.svg",
   badge: "/class-scribe-icon.svg",
   tag: "class-scribe-test",
-  data: { url: "/dashboard" },
+  data: { url: "/recordings" },
 };
 
 export function NotificationSettings({ userId, accountEmail }: { userId: string; accountEmail: string }) {

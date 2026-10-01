@@ -1,0 +1,75 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Circle, Clock3, FileAudio } from "lucide-react";
+import { ResultActions } from "@/components/result-actions";
+import { createClient } from "@/lib/supabase/server";
+import { getTranscriptionTier } from "@/lib/transcription-tiers";
+
+export const metadata: Metadata = { title: "Lecture notes" };
+
+export default async function JobPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  // The authenticated layout has already redirected signed-out visitors.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) notFound();
+
+  const [{ data: job }, { data: result }, { data: recordingState }] = await Promise.all([
+    supabase.from("transcription_jobs").select("*").eq("id", id).maybeSingle(),
+    supabase.from("transcription_results").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("recording_user_states").select("*").eq("job_id", id).maybeSingle(),
+  ]);
+  if (!job) notFound();
+  const tier = getTranscriptionTier(job.transcription_tier);
+
+  if (!result) {
+    const currentStep = job.status === "uploading"
+      ? "Waiting for the upload to finish"
+      : job.status === "queued"
+        ? "Waiting to start"
+        : job.status === "transcribing"
+          ? "Creating your transcript"
+          : job.status === "summarizing"
+            ? "Creating your study notes"
+            : "This recording needs attention";
+    return <div className="result-shell">
+      <Link className="back-link" href="/recordings"><ArrowLeft size={15} /> Your notes</Link>
+      <div className="processing-card">
+        <Clock3 />
+        <h1>{job.original_filename}</h1>
+        <p>{currentStep} · {tier.label} quality</p>
+        <div className="progress-track"><span style={{ width: `${job.progress}%` }} /></div>
+        <Link className="button button-primary" href={`/jobs/${id}`}>Refresh status</Link>
+      </div>
+    </div>;
+  }
+
+  const summaryNotes = `# ${job.original_filename}\n\n## Summary\n\n${result.summary}\n\n## Key points\n\n${result.key_points.map((point) => `- ${point}`).join("\n")}\n\n## Action items\n\n${result.action_items.length ? result.action_items.map((item) => `- [ ] ${item}`).join("\n") : "- None identified"}\n`;
+  const transcriptNotes = `# ${job.original_filename}\n\n## Transcript\n\n${result.transcript}\n`;
+  const notes = `${summaryNotes}\n## Transcript\n\n${result.transcript}\n`;
+
+  return <article className="result-shell">
+    <div className="result-topbar">
+      <Link className="back-link" href="/recordings"><ArrowLeft size={15} /> Your notes</Link>
+      <ResultActions filename={job.original_filename} jobId={job.id} userId={user.id} initialState={recordingState} summaryContent={summaryNotes} transcriptContent={transcriptNotes} allContent={notes} />
+    </div>
+    <header className="result-header">
+      <span className="result-file-icon"><FileAudio /></span>
+      <div>
+        <span className="section-kicker">Notes ready</span>
+        <h1>{job.original_filename}</h1>
+        <p><CheckCircle2 size={15} /> Ready {job.completed_at ? new Date(job.completed_at).toLocaleString() : "now"} · {tier.label} quality</p>
+      </div>
+    </header>
+    <section className="notes-section summary-section"><span className="section-number">01</span><div><h2>Summary</h2><p className="summary-copy">{result.summary}</p></div></section>
+    <div className="notes-columns">
+      <section className="notes-section"><span className="section-number">02</span><div><h2>Key points</h2><ul className="point-list">{result.key_points.map((point, index) => <li key={index}><CheckCircle2 size={17} />{point}</li>)}</ul></div></section>
+      <section className="notes-section"><span className="section-number">03</span><div><h2>Action items</h2>{result.action_items.length ? <ul className="point-list action-list">{result.action_items.map((item, index) => <li key={index}><Circle size={16} />{item}</li>)}</ul> : <p className="muted-copy">No action items were identified.</p>}</div></section>
+    </div>
+    <section className="transcript-section">
+      <div className="transcript-heading"><div><span className="section-number">04</span><h2>Full transcript</h2></div><small>{result.transcript.split(/\s+/).length.toLocaleString()} words</small></div>
+      <div className="transcript-copy">{result.transcript.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+    </section>
+  </article>;
+}

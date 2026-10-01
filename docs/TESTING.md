@@ -620,3 +620,16 @@ The stored segment records contain timestamps and text but omit confidence field
 5. The recorder now surfaces the underlying failure text. Previously the real message was written only to the upload card below the fold.
 
 **Not covered:** the corrected upload has not yet been run on the phone.
+
+## Multi-page app shell — PARTIAL PASS, INTERFACE NOT EXERCISED
+
+**Date:** 2026-09-30
+
+1. `npm run lint` reported no problems. One `react-hooks/purity` error was fixed first: worker freshness was computed with `Date.now()` during render, and now derives from a timestamp captured when the poll lands.
+2. `npm run build` compiled with TypeScript checking and emitted all 17 routes, including the new `/record`, `/recordings`, `/settings`, `/account`, and `/upload`.
+3. Unauthenticated requests to `/record`, `/recordings`, `/settings`, `/account`, and `/upload` each returned HTTP 307 to `/login`, confirming the single layout-level authentication check covers every signed-in screen.
+4. `/dashboard` returned HTTP 307 to `/record`, so the installed app's existing start URL and older bookmarks still work.
+5. Compared the rewritten Done/Archive handlers against the previous dashboard implementation and corrected two regressions found that way: marking a recording done must also clear its archive, and archiving must imply done. Both now match the shipped behaviour.
+6. The migration adding `user_preferences` produced no new Supabase security advisories; RLS is enabled with per-account select, insert, and update policies.
+
+**Not covered:** no browser automation host was available this session, so no screen was rendered or interacted with. The tab bar, the three recording screens, the course/date grouping, Settings, Account, and the persistent recording and upload bars are unverified visually and behaviourally. Critically, recording survival across a tab change has not been observed — it is the primary reason for ADR-048 and must be tested on the phone.

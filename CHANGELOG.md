@@ -2,6 +2,16 @@
 
 ## 2026-09-30
 
+### Multi-page app shell
+
+- Replaced the single scrolling dashboard with a tabbed app: Record, Notes, and Settings, plus Account, Upload, and the existing result page. `/dashboard` now redirects to `/record`, which is also the manifest `start_url`, because the installed app has the old URL baked in.
+- Moved the recorder into the authenticated layout. A route change unmounts page components, so leaving the recording page would previously have torn down the `MediaRecorder` and ended the lecture. Uploads moved there too, so they continue while the user reads notes on another tab.
+- Added a persistent recording bar and upload progress bar that stay visible from every tab and link back to the recording.
+- Recording is now three screens: pick a class, a full-screen recording view, then a confirmation offering exactly "Record another class" and "See notes".
+- Grouped Notes by class and then lecture date instead of by upload batch. The course is read from the recording filename; a dedicated column is the planned follow-up.
+- Added Settings (install, default transcription quality, notifications, service status) and Account (email, password reset, privacy, sign out) pages, and a single authentication check in the shared layout instead of one per page.
+- Added a `user_preferences` table so the transcription quality default is saved per account rather than chosen on every upload.
+
 ### Recorded-audio upload fix
 
 - Fixed in-app recordings failing to upload. `MediaRecorder` reports its type with codec parameters such as `audio/mp4;codecs=mp4a.40.2`, while the `recordings` bucket's allowed-type list and `queue_uploaded_recording` both match exactly, so Supabase rejected the object before it was stored. Codec parameters are now stripped in the recorder and again in the shared upload path.

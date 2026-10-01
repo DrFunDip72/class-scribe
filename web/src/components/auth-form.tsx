@@ -31,14 +31,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
       if (mode === "login") {
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) throw authError;
-        router.push("/dashboard"); router.refresh();
+        router.push("/record"); router.refresh();
       } else if (mode === "signup") {
         const { data, error: authError } = await supabase.auth.signUp({ email, password });
         if (authError) throw authError;
         if (!data.session) {
           throw new Error("Your account was created, but automatic sign-in is unavailable. Try signing in.");
         }
-        router.replace("/dashboard"); router.refresh();
+        router.replace("/record"); router.refresh();
       } else if (mode === "forgot") {
         const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         if (authError) throw authError;
@@ -48,7 +48,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         const { error: authError } = await supabase.auth.updateUser({ password });
         if (authError) throw authError;
         setMessage("Password updated. Taking you to your dashboard…");
-        setTimeout(() => { router.push("/dashboard"); router.refresh(); }, 800);
+        setTimeout(() => { router.push("/record"); router.refresh(); }, 800);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong. Try again.");

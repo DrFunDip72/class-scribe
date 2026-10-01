@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Class Scribe",
     short_name: "Class Scribe",
     description: "Private class transcription and study notes powered by local AI.",
-    start_url: "/dashboard",
+    start_url: "/record",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
@@ -19,7 +19,8 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/class-scribe-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],
     shortcuts: [
-      { name: "Record a class", short_name: "Record", url: "/dashboard?record=1" },
+      { name: "Record a class", short_name: "Record", url: "/record" },
+      { name: "Your notes", short_name: "Notes", url: "/recordings" },
     ],
   };
 }

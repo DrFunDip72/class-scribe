@@ -1,4 +1,4 @@
-const DEFAULT_URL = "/dashboard";
+const DEFAULT_URL = "/recordings";
 const SHELL_CACHE = "class-scribe-shell-v1";
 const OFFLINE_URL = "/offline";
 

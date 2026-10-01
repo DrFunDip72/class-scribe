@@ -109,7 +109,7 @@ button { color: inherit; }
 .worker-card strong, .worker-card small { display: block; }
 .worker-card strong { font-size: 12px; }
 .worker-card small { margin-top: 3px; color: var(--muted); font-size: 9px; }
-.install-card, .recorder-card, .upload-card, .notification-card, .history-section, .aside-card, .notes-section, .transcript-section { border: 1px solid var(--line); border-radius: 15px; background: white; box-shadow: 0 4px 18px #213a2c08; }
+.settings-card, .settings-link, .install-card, .recorder-card, .upload-card, .notification-card, .history-section, .aside-card, .notes-section, .transcript-section { border: 1px solid var(--line); border-radius: 15px; background: white; box-shadow: 0 4px 18px #213a2c08; }
 .upload-card { padding: 22px; }
 
 .recorder-card { margin-bottom: 18px; padding: 22px; }
@@ -338,6 +338,69 @@ button { color: inherit; }
 .not-found h1 { margin-bottom: 0; }
 .not-found p { color: var(--muted); margin-bottom: 25px; }
 
+
+/* ---- App shell: header, tabs, and the bars that follow a recording ---- */
+.app-frame { min-height: 100dvh; display: flex; flex-direction: column; background: var(--paper); }
+.app-main { flex: 1; width: min(760px, 100%); margin: 0 auto; padding: 22px 18px calc(86px + env(safe-area-inset-bottom)); }
+.icon-button.active { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+
+.tab-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: #ffffffee; backdrop-filter: blur(12px); padding-bottom: env(safe-area-inset-bottom); }
+.tab-bar a { min-height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.tab-bar a.active { color: var(--green); }
+.tab-bar a svg { stroke-width: 1.9; }
+
+.recording-bar { position: sticky; top: 70px; z-index: 15; display: flex; align-items: center; gap: 10px; padding: 11px 18px; color: white; background: var(--red); font-size: 13px; font-weight: 700; }
+.recording-bar .recorder-dot { background: white; }
+.recording-bar-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recording-bar strong { font-variant-numeric: tabular-nums; }
+.upload-bar { position: sticky; top: 70px; z-index: 15; padding: 9px 18px 11px; border-bottom: 1px solid var(--line); background: #f0f7f3; }
+.upload-bar-text { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #315e4d; font-size: 11px; font-weight: 700; }
+.upload-bar .progress-track { margin-top: 6px; }
+
+/* ---- Page scaffolding ---- */
+.page-section { min-width: 0; }
+.page-title { margin: 0; font-size: 27px; letter-spacing: -.035em; }
+.page-subtitle { margin: 6px 0 20px; color: var(--muted); font-size: 13px; }
+.empty-note { color: var(--muted); font-size: 13px; }
+.text-inline-link { color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.button-large { min-height: 54px; font-size: 16px; }
+.button-secondary { margin-top: 10px; border: 1px solid var(--line); background: white; color: var(--ink); }
+.record-alt { margin: 16px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
+.inline-alert.warning { color: #76501c; }
+
+/* ---- Record: the full-screen recording and done states ---- */
+.record-stage { min-height: calc(100dvh - 240px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.record-stage h1 { margin: 0; font-size: 28px; letter-spacing: -.03em; }
+.record-live-head { display: flex; align-items: center; gap: 8px; color: var(--red); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.record-timer { margin: 14px 0 0; font-size: 60px; font-weight: 800; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.record-meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.record-hint { margin: 14px 0 26px; max-width: 320px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.record-hint svg { flex: none; }
+.record-stage .button-full { max-width: 420px; }
+.record-done-icon { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; color: var(--green); background: var(--green-soft); margin-bottom: 16px; }
+
+/* ---- Notes list grouped by class, then lecture date ---- */
+.course-list { display: flex; flex-direction: column; gap: 26px; }
+.course-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.course-heading strong { font-size: 15px; letter-spacing: -.02em; }
+.course-heading small { color: var(--muted); font-size: 10px; }
+.date-group + .date-group { margin-top: 14px; }
+.date-group { margin-top: 13px; }
+.date-heading { margin: 0 0 8px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+
+/* ---- Settings and account rows ---- */
+.settings-card { margin-bottom: 16px; padding: 18px; }
+.settings-card .transcription-tier-picker { margin-top: 12px; }
+.settings-link { margin-bottom: 16px; padding: 15px 18px; display: flex; align-items: center; gap: 13px; }
+.settings-link > div, .settings-row > div { flex: 1; min-width: 0; }
+.settings-link strong, .settings-row strong { display: block; font-size: 13px; }
+.settings-link small, .settings-row small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.settings-row { padding: 12px 0; display: flex; align-items: center; gap: 13px; }
+.settings-row + .settings-row { border-top: 1px solid var(--line); }
+.settings-row-link:hover strong { color: var(--green); }
+.settings-card .worker-card { margin-top: 13px; }
+.settings-card .notification-card { margin: 0; border: 0; box-shadow: none; padding: 0; }
+
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: 1fr; gap: 5px; }
   .auth-shell { grid-template-columns: 1fr; }
@@ -350,6 +413,11 @@ button { color: inherit; }
 }
 
 @media (max-width: 640px) {
+  .app-main { padding: 18px 14px calc(84px + env(safe-area-inset-bottom)); }
+  .page-title { font-size: 23px; }
+  .record-timer { font-size: 52px; }
+  .settings-card { padding: 15px; }
+  .recording-bar, .upload-bar { padding-inline: 14px; }
   .install-card { padding: 14px; gap: 11px; flex-wrap: wrap; }
   .install-card > button { width: 100%; }
   .recorder-card { padding: 17px; }

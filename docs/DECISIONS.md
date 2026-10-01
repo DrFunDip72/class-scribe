@@ -329,3 +329,19 @@ Capture lectures with `MediaRecorder` at a five-second timeslice, write every ch
 **Reason:** Android Chrome keeps a tab alive while a microphone capture is active, so recording survives the screen turning off, but the browser can still be killed under memory pressure. Holding a 75-minute lecture in a JavaScript array would lose the entire class. Background JavaScript timers are throttled to roughly one tick per minute, so a timer cannot be trusted to end a timed recording, while capture events keep firing because they are driven by the media pipeline rather than by the event loop.
 
 **Consequence:** A crash or eviction costs at most the last few seconds, and an unfinished recording is offered for upload on the next load. Recording reuses the existing preparation, multipart, resumable-upload, queue, and deletion behavior rather than adding a second ingestion path, and the file name matches the parser the Drive importer already uses. Screen recording and iOS background capture remain out of scope: iOS suspends media capture when the screen locks, and no web API changes that.
+
+## ADR-048 — Own the Recorder and Upload Engine in the Authenticated Layout
+
+Move the class recorder, the job list, and the upload engine into providers mounted by the `(app)` route-group layout, and let page components consume them through context.
+
+**Reason:** Splitting the single dashboard into tabs made navigation routine, and the App Router unmounts a page component on every route change. With the recorder owned by a page, tapping another tab mid-lecture would run its teardown, stop the microphone track, and end the recording. Layouts persist across route changes within their segment, so they are the only safe owner. The same reasoning applies to an in-flight upload, which previously could not survive leaving the page either.
+
+**Consequence:** Recording and uploading continue while the user moves between Record, Notes, and Settings, and a persistent bar keeps an active recording reachable from anywhere. The providers hold session-scoped state only; nothing is persisted beyond the existing IndexedDB chunk store. Pages stay small, and one authentication check in the layout replaces a per-page check. New signed-in screens must be added inside `(app)` to inherit both.
+
+## ADR-049 — Group Recordings by Course Derived From the Filename
+
+Group the Notes list by course and then lecture date, deriving the course from the `<COURSE>_<YYYY-MM-DD>` filename the recorder already produces, rather than adding a column now.
+
+**Reason:** Batch grouping suited multi-file uploads but turns into a wall of single-item groups once classes are recorded daily. Course and date are already encoded in the filename in the exact form `class_scribe_automation.py` parses, so the grouping can ship with the interface change instead of waiting on a migration and an RPC signature change.
+
+**Consequence:** Recorded classes group correctly immediately, and uploaded files fall into "Other recordings" rather than being mis-grouped. The derivation is display-only and nothing depends on it for correctness. A `course_code`/`lecture_date` column on `transcription_jobs` remains the durable fix and is required anyway for publishing app recordings to the public course repositories.

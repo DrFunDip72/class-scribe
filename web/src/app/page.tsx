@@ -13,7 +13,7 @@ export default async function Home() {
         </Link>
         <div className="nav-actions">
           {user ? (
-            <Link className="button button-primary button-small" href="/dashboard">
+            <Link className="button button-primary button-small" href="/record">
               Open dashboard <ArrowRight size={15} />
             </Link>
           ) : (
@@ -27,7 +27,7 @@ export default async function Home() {
         <h1>Turn every lecture into<br /><span>notes you can use.</span></h1>
         <p className="hero-copy">Upload up to 20 audio or video class recordings, choose your quality, and receive a complete transcript and focused study guide.</p>
         <div className="hero-actions">
-          <Link className="button button-primary" href={user ? "/dashboard" : "/signup"}>
+          <Link className="button button-primary" href={user ? "/record" : "/signup"}>
             {user ? "Open your dashboard" : "Start transcribing free"} <ArrowRight size={17} />
           </Link>
           <span className="cost-note">Free to use · private by default</span>

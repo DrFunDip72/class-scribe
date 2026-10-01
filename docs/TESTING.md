@@ -590,3 +590,19 @@ The stored segment records contain timestamps and text but omit confidence field
 10. The "Today" badge was suppressed when every course meets, because 2026-09-30 is a Wednesday and all four courses would otherwise be badged.
 
 **Not covered:** microphone capture, screen-off recording, the automatic stop, IndexedDB persistence across a browser kill, recovery of an unfinished recording, the handoff into the upload queue, the authenticated dashboard, layout at 320 CSS pixels, and any iOS behavior. Steps 7 and 8 used a temporary unauthenticated page that mounted the recorder in isolation; it was deleted afterward and the build and lint above were re-run clean without it.
+
+## Production release of installation and recording — PASS
+
+**Date:** 2026-09-30
+
+**Deployment:** `dpl_BMPkvsLsshxaxRPp1Ar54BoPqqiJ`, commit `518233e`, Ready on `https://class-scribe-ruddy.vercel.app`.
+
+1. Confirmed before release that the live site served the pre-change manifest and a service worker with zero `fetch` listeners, which is why Chrome offered no installation. Pushing to `main` changed nothing, because the Vercel project is not connected to Git.
+2. The Vercel project had no environment variables at all. Added `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as encrypted project variables for production, preview, and development. Both are browser-visible identifiers, not secrets. Vercel reported no security issues for either.
+3. `vercel deploy --prod` reached Ready.
+4. Live `/sw.js` contained exactly one `fetch` listener, satisfying Chrome's installability requirement.
+5. Live `/manifest.webmanifest` advertised standalone display, `/` scope, portrait orientation, the 192/512 PNG icons, the 512 maskable icon, and the Record shortcut.
+6. `/icon-192.png`, `/icon-512.png`, `/icon-maskable-512.png`, `/apple-touch-icon.png`, and `/offline` each returned HTTP 200.
+7. `/login` returned HTTP 200, confirming the missing-environment-variable middleware 500 described in `docs/DEPLOYMENT.md` did not occur.
+
+**Not covered:** the install card and recorder were not exercised on a physical phone. Home-screen installation, screen-off capture, the automatic stop, crash recovery, and the upload handoff remain owner-operated tests.

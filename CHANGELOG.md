@@ -4,6 +4,8 @@
 
 ### Installable app and in-app class recording
 
+- Released as `dpl_BMPkvsLsshxaxRPp1Ar54BoPqqiJ`. Discovered during release that the Vercel project is not Git-connected, so `git push` never deployed, and that the project had no environment variables; added the two public Supabase values as Vercel-managed variables and deployed with `vercel deploy --prod`.
+
 - Made the web app installable on a phone home screen. Added 192/512 PNG icons, a full-bleed maskable icon, and a 180-pixel Apple touch icon generated from the existing mark; added `scope`, `orientation`, categories, and a Record shortcut to the manifest; and added `appleWebApp` metadata plus a `viewport` export.
 - Added an explicit Add to home screen card on the dashboard. It captures `beforeinstallprompt` at module scope so Chrome's one-shot event is not missed before React mounts, offers an Install button when the browser allows it, and otherwise shows per-platform manual steps. Chrome's own banner is suppressed so the in-app button owns the flow.
 - Moved service-worker registration out of notification settings into a layout-level component so the app registers on every load. Chrome withheld the install prompt while registration depended on enabling pop-ups.

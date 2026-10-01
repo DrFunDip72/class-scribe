@@ -13,6 +13,8 @@
 
 `web/` is the Vercel project root. Its only runtime configuration is the public Supabase project URL and publishable key. They are browser-visible identifiers, not secrets. Prefer Vercel environment-variable settings for future deployments; never add worker credentials, the FluxPrompt API key, or the VAPID private key.
 
+As of 2026-09-30 the project carries `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as Vercel-managed encrypted variables for production, preview, and development, so a CLI deployment no longer needs an ephemeral env file. The Vercel project is not connected to Git: `git push` does not deploy. Release with `vercel deploy --prod` from `web/` after `vercel link --project class-scribe --scope justin-maxwells-projects`.
+
 The connected file-upload deployment path did not inherit project environment settings during the 2026-08-28 release check. For that path, include an ephemeral `.env.production` in the deployment payload containing only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, sourced from ignored `web/.env.local`; never commit it. A Vercel build can report Ready while middleware still returns HTTP 500 if these values are absent, so always open `/login` after the alias moves and inspect current-deployment runtime logs. Normal Git/CLI deployment should instead use Vercel-managed environment variables.
 
 `public/sw.js` must be served from the site root and `manifest.webmanifest` must remain reachable. Web Push requires HTTPS in production; Vercel provides it automatically. Do not cache the service-worker script with an immutable policy.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlertCircle, ArrowRight, CheckCircle2, CircleStop, Loader2, Mic, MoonStar, Trash2, UploadCloud } from "lucide-react";
 import { courseName, coursesForToday, type CourseCode } from "@/lib/courses";
 import { recordingSupported } from "@/lib/recording/use-recorder";
@@ -47,6 +47,12 @@ export function RecordView() {
   const [courseCode, setCourseCode] = useState<CourseCode>((meeting[0] ?? other[0]).code);
   const [limitChoice, setLimitChoice] = useState<string>("0");
   const [customMinutes, setCustomMinutes] = useState("90");
+
+  // Leaving the Record screen dismisses the upload confirmation, so coming
+  // back lands on the class picker ready for the next class rather than on a
+  // stale "Uploaded" screen.
+  const { clearCompleted } = recorder;
+  useEffect(() => clearCompleted, [clearCompleted]);
 
   const customValue = Number(customMinutes);
   const customValid = Number.isFinite(customValue) && customValue >= 1 && customValue <= MAX_CUSTOM_MINUTES;

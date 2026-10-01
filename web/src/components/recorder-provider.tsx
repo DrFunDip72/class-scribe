@@ -116,6 +116,8 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setRecoverable((current) => current.filter((item) => item.id !== session.id));
   }, []);
 
+  const clearCompleted = useCallback(() => setCompleted(null), []);
+
   const dismissError = useCallback(() => {
     setHandoffError(null);
     recorder.setError(null);
@@ -144,7 +146,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     uploadRecoverable: handOff,
     discardRecoverable,
     completed,
-    clearCompleted: () => setCompleted(null),
+    clearCompleted,
   };
 
   return <RecorderContext.Provider value={value}>{children}</RecorderContext.Provider>;

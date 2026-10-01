@@ -4,6 +4,8 @@
 
 ### Interface clean-up
 
+- Leaving the Record screen now dismisses the upload confirmation, so returning lands on the class picker instead of a stale "Uploaded" screen.
+
 - Made the tab bar permanently visible. The page now scrolls inside the main area rather than the document, so the header, the recording bar, and the tabs are always on screen.
 - Removed the transcription-service status card from Settings and the "Installed" confirmation card, and reworded the processing-paused notice so it describes the service rather than a Windows computer.
 - Rebuilt the Notes list. Rows are titled by lecture date instead of a raw filename, show one line of status, and are tappable in full when ready. Done and Archive moved off the rows to the result page, where they already existed, and the duplicate date subheadings are gone.

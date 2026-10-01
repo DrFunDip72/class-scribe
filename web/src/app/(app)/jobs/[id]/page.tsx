@@ -17,14 +17,14 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   if (!user) notFound();
 
   const [{ data: job }, { data: result }, { data: recordingState }] = await Promise.all([
-    supabase.from("transcription_jobs").select("*").eq("id", id).maybeSingle(),
+    supabase.from("transcription_jobs").select("*, classes(name)").eq("id", id).maybeSingle(),
     supabase.from("transcription_results").select("*").eq("job_id", id).maybeSingle(),
     supabase.from("recording_user_states").select("*").eq("job_id", id).maybeSingle(),
   ]);
   if (!job) notFound();
   const tier = getTranscriptionTier(job.transcription_tier);
   // Customers see the class and date, not `STRAT-392_2026-09-30.m4a`.
-  const title = recordingTitle(job.original_filename, job.created_at);
+  const title = recordingTitle(job.original_filename, job.created_at, job.classes?.name);
 
   if (!result) {
     const currentStep = job.status === "uploading"

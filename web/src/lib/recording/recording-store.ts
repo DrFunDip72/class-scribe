@@ -1,4 +1,3 @@
-import type { CourseCode } from "@/lib/courses";
 
 /**
  * Durable chunk storage for in-progress recordings.
@@ -16,7 +15,9 @@ const CHUNK_STORE = "chunks";
 
 export type RecordingSession = {
   id: string;
-  courseCode: CourseCode;
+  classId: string | null;
+  className: string;
+  classCode: string;
   mimeType: string;
   startedAt: number;
   updatedAt: number;
@@ -73,11 +74,13 @@ function requestToPromise<T>(request: IDBRequest<T>) {
 }
 
 export async function createSession(
-  input: Pick<RecordingSession, "courseCode" | "mimeType" | "autoStopMinutes">,
+  input: Pick<RecordingSession, "classId" | "className" | "classCode" | "mimeType" | "autoStopMinutes">,
 ): Promise<RecordingSession> {
   const session: RecordingSession = {
     id: crypto.randomUUID(),
-    courseCode: input.courseCode,
+    classId: input.classId,
+    className: input.className,
+    classCode: input.classCode,
     mimeType: input.mimeType,
     autoStopMinutes: input.autoStopMinutes,
     startedAt: Date.now(),

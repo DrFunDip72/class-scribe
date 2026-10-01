@@ -345,3 +345,19 @@ Group the Notes list by course and then lecture date, deriving the course from t
 **Reason:** Batch grouping suited multi-file uploads but turns into a wall of single-item groups once classes are recorded daily. Course and date are already encoded in the filename in the exact form `class_scribe_automation.py` parses, so the grouping can ship with the interface change instead of waiting on a migration and an RPC signature change.
 
 **Consequence:** Recorded classes group correctly immediately, and uploaded files fall into "Other recordings" rather than being mis-grouped. The derivation is display-only and nothing depends on it for correctness. A `course_code`/`lecture_date` column on `transcription_jobs` remains the durable fix and is required anyway for publishing app recordings to the public course repositories.
+
+## ADR-050 — Store the Class on Each Recording Instead of Inferring It
+
+Give every account a private `classes` table and store `class_id` on `transcription_jobs`. Supersedes ADR-049, which derived the course from the recording filename.
+
+**Reason:** Filename inference could only ever recognise names this application generates. A second user joined with their own courses, which no hard-coded list could cover, and the matcher silently failed on every recording created before the in-app recorder existed: all of the owner's Drive-era lectures carried names such as `hrm 391 9-8.m4a` and `philo_201_9-2.m4a` and were shown as uncategorised. A stored identifier is also what publishing app recordings to the public course repositories needs.
+
+**Consequence:** Classes are per account and isolated by row-level security, so one user's list is invisible to another. `begin_upload_batch` accepts a class and rejects one the caller does not own; `set_job_class` moves an existing recording without granting users broader update access to jobs. Deleting a class sets its recordings' `class_id` to null rather than removing them, so they reappear under Unsorted. The filename still carries a class code because the owner-only Drive/GitHub automation parses it, so renaming a class deliberately leaves the code untouched. Filename matching now exists only as the one-time backfill that was run against existing rows.
+
+## ADR-051 — Drop Per-Class Meeting Days
+
+Classes are a name and nothing more. The Record screen defaults to whichever class was recorded most recently.
+
+**Reason:** Meeting days existed to pre-select today's class and show a Today badge, and were hard-coded for one person's timetable. Making them user-managed would have meant every user entering a schedule before recording anything, which is setup work in exchange for saving one tap. On Wednesdays, when all four of the owner's classes met, the badge marked every option and conveyed nothing.
+
+**Consequence:** Adding a class is a single field. The most-recent default is usually correct for someone recording the same few classes repeatedly, and costs one tap when it is not. Nothing in the system depends on knowing when a class meets; the owner-only weekly audit keeps its own schedule.

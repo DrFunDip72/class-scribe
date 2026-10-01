@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CourseCode } from "@/lib/courses";
 import { appendChunk, createSession, type RecordingSession } from "@/lib/recording/recording-store";
 
 /**
@@ -138,7 +137,12 @@ export function useRecorder(options: { onFinished?: (session: RecordingSession) 
     if (recorder.state !== "inactive") recorder.stop();
   }, []);
 
-  const start = useCallback(async (options: { courseCode: CourseCode; autoStopMinutes: number | null }) => {
+  const start = useCallback(async (options: {
+    classId: string | null;
+    className: string;
+    classCode: string;
+    autoStopMinutes: number | null;
+  }) => {
     if (recorderRef.current) return;
     setError(null);
     setStatus("starting");
@@ -181,7 +185,9 @@ export function useRecorder(options: { onFinished?: (session: RecordingSession) 
     let created: RecordingSession;
     try {
       created = await createSession({
-        courseCode: options.courseCode,
+        classId: options.classId,
+        className: options.className,
+        classCode: options.classCode,
         mimeType,
         autoStopMinutes: options.autoStopMinutes,
       });

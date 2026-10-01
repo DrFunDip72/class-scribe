@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CircleUser } from "lucide-react";
+import { ArrowRight, CircleUser, GraduationCap } from "lucide-react";
 import { InstallCard } from "@/components/install-card";
 import { NotificationSettings } from "@/components/notification-settings";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -38,6 +38,12 @@ export function SettingsView() {
     </div>
 
     <NotificationSettings userId={workspace.userId} accountEmail={workspace.userEmail} />
+
+    <Link className="settings-link" href="/classes">
+      <span className="install-icon"><GraduationCap size={17} /></span>
+      <div><strong>Classes</strong><small>{workspace.classes.length} class{workspace.classes.length === 1 ? "" : "es"}</small></div>
+      <ArrowRight size={17} />
+    </Link>
 
     <Link className="settings-link" href="/account">
       <span className="install-icon"><CircleUser size={17} /></span>

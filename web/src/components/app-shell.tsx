@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CircleUser, FileAudio, ListChecks, Mic, Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { courseName } from "@/lib/courses";
 import { useClassRecorder } from "@/components/recorder-provider";
 import { useWorkspace } from "@/components/workspace-provider";
 
@@ -29,7 +28,7 @@ function RecordingBar() {
   return <Link className="recording-bar" href="/record">
     <span className="recorder-dot" aria-hidden="true" />
     <span className="recording-bar-text">
-      Recording {recorder.activeCourse ? courseName(recorder.activeCourse) : "class"}
+      Recording {recorder.activeClassName ?? "class"}
     </span>
     <strong>{formatElapsed(recorder.elapsedMs)}</strong>
   </Link>;

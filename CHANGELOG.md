@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-01
+
+### Account-managed classes
+
+- Replaced the four hard-coded courses with a per-account `classes` table. Each user adds, renames, and deletes their own classes, isolated by row-level security, so a second account manages its own list.
+- Recordings now store `class_id` instead of having their class guessed from the filename. `begin_upload_batch` accepts a class and verifies it belongs to the caller; a new `set_job_class` RPC moves an existing recording without widening update access to jobs.
+- Added a Classes screen under Settings, a class selector on Upload, and a "Move to class" sheet on every recording so nothing stays stuck in Unsorted.
+- The Notes tabs and the result page title now read the stored class, and Unsorted appears only when something is waiting to be filed.
+- Dropped per-class meeting days. The Record screen defaults to whichever class was recorded most recently, which needs no timetable.
+- Fixed class detection for historical recordings. The old matcher only recognised the canonical `HRM-391_2026-09-30` filename the in-app recorder produces, so every Drive-era recording — `hrm 391 9-8.m4a`, `philo_201_9-2.m4a`, `pse 390 - 9-16 (1).m4a` — fell into Other. A one-time backfill assigned 37 of the owner's 41 recordings across the four classes; the four left unsorted are two test files and two cross-account samples.
+
 ## 2026-09-30
 
 ### Interface clean-up

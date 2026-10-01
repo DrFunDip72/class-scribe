@@ -21,6 +21,7 @@ export function UploadView() {
   const workspace = useWorkspace();
   const inputRef = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState("");
+  const [classId, setClassId] = useState<string>("");
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function UploadView() {
     if (!files.length || !idle) return;
     setError(null);
     setSuccess(null);
-    const result = await workspace.submitBatch({ files, label, tier: workspace.defaultTier });
+    const result = await workspace.submitBatch({ files, label, tier: workspace.defaultTier, classId: classId || null });
     if (result.queued > 0) {
       const tier = getTranscriptionTier(workspace.defaultTier);
       setSuccess(`${result.queued} recording${result.queued === 1 ? " is" : "s are"} on the way with ${tier.label} quality.${result.failed ? ` ${result.failed} did not finish.` : ""}`);
@@ -101,6 +102,14 @@ export function UploadView() {
         <button aria-label={`Remove ${file.name}`} disabled={!idle} onClick={() => workspace.removeStagedFile(index)}><X size={16} /></button>
       </div>;
     })}</div> : null}
+
+    {files.length > 0 && workspace.classes.length > 0 ? <label className="recorder-limit upload-class">
+      <span>Class</span>
+      <select value={classId} disabled={!idle} onChange={(event) => setClassId(event.target.value)}>
+        <option value="">No class</option>
+        {workspace.classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </select>
+    </label> : null}
 
     {files.length > 0 ? <div className="upload-footer">
       <label>Group name <input value={label} maxLength={80} disabled={!idle} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label>

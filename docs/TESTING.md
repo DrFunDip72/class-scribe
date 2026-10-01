@@ -648,3 +648,17 @@ No browser automation host was available, so the whole shell was mounted on a te
 6. No React error markers appeared in the output.
 
 **Not covered:** this proves server render and markup only. Client interaction, the tab bar's active state, the full-screen recording and done screens, course/date grouping with real rows, and recording survival across a tab change all remain untested.
+
+## Account-managed classes and historical backfill — PASS
+
+**Date:** 2026-10-01
+
+1. `npm run lint` reported no problems and `npm run build` compiled all 18 routes with TypeScript checking, including the new `/classes`.
+2. The `classes` migration produced no new Supabase security advisories. `pg_class.relrowsecurity` is true, and `pg_policies` shows four policies: SELECT and DELETE with a USING clause, INSERT with a WITH CHECK clause, and UPDATE with both.
+3. Audited the two accounts before changing anything. The owner held 41 recordings and a second account 36.
+4. Established that the previous filename matcher was the cause of the uncategorised recordings rather than missing data: it required the canonical `HRM-391_YYYY-MM-DD` form, while historical names use spaces, underscores and aliases. Normalising separators and applying the aliases the Python importer already accepts classified the owner's recordings as STRAT 392 11, HRM 391 9, PSE 390 9, PHIL 201 8.
+5. Seeded the owner's four classes with their existing codes so the Drive/GitHub automation continues to parse recording filenames unchanged.
+6. Ran the backfill. The resulting distribution matched the prediction exactly: 11 / 9 / 9 / 8, with four left unsorted — two local test files and two cross-account samples. The second account's 36 recordings were left untouched, as directed.
+7. Rendered Record, Notes, Classes and Settings through the providers on a temporary route. With no classes visible to the mock identity, Record correctly showed the "Add your first class" empty state, the Classes screen showed its add form, and the "Manage classes" link and class list correctly did not render. No React errors appeared. The route was removed and lint and build re-run clean without it.
+
+**Not covered:** no browser automation host was available, so no class was created, renamed, deleted or moved through the interface, and the move-to-class and delete sheets were not interacted with. Cross-account isolation was verified from the policy definitions rather than by signing in as the second account.

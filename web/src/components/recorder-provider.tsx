@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { recordingFilename, recordingLabel, type CourseCode } from "@/lib/courses";
+import { recordingFilename, recordingLabel, type ClassRow } from "@/lib/classes";
 import {
   assembleSession,
   deleteSession,
@@ -12,7 +12,7 @@ import {
 import { baseMimeType, extensionForMimeType, useRecorder } from "@/lib/recording/use-recorder";
 import { useWorkspace } from "@/components/workspace-provider";
 
-export type CompletedRecording = { jobId: string | null; courseCode: CourseCode; recordedAt: Date };
+export type CompletedRecording = { jobId: string | null; className: string; recordedAt: Date };
 
 /**
  * A single state for the Record screen to switch on. Without it the screen
@@ -28,8 +28,8 @@ type RecorderValue = {
   storedBytes: number;
   error: string | null;
   dismissError: () => void;
-  activeCourse: CourseCode | null;
-  start: (options: { courseCode: CourseCode; autoStopMinutes: number | null }) => void;
+  activeClassName: string | null;
+  start: (options: { target: ClassRow; autoStopMinutes: number | null }) => void;
   stop: () => void;
   autoStopMinutes: number;
   busy: boolean;
@@ -58,7 +58,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
   const [recoverable, setRecoverable] = useState<RecordingSession[]>([]);
   const [handingOff, setHandingOff] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
-  const [activeCourse, setActiveCourse] = useState<CourseCode | null>(null);
+  const [activeClassName, setActiveClassName] = useState<string | null>(null);
   const [autoStopMinutes, setAutoStopMinutes] = useState(0);
   const [completed, setCompleted] = useState<CompletedRecording | null>(null);
 
@@ -70,20 +70,21 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       const recordedAt = new Date(session.startedAt);
       const file = new File(
         [blob],
-        recordingFilename(session.courseCode, extensionForMimeType(session.mimeType), recordedAt),
+        recordingFilename(session.classCode, extensionForMimeType(session.mimeType), recordedAt),
         { type: baseMimeType(session.mimeType), lastModified: session.startedAt },
       );
       const result = await workspace.submitBatch({
         files: [file],
-        label: recordingLabel(session.courseCode, recordedAt),
+        label: recordingLabel(session.className, recordedAt),
         tier: "high",
+        classId: session.classId,
       });
       if (result.ok) {
         // Only drop the local copy once the queue has accepted the upload.
         await markFinalized(session.id);
         await deleteSession(session.id);
         setRecoverable((current) => current.filter((item) => item.id !== session.id));
-        setCompleted({ jobId: result.jobIds[0] ?? null, courseCode: session.courseCode, recordedAt });
+        setCompleted({ jobId: result.jobIds[0] ?? null, className: session.className, recordedAt });
       } else {
         setRecoverable((current) => current.some((item) => item.id === session.id) ? current : [session, ...current]);
         setHandoffError(result.message
@@ -103,12 +104,17 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     void listRecoverableSessions().then(setRecoverable).catch(() => {});
   }, []);
 
-  const start = useCallback((options: { courseCode: CourseCode; autoStopMinutes: number | null }) => {
+  const start = useCallback((options: { target: ClassRow; autoStopMinutes: number | null }) => {
     setCompleted(null);
     setHandoffError(null);
-    setActiveCourse(options.courseCode);
+    setActiveClassName(options.target.name);
     setAutoStopMinutes(options.autoStopMinutes ?? 0);
-    void recorder.start(options);
+    void recorder.start({
+      classId: options.target.id,
+      className: options.target.name,
+      classCode: options.target.code,
+      autoStopMinutes: options.autoStopMinutes,
+    });
   }, [recorder]);
 
   const discardRecoverable = useCallback(async (session: RecordingSession) => {
@@ -137,7 +143,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     storedBytes: recorder.storedBytes,
     error: recorder.error ?? handoffError,
     dismissError,
-    activeCourse,
+    activeClassName,
     start,
     stop: recorder.stop,
     autoStopMinutes,

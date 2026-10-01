@@ -4,23 +4,25 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
 import type { TranscriptionTier } from "@/lib/transcription-tiers";
+import { classCodeFromName, type ClassRow } from "@/lib/classes";
 
 export type RecordingState = Database["public"]["Tables"]["recording_user_states"]["Row"];
 export type Job = Database["public"]["Tables"]["transcription_jobs"]["Row"] & {
   transcription_results: { summary: string; key_points: string[] } | null;
   recording_user_states: RecordingState | null;
   upload_batches: { created_at: string; file_count: number; label: string | null } | null;
+  classes: { id: string; name: string; code: string } | null;
 };
 export type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 
 export type UploadState = "idle" | "starting" | "preparing" | "uploading";
 export type UploadItemStatus = "waiting" | "preparing" | "uploading" | "queued" | "failed";
 export type UploadItem = { jobId: string; name: string; status: UploadItemStatus; progress: number };
-export type BatchInput = { files: File[]; label: string; tier: TranscriptionTier };
+export type BatchInput = { files: File[]; label: string; tier: TranscriptionTier; classId?: string | null };
 export type BatchResult = { ok: boolean; queued: number; failed: number; jobIds: string[]; message?: string };
 
 type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
-type PendingUploadRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier };
+type PendingUploadRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier; class_id: string | null };
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const videoExtensions = new Set(["mp4", "webm", "mov", "m4v", "mkv"]);
@@ -71,6 +73,11 @@ type WorkspaceValue = {
    * picker must open from a real user gesture, so it cannot be triggered after
    * navigating; picking first and navigating second keeps it to one tap.
    */
+  classes: ClassRow[];
+  createClass: (name: string) => Promise<string | null>;
+  renameClass: (id: string, name: string) => Promise<string | null>;
+  deleteClass: (id: string) => Promise<string | null>;
+  setJobClass: (jobId: string, classId: string | null) => Promise<string | null>;
   stagedFiles: File[];
   stageFiles: (files: File[]) => void;
   addStagedFiles: (files: File[]) => void;
@@ -115,20 +122,23 @@ export function WorkspaceProvider({
   const [batchCount, setBatchCount] = useState(0);
   const [savingJobIds, setSavingJobIds] = useState<string[]>([]);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [classes, setClasses] = useState<ClassRow[]>([]);
   // Captured when the poll lands, so freshness is never computed during render.
   const [checkedAt, setCheckedAt] = useState(0);
   const uploadingRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    const [jobResponse, workerResponse] = await Promise.all([
+    const [jobResponse, workerResponse, classResponse] = await Promise.all([
       supabase
         .from("transcription_jobs")
-        .select("*, transcription_results(summary, key_points), recording_user_states(*), upload_batches(created_at, file_count, label)")
+        .select("*, transcription_results(summary, key_points), recording_user_states(*), upload_batches(created_at, file_count, label), classes(id, name, code)")
         .order("created_at", { ascending: false }),
       supabase.from("worker_heartbeats").select("*").order("last_seen_at", { ascending: false }),
+      supabase.from("classes").select("*").is("archived_at", null).order("created_at"),
     ]);
     if (!jobResponse.error) setJobs(jobResponse.data as Job[]);
     if (!workerResponse.error) setWorkers(workerResponse.data);
+    if (!classResponse.error) setClasses(classResponse.data);
     setCheckedAt(Date.now());
     setLoading(false);
   }, [supabase]);
@@ -168,6 +178,7 @@ export function WorkspaceProvider({
       job_id: crypto.randomUUID(),
       original_filename: safeName(file.name),
       transcription_tier: input.tier,
+      class_id: input.classId ?? null,
     }));
     setUploadItems(pendingRecords.map((record, index) => ({
       jobId: record.job_id, name: batchFiles[index].name, status: "waiting", progress: 0,
@@ -287,6 +298,48 @@ export function WorkspaceProvider({
     return { ok: queuedCount > 0, queued: queuedCount, failed: failedCount, jobIds: queuedJobIds, message };
   }, [refresh, supabase, userId]);
 
+  const createClass = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return "Give the class a name.";
+    const { error } = await supabase.from("classes").insert({
+      user_id: userId,
+      name: trimmed,
+      code: classCodeFromName(trimmed),
+    });
+    if (error) {
+      return error.code === "23505"
+        ? "You already have a class with a very similar name."
+        : error.message;
+    }
+    await refresh();
+    return null;
+  }, [refresh, supabase, userId]);
+
+  const renameClass = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return "Give the class a name.";
+    // The code is deliberately left alone: recordings are already named with
+    // it, and the Drive automation parses that name.
+    const { error } = await supabase.from("classes").update({ name: trimmed }).eq("id", id);
+    if (error) return error.message;
+    await refresh();
+    return null;
+  }, [refresh, supabase]);
+
+  const deleteClass = useCallback(async (id: string) => {
+    const { error } = await supabase.from("classes").delete().eq("id", id);
+    if (error) return error.message;
+    await refresh();
+    return null;
+  }, [refresh, supabase]);
+
+  const setJobClass = useCallback(async (jobId: string, classId: string | null) => {
+    const { error } = await supabase.rpc("set_job_class", { p_job_id: jobId, p_class_id: classId });
+    if (error) return error.message;
+    await refresh();
+    return null;
+  }, [refresh, supabase]);
+
   const retry = useCallback(async (jobId: string) => {
     const { error } = await supabase.rpc("retry_transcription_job", { p_job_id: jobId });
     if (error) return error.message;
@@ -313,6 +366,7 @@ export function WorkspaceProvider({
     defaultTier, saveDefaultTier,
     uploadState, uploadItems, uploadProgress, preparationProgress, preparationIndex, batchCount,
     submitBatch, retry, saveRecordingState, savingJobIds,
+    classes, createClass, renameClass, deleteClass, setJobClass,
     stagedFiles,
     stageFiles: setStagedFiles,
     addStagedFiles: (incoming: File[]) => setStagedFiles((current) => [...current, ...incoming]),

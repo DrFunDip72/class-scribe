@@ -405,6 +405,33 @@ button.text-inline-link { border: 0; background: none; cursor: pointer; padding:
 .class-tabs button.active { color: var(--green); border-bottom-color: var(--green); }
 .class-tabs button.active span { color: white; background: var(--green); }
 .note-list { margin-top: 16px; }
+.note-row-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
+.note-row-actions:empty { display: none; }
+
+/* Classes screen */
+.class-add { margin-bottom: 18px; display: flex; gap: 9px; }
+.class-add input { flex: 1; min-width: 0; min-height: 46px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; background: white; font-size: 14px; }
+.class-add input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.class-list { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 14px; background: white; overflow: hidden; }
+.class-row { min-height: 64px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; }
+.class-row + .class-row { border-top: 1px solid var(--line); }
+.class-row > div:first-child { flex: 1; min-width: 0; }
+.class-row strong { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.class-row small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.class-row.editing input { flex: 1; min-width: 0; min-height: 44px; padding: 0 11px; border: 1px solid var(--green); border-radius: 10px; font-size: 14px; }
+.icon-button.danger { color: var(--red); }
+.button-danger { color: white; background: var(--red); }
+
+/* Bottom sheet used for moving a recording and confirming a delete */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: #10201a66; }
+.sheet { width: min(460px, 100%); max-height: 76dvh; overflow-y: auto; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: white; }
+.sheet-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sheet-heading strong { font-size: 15px; }
+.sheet-copy { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.sheet-options { display: flex; flex-direction: column; gap: 7px; }
+.sheet-options button { min-height: 50px; padding: 0 14px; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); font-size: 14px; font-weight: 650; text-align: left; cursor: pointer; }
+.sheet-options button.active { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+.upload-class { margin-top: 14px; }
 .note-list { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 14px; background: white; overflow: hidden; }
 .note-row + .note-row { border-top: 1px solid var(--line); }
 .note-row.done .note-text strong { color: var(--muted); }

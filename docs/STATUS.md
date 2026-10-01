@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-01
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, home-screen installation, in-app class recording, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -43,6 +43,7 @@ No credentials are stored in this document.
 - Mobile-first upload tier selector with measured per-hour estimates, database-enforced tier persistence, dashboard/result tier labels, and one-model-at-a-time worker switching. Fast is the backward-compatible default and Turbo is unavailable.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 - Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
+- Account-managed classes. Each user owns a private `classes` list with row-level isolation; recordings store `class_id` rather than having it inferred from a filename. Classes screen, upload class selector, and per-recording move. The owner's four classes were seeded and 37 of 41 historical recordings backfilled; a second account's 36 remain unsorted by owner decision.
 - Tabbed application shell: Record, Notes, Settings, with Account, Upload, and result pages. The recorder and upload engine live in the authenticated layout so neither is interrupted by navigation. A persistent recording bar and upload bar appear on every tab.
 - Account-scoped `user_preferences` holding the default transcription tier, chosen in Settings instead of on every upload.
 - Dashboard Add to home screen card with a real Install button where the browser supports it, per-platform manual steps otherwise, and an installed state detected from `display-mode: standalone`.

@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      classes: {
+        Row: {
+          archived_at: string | null
+          code: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       completion_events: {
         Row: {
           attempt_count: number
@@ -305,6 +335,7 @@ export type Database = {
         Row: {
           attempt_count: number
           batch_id: string
+          class_id: string | null
           claimed_by: string | null
           completed_at: string | null
           created_at: string
@@ -328,6 +359,7 @@ export type Database = {
         Insert: {
           attempt_count?: number
           batch_id: string
+          class_id?: string | null
           claimed_by?: string | null
           completed_at?: string | null
           created_at?: string
@@ -351,6 +383,7 @@ export type Database = {
         Update: {
           attempt_count?: number
           batch_id?: string
+          class_id?: string | null
           claimed_by?: string | null
           completed_at?: string | null
           created_at?: string
@@ -372,6 +405,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transcription_jobs_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transcription_jobs_batch_id_fkey"
             columns: ["batch_id"]
@@ -569,6 +609,10 @@ export type Database = {
       queue_uploaded_recording: {
         Args: { p_job_id: string; p_parts: Json }
         Returns: string
+      }
+      set_job_class: {
+        Args: { p_class_id: string | null; p_job_id: string }
+        Returns: undefined
       }
       retry_transcription_job: {
         Args: { p_job_id: string }

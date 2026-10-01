@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AlertCircle, ArrowRight, CheckCircle2, CircleStop, Loader2, Mic, MoonStar, Trash2, UploadCloud } from "lucide-react";
-import { courseName, coursesForToday, type CourseCode } from "@/lib/courses";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AlertCircle, ArrowRight, CheckCircle2, CircleStop, Loader2, Mic, MoonStar, Plus, Trash2, UploadCloud } from "lucide-react";
 import { recordingSupported } from "@/lib/recording/use-recorder";
 import { useClassRecorder } from "@/components/recorder-provider";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -42,17 +41,27 @@ export function RecordView() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supported = useSyncExternalStore(subscribeToNothing, recordingSupported, assumeSupported);
-  const { meeting, other } = coursesForToday();
-  const showsTodayBadge = meeting.length > 0 && other.length > 0;
-  const [courseCode, setCourseCode] = useState<CourseCode>((meeting[0] ?? other[0]).code);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [limitChoice, setLimitChoice] = useState<string>("0");
   const [customMinutes, setCustomMinutes] = useState("90");
 
   // Leaving the Record screen dismisses the upload confirmation, so coming
-  // back lands on the class picker ready for the next class rather than on a
-  // stale "Uploaded" screen.
+  // back lands on the class picker ready for the next class.
   const { clearCompleted } = recorder;
   useEffect(() => clearCompleted, [clearCompleted]);
+
+  // Default to whichever class was recorded most recently. That beats any
+  // fixed order and needs no timetable to be set up.
+  const lastUsedId = useMemo(
+    () => workspace.jobs.find((job) => job.class_id)?.class_id ?? null,
+    [workspace.jobs],
+  );
+
+  const classes = workspace.classes;
+  const activeId = selectedId && classes.some((item) => item.id === selectedId)
+    ? selectedId
+    : (lastUsedId && classes.some((item) => item.id === lastUsedId) ? lastUsedId : classes[0]?.id ?? null);
+  const active = classes.find((item) => item.id === activeId) ?? null;
 
   const customValue = Number(customMinutes);
   const customValid = Number.isFinite(customValue) && customValue >= 1 && customValue <= MAX_CUSTOM_MINUTES;
@@ -61,11 +70,10 @@ export function RecordView() {
     : Number(limitChoice) || null;
   const blockedByCustom = limitChoice === "custom" && !customValid;
 
-  // Recording: a full-screen state with nothing competing for attention.
   if (recorder.stage === "recording") {
     return <section className="record-stage">
       <div className="record-live-head"><span className="recorder-dot" aria-hidden="true" /><span>Recording</span></div>
-      <h1>{recorder.activeCourse ? courseName(recorder.activeCourse) : "Class"}</h1>
+      <h1>{recorder.activeClassName ?? "Class"}</h1>
       <p className="record-timer">{formatElapsed(recorder.elapsedMs)}</p>
       <p className="record-meta">
         {formatSize(recorder.storedBytes)} saved
@@ -80,8 +88,8 @@ export function RecordView() {
     </section>;
   }
 
-  // Saving: shown from the moment recording stops until the upload settles, so
-  // the class picker never reappears in between.
+  // Shown from the moment recording stops until the upload settles, so the
+  // class picker never reappears in between.
   if (recorder.stage === "saving") {
     const uploading = workspace.uploadState === "uploading";
     return <section className="record-stage">
@@ -97,14 +105,13 @@ export function RecordView() {
     </section>;
   }
 
-  // Done: exactly two next steps.
   if (recorder.stage === "done" && recorder.completed) {
     const { completed } = recorder;
     return <section className="record-stage">
       <span className="record-done-icon"><CheckCircle2 size={34} /></span>
       <h1>Uploaded</h1>
       <p className="record-meta">
-        {courseName(completed.courseCode)} · {completed.recordedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        {completed.className} · {completed.recordedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
       </p>
       <p className="record-hint">Your notes are being created. You can close the app.</p>
       <button type="button" className="button button-primary button-full button-large" onClick={recorder.clearCompleted}>
@@ -145,73 +152,82 @@ export function RecordView() {
       <strong><AlertCircle size={15} /> Unfinished recording{recorder.recoverable.length === 1 ? "" : "s"} on this device</strong>
       {recorder.recoverable.map((session) => <div key={session.id} className="recorder-recovery-row">
         <div>
-          <strong>{courseName(session.courseCode)}</strong>
+          <strong>{session.className}</strong>
           <small>{new Date(session.startedAt).toLocaleString()} · {formatSize(session.bytes)}</small>
         </div>
         <div className="recorder-recovery-actions">
           <button type="button" className="button button-small button-primary" disabled={recorder.busy} onClick={() => void recorder.uploadRecoverable(session)}>
             <UploadCloud size={15} /> Upload
           </button>
-          <button type="button" className="ghost-button" disabled={recorder.busy} onClick={() => void recorder.discardRecoverable(session)} aria-label={`Discard ${courseName(session.courseCode)} recording`}>
+          <button type="button" className="ghost-button" disabled={recorder.busy} onClick={() => void recorder.discardRecoverable(session)} aria-label={`Discard ${session.className} recording`}>
             <Trash2 size={15} />
           </button>
         </div>
       </div>)}
     </div> : null}
 
-    <fieldset className="recorder-classes" disabled={recorder.busy}>
-      <legend>Class</legend>
-      <div className="recorder-class-options">
-        {[...meeting, ...other].map((course) => <label
-          key={course.code}
-          className={`recorder-class-option ${courseCode === course.code ? "selected" : ""}`}
-        >
-          <input
-            type="radio"
-            name="recorder-course"
-            value={course.code}
-            checked={courseCode === course.code}
-            onChange={() => setCourseCode(course.code)}
-          />
-          <span>{course.name}</span>
-          {/* On Wednesdays every course meets, so the badge would mark all four. */}
-          {showsTodayBadge && meeting.some((item) => item.code === course.code) ? <em>Today</em> : null}
-        </label>)}
+    {classes.length === 0
+      ? <div className="empty-state">
+        <Mic />
+        <h3>Add your first class</h3>
+        <p>Classes keep your recordings organised. Add as many as you need.</p>
+        <Link className="button button-primary" href="/classes"><Plus size={17} /> Add a class</Link>
       </div>
-    </fieldset>
+      : <>
+        <fieldset className="recorder-classes" disabled={recorder.busy}>
+          <legend>Class</legend>
+          <div className="recorder-class-options">
+            {classes.map((item) => <label
+              key={item.id}
+              className={`recorder-class-option ${activeId === item.id ? "selected" : ""}`}
+            >
+              <input
+                type="radio"
+                name="recorder-class"
+                value={item.id}
+                checked={activeId === item.id}
+                onChange={() => setSelectedId(item.id)}
+              />
+              <span>{item.name}</span>
+            </label>)}
+          </div>
+        </fieldset>
 
-    <div className="recorder-limit-group">
-      <label className="recorder-limit">
-        <span>Stop automatically after</span>
-        <select value={limitChoice} disabled={recorder.busy} onChange={(event) => setLimitChoice(event.target.value)}>
-          {AUTO_STOP_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-        </select>
-      </label>
-      {limitChoice === "custom" ? <label className="recorder-custom-limit">
-        <span className="sr-only">Custom length in minutes</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={MAX_CUSTOM_MINUTES}
-          value={customMinutes}
-          disabled={recorder.busy}
-          onChange={(event) => setCustomMinutes(event.target.value)}
-          aria-invalid={!customValid}
-        />
-        <em>minutes</em>
-      </label> : null}
-      {blockedByCustom ? <p className="field-note">Enter between 1 and {MAX_CUSTOM_MINUTES} minutes.</p> : null}
-    </div>
+        <div className="recorder-limit-group">
+          <label className="recorder-limit">
+            <span>Stop automatically after</span>
+            <select value={limitChoice} disabled={recorder.busy} onChange={(event) => setLimitChoice(event.target.value)}>
+              {AUTO_STOP_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            </select>
+          </label>
+          {limitChoice === "custom" ? <label className="recorder-custom-limit">
+            <span className="sr-only">Custom length in minutes</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_CUSTOM_MINUTES}
+              value={customMinutes}
+              disabled={recorder.busy}
+              onChange={(event) => setCustomMinutes(event.target.value)}
+              aria-invalid={!customValid}
+            />
+            <em>minutes</em>
+          </label> : null}
+          {blockedByCustom ? <p className="field-note">Enter between 1 and {MAX_CUSTOM_MINUTES} minutes.</p> : null}
+        </div>
 
-    <button
-      type="button"
-      className="button button-primary button-full button-large recorder-start"
-      disabled={recorder.busy || blockedByCustom}
-      onClick={() => recorder.start({ courseCode, autoStopMinutes })}
-    >
-      {recorder.busy ? <><Loader2 size={19} className="spin" /> Working…</> : <><Mic size={19} /> Start recording</>}
-    </button>
+        <button
+          type="button"
+          className="button button-primary button-full button-large recorder-start"
+          disabled={recorder.busy || blockedByCustom || !active}
+          onClick={() => { if (active) recorder.start({ target: active, autoStopMinutes }); }}
+        >
+          {recorder.busy ? <><Loader2 size={19} className="spin" /> Working…</> : <><Mic size={19} /> Start recording</>}
+        </button>
+
+        <p className="record-alt"><Link className="text-inline-link" href="/classes">Manage classes</Link></p>
+      </>}
 
     {/* Picking here keeps the file dialog inside the click that opens it. */}
     <input

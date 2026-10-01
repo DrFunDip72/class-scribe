@@ -1,7 +1,7 @@
 # Current Status
 
-**Last updated:** 2026-09-24
-**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
+**Last updated:** 2026-09-30
+**Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, home-screen installation, in-app class recording, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
 
@@ -41,6 +41,9 @@ No credentials are stored in this document.
 - Mobile-first upload tier selector with measured per-hour estimates, database-enforced tier persistence, dashboard/result tier labels, and one-model-at-a-time worker switching. Fast is the backward-compatible default and Turbo is unavailable.
 - Completed result Copy menu with separate Summary, Transcript, and Everything targets; complete Markdown download remains unchanged.
 - Persistent per-recording Summary/Transcript/Everything copy checkmarks, explicit Done/Undo, reversible Archive/Restore, To do/Done/Archived/All filters, per-batch progress, and one-click archive of completed work.
+- Dashboard Add to home screen card with a real Install button where the browser supports it, per-platform manual steps otherwise, and an installed state detected from `display-mode: standalone`.
+- Installable phone app: PNG/maskable/Apple touch icons, scoped standalone manifest with a Record shortcut, layout-level service-worker registration independent of notifications, and a network-first fetch handler whose cache holds only an offline page and brand icons.
+- In-app class recording for the four configured courses with an optional 50/75/110-minute automatic stop, a live timer, durable five-second IndexedDB timeslices, recovery of an unfinished recording, and one-tap handoff into the existing High-tier upload queue. Verified in a desktop browser only; screen-off capture on a physical Android phone is still untested.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 - Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
 - Created four public course repositories (`HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`) and performed the initial one-time export of the owner's September 2 completed results as dated Markdown notes for intentional sharing. The later owner automation now handles GitHub delivery; Notion delivery remains unimplemented.
@@ -58,6 +61,8 @@ No credentials are stored in this document.
 - Added a clean-installation handoff for a new owner that separates the private core transcription service from owner-specific optional automations and includes a ready-to-paste Claude implementation prompt.
 
 ## Last verified state
+
+- Post-update startup audit on 2026-09-29 after a Windows update. Ollama's runtime was silently broken: a rolled-back auto-update had emptied `lib/ollama`, so `/api/tags` answered while every generate call failed. It was repaired through the maintenance-pause marker and a reinstall, and the conflicting `Ollama.lnk` tray-app autostart was disabled because it fought the worker launcher for port 11434 and triggered that update. The OpenWhispr container was running but unreachable because Docker dropped its Tailscale port publish on a boot that beat Tailscale; the supervisor now detects and restarts that state. `ClassScribeGitHubAudit` was found missing from Task Scheduler and still needs an elevated `install-drive-automation-tasks.ps1` run, so the Thursday audit is not currently scheduled.
 
 - On 2026-08-28, a live health check found Vercel Ready and Supabase Active Healthy but found the local worker stale for about 58 hours with 10 queued recordings. The prior logon-only task had exited with `0xC000013A` after exhausting three restarts.
 - The hardened task is installed as `SYSTEM` with startup, logon, and five-minute repeating triggers, `StartWhenAvailable`, no execution time limit, `IgnoreNew`, wake support, and 999 one-minute restart attempts.
@@ -156,6 +161,8 @@ Password-reset email stays enabled. The production reset URL should remain allow
 - Automatic cleanup or user cancellation for stale `uploading` placeholders left by a force-closed browser.
 
 ## Exact next task
+
+Record one real lecture on the owner's Android phone with the screen locked and confirm the audio is complete, then decide whether app recordings should reach the public course repositories. That requires a forward migration for an owner-callable app-recording source, a retention flag so `worker.py` does not delete parts before the archive step, and an automation change that writes the MP3 to a Drive-synced folder other than `URecorder`.
 
 Ask the owner to re-upload the original HRM 391 September 8 recording because its stored High result is corrupted and the source was deleted after completion. Keep that result and `tyler_eager.m4a` out of every course repository. Then test five real 30-60 minute recordings as one mixed-tier batch and compare whether Balanced is the best routine default in practice. Design and implement durable owner-only GitHub export plus idempotent Notion synchronization only after the metadata and public-sharing conventions are approved. Separately, replace or supplement the best-effort GitHub health schedule with a dependable zero-cost external interval, confirm the owner receives its outage email, and run a planned worker outage/recovery drill.
 

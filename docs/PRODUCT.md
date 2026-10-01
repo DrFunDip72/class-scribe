@@ -7,15 +7,17 @@ Give students a simple account-based website that converts class recordings into
 ## Core experience
 
 1. Create an email/password account and enter the dashboard immediately; sign-up confirmation email is disabled.
-2. Drag or select one to 20 audio or video class recordings.
-3. Choose Fast, Balanced, or High transcription for the upload; the choice applies to every selected recording and shows a measured per-hour estimate.
-4. Register the selected recordings, then prepare and upload them one at a time. As soon as one recording finishes uploading, make that logical recording available to the processing queue while later files continue uploading.
-5. The owner's Windows computer processes the oldest job one at a time with the selected model.
-6. Return to a dashboard showing plain-language progress and saved study notes; keep internal model names, raw pipeline stages, byte counts, and infrastructure terminology out of the normal client experience.
-7. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
-8. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
-9. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
-10. For the configured owner, accept a Monday/Wednesday recording from the `URecorder` Google Drive folder, reuse an existing matching upload or queue it automatically, and publish a validated summary-first note, structure-preserving formatted transcript, and verified public speech MP3 to the matching public course repository.
+2. Install the app to the phone home screen and open it as a standalone app.
+3. Record a class in the app: choose one of the configured courses, optionally set an automatic stop, start recording, and lock the phone. Recording continues with the screen off, and finishing hands the audio to the normal upload queue at High quality.
+4. Or drag or select one to 20 audio or video class recordings.
+5. Choose Fast, Balanced, or High transcription for a manual upload; the choice applies to every selected recording and shows a measured per-hour estimate.
+6. Register the selected recordings, then prepare and upload them one at a time. As soon as one recording finishes uploading, make that logical recording available to the processing queue while later files continue uploading.
+7. The owner's Windows computer processes the oldest job one at a time with the selected model.
+8. Return to a dashboard showing plain-language progress and saved study notes; keep internal model names, raw pipeline stages, byte counts, and infrastructure terminology out of the normal client experience.
+9. Optionally enable an email, a persistent browser pop-up, or both for the completed batch or each completed recording.
+10. Click the alert to open the finished result, then copy the summary, transcript, or complete notes—or download everything as Markdown. Successful copy choices remain checked across devices.
+11. Explicitly mark handled recordings done, track progress across the upload batch, and archive finished work without deleting its notes.
+12. For the configured owner, accept a Monday/Wednesday recording from the `URecorder` Google Drive folder, reuse an existing matching upload or queue it automatically, and publish a validated summary-first note, structure-preserving formatted transcript, and verified public speech MP3 to the matching public course repository.
 
 The same workflow must remain usable on a phone without pinch-zooming or horizontal scrolling. Narrow layouts stack dense controls, preserve readable labels, and provide touch targets of at least 44 by 44 CSS pixels.
 

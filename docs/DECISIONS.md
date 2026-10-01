@@ -305,3 +305,27 @@ For a new independent deployment, provision and accept the GitHub fork, Supabase
 **Reason:** The current installation contains several useful but owner-specific layers with hard-coded course, schedule, repository, account, provider, and privacy decisions. Copying those settings into another person's initial deployment could connect the wrong cloud resources, publish private classroom material, or obscure whether the core transcription path works.
 
 **Consequence:** A new owner receives a smaller acceptance boundary and independent identities at every provider. Optional code and migrations may remain present but inert without credentials. Claude can automate the technical setup, while provider sign-in, secret entry, recording consent, and Windows UAC remain explicit human checkpoints.
+
+## ADR-045 — Recover a Running OpenWhispr Container Whose Port Publish Was Dropped
+
+Wait for the Tailscale bind address before touching the container, and restart a container that is already running when `/v1/models` is unreachable and the container has been up for at least 60 seconds.
+
+**Reason:** `compose.yaml` publishes the API on `100.79.197.76:8000` rather than every interface, and Docker resolves that host address only at container start. After the 2026-09-29 Windows update, the `unless-stopped` container came up about a minute before Tailscale created the address, so Docker dropped the publish. The container was healthy inside, listing both models and serving Uvicorn on `0.0.0.0:8000`, while the host endpoint refused every connection. The supervisor could not recover it, because its only repair action was starting an already-running container, which does not republish a port.
+
+**Consequence:** A boot that wins the race against Tailscale now self-heals within one recovery interval instead of requiring a manual `docker restart`. The 60-second uptime floor keeps a cold start from being mistaken for a lost binding and restarted in a loop, and new exit code 7 distinguishes "Tailscale never came up" from a container fault. The supervisor still never creates or replaces the container.
+
+## ADR-046 — Register the Service Worker at Layout Level and Cache Only Non-Private Assets
+
+Register `/sw.js` from a layout-level client component on every load, and give it a fetch handler that serves navigations network-first with a generic `/offline` fallback while caching only the offline page and brand icons.
+
+**Reason:** Registration previously happened inside notification settings, so a user who never enabled pop-ups had no service worker and Chrome never offered installation. Chrome also requires a fetch handler before treating a site as installable. Caching responses is the usual way to satisfy that requirement, but dashboard and result documents contain private educational data that must not be written to disk.
+
+**Consequence:** The app is installable on a phone home screen without enabling notifications, and an offline navigation shows a page that names no recording. Cached content is limited to an offline shell and icons, so the privacy boundary is unchanged. The cache name is versioned and stale caches are deleted on activation.
+
+## ADR-047 — Record Class Audio in the Browser Through Durable IndexedDB Timeslices
+
+Capture lectures with `MediaRecorder` at a five-second timeslice, write every chunk to IndexedDB as it arrives, and decide the automatic stop from timestamps inside `ondataavailable`. Hand the reassembled recording to the existing upload path as a normal file, and delete the local copy only after the queue accepts it.
+
+**Reason:** Android Chrome keeps a tab alive while a microphone capture is active, so recording survives the screen turning off, but the browser can still be killed under memory pressure. Holding a 75-minute lecture in a JavaScript array would lose the entire class. Background JavaScript timers are throttled to roughly one tick per minute, so a timer cannot be trusted to end a timed recording, while capture events keep firing because they are driven by the media pipeline rather than by the event loop.
+
+**Consequence:** A crash or eviction costs at most the last few seconds, and an unfinished recording is offered for upload on the next load. Recording reuses the existing preparation, multipart, resumable-upload, queue, and deletion behavior rather than adding a second ingestion path, and the file name matches the parser the Drive importer already uses. Screen recording and iOS background capture remain out of scope: iOS suspends media capture when the screen locks, and no web API changes that.

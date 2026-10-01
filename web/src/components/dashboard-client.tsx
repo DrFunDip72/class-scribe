@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Archive, ArchiveRestore, ArrowRight, Check, CheckCheck, ClipboardCheck, Clock3, FileAudio, FileVideo, LoaderCircle, Plus, RotateCcw, Sparkles, Trash2, UploadCloud, X } from "lucide-react";
 import { NotificationSettings } from "@/components/notification-settings";
+import { ClassRecorder, type RecordingHandoff } from "@/components/class-recorder";
+import { InstallCard } from "@/components/install-card";
+import { recordingLabel } from "@/lib/courses";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/database.types";
 import { getTranscriptionTier, TRANSCRIPTION_TIERS, type TranscriptionTier } from "@/lib/transcription-tiers";
@@ -22,6 +25,7 @@ type UploadItem = { jobId: string; name: string; status: UploadItemStatus; progr
 type HistoryFilter = "todo" | "done" | "archived" | "all";
 type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
 type PendingUploadRecord = { job_id: string; original_filename: string; transcription_tier: TranscriptionTier };
+type BatchOverride = { files: File[]; label: string; tier: TranscriptionTier };
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -108,6 +112,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [uploadProgress, setUploadProgress] = useState(0);
   const [preparationProgress, setPreparationProgress] = useState(0);
   const [preparationIndex, setPreparationIndex] = useState(0);
+  const [batchCount, setBatchCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -157,13 +162,22 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
     setFiles(combined);
   }
 
-  async function submitBatch() {
-    if (!files.length || uploadState !== "idle") return;
-    const batchFiles = [...files];
+  /**
+   * `override` lets the in-app recorder submit its own single-file batch
+   * without disturbing files the user has separately staged for upload.
+   * Returns true when at least one recording reached the queue.
+   */
+  async function submitBatch(override?: BatchOverride) {
+    if (uploadState !== "idle") return false;
+    const batchFiles = override ? override.files : [...files];
+    if (!batchFiles.length) return false;
+    const batchLabel = (override ? override.label : label).trim();
+    const batchTier = override ? override.tier : transcriptionTier;
+    setBatchCount(batchFiles.length);
     const pendingRecords: PendingUploadRecord[] = batchFiles.map((file) => ({
       job_id: crypto.randomUUID(),
       original_filename: safeName(file.name),
-      transcription_tier: transcriptionTier,
+      transcription_tier: batchTier,
     }));
     setUploadItems(pendingRecords.map((record, index) => ({
       jobId: record.job_id,
@@ -181,7 +195,7 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
     const settledJobIds = new Set<string>();
     try {
       const { error: batchError } = await supabase.rpc("begin_upload_batch", {
-        p_label: label.trim(),
+        p_label: batchLabel,
         p_files: pendingRecords as unknown as Json,
       });
       if (batchError) throw batchError;
@@ -263,18 +277,21 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
           await refresh();
         }
       }
-      const selectedTier = getTranscriptionTier(transcriptionTier);
+      const selectedTier = getTranscriptionTier(batchTier);
       if (queuedCount > 0) {
         setSuccess(`${queuedCount} recording${queuedCount === 1 ? " is" : "s are"} on the way with ${selectedTier.label} quality.${failedCount ? ` ${failedCount} did not finish uploading.` : " You can leave this page."}`);
       }
-      setFiles([]);
-      setLabel("");
+      if (!override) {
+        setFiles([]);
+        setLabel("");
+        if (inputRef.current) inputRef.current.value = "";
+      }
       setUploadProgress(0);
       setPreparationProgress(0);
       setPreparationIndex(0);
-      if (inputRef.current) inputRef.current.value = "";
       await refresh();
       setUploadItems([]);
+      return queuedCount > 0;
     } catch (caught) {
       if (batchStarted) {
         await Promise.all(pendingRecords
@@ -284,9 +301,19 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
       }
       setUploadItems([]);
       setError(caught instanceof Error ? caught.message : "We couldn't start this upload. Please try again.");
+      return false;
     } finally {
       setUploadState("idle");
     }
+  }
+
+  /**
+   * In-app recordings are class lectures, so they always use the High tier the
+   * Drive automation already uses for the same material, and they carry the
+   * course code in both the filename and the batch label.
+   */
+  async function handleRecordingReady({ file, courseCode, recordedAt }: RecordingHandoff) {
+    return submitBatch({ files: [file], label: recordingLabel(courseCode, recordedAt), tier: "high" });
   }
 
   async function retry(jobId: string) {
@@ -407,6 +434,10 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
         <div className={`worker-card ${activeWorker ? "online" : ""}`}><span className="worker-dot" /><div><strong>{activeWorker ? "Service ready" : "Service unavailable"}</strong><small>{activeWorker ? activeWorker.state === "processing" ? "Creating class notes now" : "Recordings will process automatically" : "Uploads are saved and will wait safely"}</small></div></div>
       </div>
 
+      <InstallCard />
+
+      <ClassRecorder onRecordingReady={handleRecordingReady} busy={uploadState !== "idle"} />
+
       <div className="upload-card">
         <div className="card-heading"><div><h2>Add recordings</h2><p>Choose up to 20 audio or video files. Each recording starts processing as soon as its upload finishes.</p></div><span>{files.length}/{MAX_FILES}</span></div>
         <fieldset className="transcription-tier-picker" disabled={uploadState !== "idle"}>
@@ -434,9 +465,9 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
           </div>;
         })}</div> : null}
         {uploadState === "starting" ? <div className="preparation-status" role="status"><div><span>Getting your uploads ready</span><LoaderCircle className="spin" size={17} /></div><small>Your files will begin one at a time.</small></div> : null}
-        {uploadState === "preparing" ? <div className="preparation-status" role="status"><div><span>Preparing recording {preparationIndex} of {files.length}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
-        {uploadState === "uploading" ? <div className="preparation-status" role="status"><div><span>Uploading recording {preparationIndex} of {files.length}</span><strong>{Math.round(uploadProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${uploadProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
-        {files.length > 0 ? <div className="upload-footer"><label>Group name <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={submitBatch} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Start upload</> : <><LoaderCircle className="spin" size={17} />{uploadState === "starting" ? "Getting ready…" : `Sending ${preparationIndex}/${files.length}`}</>}</button></div> : null}
+        {uploadState === "preparing" ? <div className="preparation-status" role="status"><div><span>Preparing recording {preparationIndex} of {batchCount}</span><strong>{Math.round(preparationProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${preparationProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
+        {uploadState === "uploading" ? <div className="preparation-status" role="status"><div><span>Uploading recording {preparationIndex} of {batchCount}</span><strong>{Math.round(uploadProgress * 100)}%</strong></div><div className="progress-track"><span style={{ width: `${uploadProgress * 100}%` }} /></div><small>Finished recordings can begin processing while the rest continue uploading.</small></div> : null}
+        {files.length > 0 ? <div className="upload-footer"><label>Group name <input value={label} maxLength={80} disabled={uploadState !== "idle"} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Monday classes (optional)" /></label><button className="button button-primary" onClick={() => void submitBatch()} disabled={uploadState !== "idle"}>{uploadState === "idle" ? <><Plus size={17} /> Start upload</> : <><LoaderCircle className="spin" size={17} />{uploadState === "starting" ? "Getting ready…" : `Sending ${preparationIndex}/${batchCount}`}</>}</button></div> : null}
         {error && <p className="inline-alert error" role="alert"><AlertCircle size={16} />{error}</p>}
         {success && <p className="inline-alert success" role="status"><Check size={16} />{success}</p>}
       </div>

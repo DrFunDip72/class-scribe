@@ -8,6 +8,7 @@ $dockerDesktop = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 $dockerCli = "C:\Program Files\Docker\Docker\resources\bin\docker.exe"
 $containerName = "openwhispr-speaches"
 $healthUrl = "http://100.79.197.76:8000/v1/models"
+$healthBindAddress = "100.79.197.76"
 $requiredModel = "Systran/faster-whisper-base.en"
 
 New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -44,6 +45,19 @@ function Test-OpenWhisprReady {
     catch {
         return $false
     }
+}
+
+function Wait-BindAddress {
+    # compose.yaml publishes the API on the Tailscale address rather than every
+    # interface. Docker resolves that host address once, when the container
+    # starts, so the address has to exist before the container comes up.
+    for ($attempt = 0; $attempt -lt 45; $attempt++) {
+        if (@(Get-NetIPAddress -IPAddress $healthBindAddress -ErrorAction SilentlyContinue).Count -gt 0) {
+            return $true
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $false
 }
 
 try {
@@ -92,6 +106,11 @@ try {
         exit 4
     }
 
+    if (-not (Wait-BindAddress)) {
+        Write-SupervisorLog "The bind address $healthBindAddress never appeared; Tailscale is not up."
+        exit 7
+    }
+
     $containerState = (& $dockerCli container inspect --format "{{.State.Status}}" $containerName 2>$null)
     if ($containerState -ne "running") {
         Write-SupervisorLog "Starting the OpenWhispr container."
@@ -99,6 +118,36 @@ try {
         if ($LASTEXITCODE -ne 0) {
             Write-SupervisorLog "The OpenWhispr container did not start."
             exit 5
+        }
+    }
+    else {
+        # The container is up but the health check above still failed. On a boot
+        # where the container beat Tailscale to the bind address, Docker dropped
+        # the port publish and the API is only reachable from inside the
+        # container. Starting an already-running container does not republish the
+        # port, so recover with a restart now that the address exists.
+        $uptimeSeconds = [double]::MaxValue
+        try {
+            $startedAt = [datetime](& $dockerCli container inspect --format "{{.State.StartedAt}}" $containerName 2>$null)
+            $uptimeSeconds = ((Get-Date).ToUniversalTime() - $startedAt.ToUniversalTime()).TotalSeconds
+        }
+        catch {
+            # An unreadable timestamp should not block recovery.
+        }
+
+        if ($uptimeSeconds -lt 60) {
+            # A container this young is still booting. Fall through to the
+            # readiness loop so a cold start is not mistaken for a lost binding
+            # and restarted in a loop.
+            Write-SupervisorLog "The container started recently; waiting for it to finish booting."
+        }
+        else {
+            Write-SupervisorLog "The container is running but unreachable; restarting it to republish the port."
+            & $dockerCli container restart $containerName *> $null
+            if ($LASTEXITCODE -ne 0) {
+                Write-SupervisorLog "The OpenWhispr container did not restart."
+                exit 5
+            }
         }
     }
 

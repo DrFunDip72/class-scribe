@@ -109,8 +109,51 @@ button { color: inherit; }
 .worker-card strong, .worker-card small { display: block; }
 .worker-card strong { font-size: 12px; }
 .worker-card small { margin-top: 3px; color: var(--muted); font-size: 9px; }
-.upload-card, .notification-card, .history-section, .aside-card, .notes-section, .transcript-section { border: 1px solid var(--line); border-radius: 15px; background: white; box-shadow: 0 4px 18px #213a2c08; }
+.install-card, .recorder-card, .upload-card, .notification-card, .history-section, .aside-card, .notes-section, .transcript-section { border: 1px solid var(--line); border-radius: 15px; background: white; box-shadow: 0 4px 18px #213a2c08; }
 .upload-card { padding: 22px; }
+
+.recorder-card { margin-bottom: 18px; padding: 22px; }
+.install-card { margin-bottom: 18px; padding: 15px 18px; display: flex; align-items: center; gap: 13px; }
+.install-card.installed { border-color: #cde4d8; background: linear-gradient(135deg, white, #f5fbf7); }
+.install-card > div { min-width: 0; flex: 1; }
+.install-card strong { display: block; font-size: 13px; }
+.install-card small, .install-card p { margin: 3px 0 0; display: block; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.install-card p svg { vertical-align: -2px; }
+.install-card > button { flex: none; }
+.install-icon { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 10px; color: var(--green); background: var(--green-soft); }
+.recorder-classes { min-width: 0; margin: 18px 0 0; padding: 0; border: 0; }
+.recorder-classes legend { width: 100%; padding: 0; color: var(--ink); font-size: 12px; font-weight: 800; }
+.recorder-class-options { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(126px, 1fr)); gap: 9px; }
+.recorder-class-option { position: relative; min-height: 52px; min-width: 0; padding: 0 13px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 11px; background: #fbfdfc; cursor: pointer; transition: .15s; }
+.recorder-class-option.selected { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 2px #187a5914; }
+.recorder-class-option:focus-within { outline: 2px solid var(--green); outline-offset: 2px; }
+.recorder-class-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.recorder-class-option > span { min-width: 0; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.recorder-class-option em { margin-left: auto; padding: 3px 7px; border-radius: 999px; color: #126b4c; background: #e3f4eb; font-size: 8px; font-weight: 800; font-style: normal; text-transform: uppercase; }
+.recorder-classes:disabled .recorder-class-option { cursor: not-allowed; opacity: .6; }
+.recorder-limit { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.recorder-limit > span { color: var(--ink); font-size: 12px; font-weight: 800; }
+.recorder-limit select { min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; background: white; font-size: 13px; }
+.recorder-limit select:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.recorder-start { margin-top: 16px; }
+.recorder-live { margin-top: 18px; padding: 17px; border: 1px solid #d5e7dc; border-radius: 13px; background: #f0f7f3; text-align: center; }
+.recorder-live-head { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: left; }
+.recorder-live-head strong, .recorder-live-head small { display: block; }
+.recorder-live-head strong { font-size: 13px; }
+.recorder-live-head small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.recorder-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: var(--red); animation: recorder-pulse 1.6s ease-in-out infinite; }
+@keyframes recorder-pulse { 50% { opacity: .25; } }
+.recorder-timer { margin: 13px 0 0; font-size: 40px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.recorder-hint { margin: 9px 0 15px; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 10px; }
+.recorder-hint svg { flex: none; }
+.recorder-recovery { margin-top: 16px; padding: 13px; border: 1px solid #e8dcc2; border-radius: 11px; background: #fdf8ee; }
+.recorder-recovery > strong { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #76501c; }
+.recorder-recovery-row { margin-top: 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.recorder-recovery-row > div:first-child { min-width: 0; }
+.recorder-recovery-row strong, .recorder-recovery-row small { display: block; }
+.recorder-recovery-row strong { font-size: 12px; }
+.recorder-recovery-row small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.recorder-recovery-actions { flex: none; display: flex; align-items: center; gap: 4px; }
 .card-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
 .card-heading h2 { margin: 0; font-size: 16px; }
 .card-heading p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
@@ -307,6 +350,13 @@ button { color: inherit; }
 }
 
 @media (max-width: 640px) {
+  .install-card { padding: 14px; gap: 11px; flex-wrap: wrap; }
+  .install-card > button { width: 100%; }
+  .recorder-card { padding: 17px; }
+  .recorder-limit { flex-direction: column; align-items: stretch; gap: 8px; }
+  .recorder-limit select { width: 100%; }
+  .recorder-timer { font-size: 34px; }
+  .recorder-recovery-row { flex-wrap: wrap; }
   .button-small, .icon-button, .ghost-button { min-height: 44px; }
   .icon-button { width: 44px; }
   .brand { min-height: 44px; }
@@ -415,6 +465,8 @@ button { color: inherit; }
 }
 
 @media (max-width: 360px) {
+  .recorder-class-options { grid-template-columns: 1fr; }
+  .recorder-timer { font-size: 30px; }
   .brand { gap: 8px; font-size: 14px; }
   .brand-mark { width: 32px; height: 32px; }
   .nav-wrap .button-small { padding-inline: 12px; font-size: 12px; }

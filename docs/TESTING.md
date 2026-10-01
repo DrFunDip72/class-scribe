@@ -1,5 +1,18 @@
 # Testing and Verification
 
+## Post-update startup audit and Ollama repair — PASS, ONE ITEM BLOCKED
+
+**Date:** 2026-09-29
+**Scope:** every configured Windows startup mechanism after a system update, plus the `openwhispr-supervisor.ps1` port-publish recovery change.
+
+1. Enumerated both Startup folders, the `HKCU` and `HKLM` `Run` keys, and every enabled non-Microsoft boot/logon scheduled task, then checked each one against a live process, listening socket, or health endpoint rather than against its registration alone.
+2. Confirmed healthy: Tailscale `Running`, Google Drive with `G:` mounted, OneDrive, the Docker Desktop engine, `AudioTranscriberWorker` with its queue worker process, `ClassScribeDriveDesktopAutomation` with last result 0, and the YT Extract worker answering `/health` with `{"ok":true}`.
+3. Reproduced the Ollama failure: `/api/tags` returned HTTP 200 while `/api/generate` returned HTTP 500 `llama-server binary not found`, and `lib/ollama` was empty. `upgrade.log` confirmed an aborted install and its rollback, caused by the locked `ollama.exe`.
+4. Repaired Ollama through the `ollama-maintenance.pause` marker and a silent reinstall. The install log recorded `Installation process succeeded` with no rollback; `llama-server.exe` was restored and both binaries matched. Verified a live `/api/generate` call returning 20 evaluated tokens in 8.9 seconds.
+5. Verified the supervisor change: the script parses without errors, `Get-NetIPAddress` resolves the Tailscale bind address, and a direct run exits 0 against an already-healthy endpoint without writing a spurious log line. Restart-based republication was confirmed empirically during the live repair, where `docker restart` restored `100.79.197.76:8000->8000/tcp` and the endpoint began answering.
+
+**Result:** PASS for the audit, the Ollama repair, and the supervisor change. `ClassScribeGitHubAudit` is BLOCKED and still unregistered, because re-registering a `SYSTEM` principal requires an elevated shell the audit session could not obtain. The running-but-unpublished branch is verified by inspection and by the equivalent manual restart; it will first execute automatically on the next boot that wins the race against Tailscale.
+
 ## Independent installation handoff review — PASS
 
 **Date:** 2026-09-24
@@ -489,6 +502,12 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 - [ ] Restart the computer during a long recording and confirm stale-lease recovery.
 - [ ] Measure 30- and 60-minute processing time and peak memory.
 - [ ] Repeat the completed mobile usability review on one physical phone.
+- [ ] Install the app to an Android home screen and confirm it opens standalone.
+- [ ] Record a full lecture on the phone with the screen locked, then confirm the uploaded audio covers the whole class.
+- [ ] Force-stop Chrome mid-recording and confirm the unfinished recording is offered and uploads correctly.
+- [ ] Confirm a timed automatic stop ends the recording on time with the screen off.
+- [ ] Confirm Chrome is excluded from battery optimization on the recording phone.
+- [ ] Repeat the recorder layout review at 320 CSS pixels.
 
 Do not promise processing time until real long-class benchmarks are recorded.
 
@@ -552,3 +571,22 @@ The stored segment records contain timestamps and text but omit confidence field
 5. Preserved the existing warning that processing-time promises require real 30- and 60-minute benchmarks.
 
 **Result:** PASS.
+
+## Installable app and in-app recorder — PARTIAL PASS, PHONE CAPTURE UNTESTED
+
+**Date:** 2026-09-30
+
+**Scope:** Static verification of the PWA surface and a desktop-browser layout review of the recorder. No microphone capture, no authenticated dashboard run, and no physical phone were exercised.
+
+1. `npm run lint` reported no problems. Two `react-hooks/set-state-in-effect` errors found on the first run were fixed by moving the recording completion handoff out of a React effect into a `MediaRecorder` stop callback and by replacing a mount-time feature-detection effect with `useSyncExternalStore`.
+2. `npm run build` compiled successfully with TypeScript checking enabled and emitted the new static `/offline` route and `/manifest.webmanifest`.
+3. `/manifest.webmanifest` served the expected JSON: standalone display, `/` scope, `/dashboard` start URL, portrait orientation, 192/512 PNG icons, a 512 maskable icon, and the Record shortcut.
+4. `/sw.js` returned HTTP 200 as JavaScript and contained exactly one `fetch` listener, which Chrome requires before offering installation.
+5. `/offline` returned HTTP 200. `/icon-192.png`, `/icon-512.png`, `/icon-maskable-512.png`, and `/apple-touch-icon.png` each returned HTTP 200 with non-zero bodies (4113, 13511, 8065, and 2847 bytes).
+6. The rendered document head contained `<link rel="manifest">`, `theme-color`, `mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-touch-icon` at 180x180, and a viewport with `viewport-fit=cover`.
+7. At a 390 x 844 viewport the recorder reported `scrollWidth === innerWidth === 390`, so it introduced no horizontal overflow. The four course cards measured 161 x 52 CSS pixels each and no button, select, or course card measured under 44 pixels in either dimension.
+8. Selecting a course moved both the checked state and the `selected` class to the clicked card and cleared the other three.
+9. The first layout attempt exposed 17 x 17 pixel radio inputs, below the documented 44-pixel minimum. Corrected to the existing tier-picker convention: the input is visually hidden and the full 52-pixel card is the target, with `:focus-within` supplying the focus ring.
+10. The "Today" badge was suppressed when every course meets, because 2026-09-30 is a Wednesday and all four courses would otherwise be badged.
+
+**Not covered:** microphone capture, screen-off recording, the automatic stop, IndexedDB persistence across a browser kill, recovery of an unfinished recording, the handoff into the upload queue, the authenticated dashboard, layout at 320 CSS pixels, and any iOS behavior. Steps 7 and 8 used a temporary unauthenticated page that mounted the recorder in isolation; it was deleted afterward and the build and lint above were re-run clean without it.

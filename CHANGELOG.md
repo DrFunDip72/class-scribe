@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-30
+
+### Installable app and in-app class recording
+
+- Made the web app installable on a phone home screen. Added 192/512 PNG icons, a full-bleed maskable icon, and a 180-pixel Apple touch icon generated from the existing mark; added `scope`, `orientation`, categories, and a Record shortcut to the manifest; and added `appleWebApp` metadata plus a `viewport` export.
+- Added an explicit Add to home screen card on the dashboard. It captures `beforeinstallprompt` at module scope so Chrome's one-shot event is not missed before React mounts, offers an Install button when the browser allows it, and otherwise shows per-platform manual steps. Chrome's own banner is suppressed so the in-app button owns the flow.
+- Moved service-worker registration out of notification settings into a layout-level component so the app registers on every load. Chrome withheld the install prompt while registration depended on enabling pop-ups.
+- Gave `sw.js` a fetch handler with a network-first navigation strategy and a new `/offline` fallback page. Only the offline page and brand icons are cached; dashboard, result, and API responses are never written to disk.
+- Added in-app class recording. The dashboard now has a course picker for the four configured courses, an optional automatic stop after 50/75/110 minutes, a live timer, and one-tap handoff into the existing upload queue at High tier.
+- Recording writes every five-second MediaRecorder timeslice to IndexedDB instead of buffering a whole lecture in memory, so a browser kill costs seconds rather than the class. Unfinished recordings are offered for upload or discard on the next load, and the local copy is deleted only after the queue accepts the upload.
+- The automatic stop is decided from timestamps inside `ondataavailable` rather than from a JavaScript timer, because Android throttles background timers to roughly one tick per minute while capture events continue.
+- Recording prefers MP4/AAC where `MediaRecorder` supports it, so a normal lecture uploads with no browser re-encode; WebM/Opus remains the fallback and still passes through the existing preparation path.
+- Recordings are named `<COURSE>_<YYYY-MM-DD>.<ext>`, the canonical form `class_scribe_automation.py` already parses, so the existing Drive/GitHub path can adopt them later without a rename.
+
+## 2026-09-29
+
+### Post-update startup recovery
+
+- Diagnosed a destructive Ollama auto-update rollback. The updater fired while the `SYSTEM` worker task held `ollama.exe`, so the installer could not replace the binary, defaulted to Abort under `/SUPPRESSMSGBOXES`, and its rollback left `lib/ollama` empty. `/api/tags` still answered HTTP 200, so the runtime looked healthy while every `/api/generate` call returned HTTP 500 `llama-server binary not found`.
+- Repaired the runtime through the launcher's existing `ollama-maintenance.pause` marker, which stops Ollama as `SYSTEM` so a silent reinstall can replace the locked binary.
+- Disabled the `Ollama.lnk` tray-app autostart. It lost the port 11434 bind to the worker launcher on every boot and then triggered the update that broke the install; `worker-launcher.ps1` already owns the runtime.
+- Taught `openwhispr-supervisor.ps1` to wait for the Tailscale bind address and to restart a container that is running but unreachable, recovering the port publish Docker drops when the container starts before Tailscale.
+
 ## 2026-09-24
 
 ### Independent installation handoff

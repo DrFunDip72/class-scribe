@@ -22,8 +22,10 @@ Docker Desktop remains a per-user application. `install-openwhispr-task.ps1` reg
 
 1. Exits immediately when the required model is already available from `/v1/models`.
 2. Starts Docker Desktop when its engine is unavailable and waits up to 90 seconds.
-3. Starts the existing `openwhispr-speaches` container when needed.
-4. Waits up to 60 seconds for the required model endpoint.
+3. Waits up to 90 seconds for the Tailscale bind address, because Docker resolves the published host address only at container start.
+4. Starts the existing `openwhispr-speaches` container when needed.
+5. Restarts a container that is already running but unreachable, once it has been up for at least 60 seconds, to republish a dropped port binding.
+6. Waits up to 60 seconds for the required model endpoint.
 
 The supervisor never creates or replaces the container. Its generic operational log is stored in ignored `.openwhispr-state/` and contains no audio, transcripts, request bodies, or credentials.
 
@@ -49,6 +51,7 @@ Invoke-RestMethod http://100.79.197.76:8000/v1/models
 ## Troubleshooting
 
 - If port 8000 is unavailable but Tailscale is online, run the supervisor once and inspect only `.openwhispr-state/supervisor.log`.
+- If `docker ps` shows `8000/tcp` with no `100.79.197.76:8000->8000/tcp` mapping, the container started before Tailscale created the address and Docker dropped the publish. The API answers inside the container but refuses every host connection. The supervisor now recovers this automatically; `docker restart openwhispr-speaches` fixes it immediately.
 - If Docker never becomes ready, open Docker Desktop interactively and inspect its diagnostics. The recurring task will retry in five minutes.
 - If the container is missing, restore it deliberately from its recorded configuration; the supervisor will not silently create a replacement from a floating image tag.
 - If `/v1/models` responds but the required model is absent, inspect the container's model volume and logs.

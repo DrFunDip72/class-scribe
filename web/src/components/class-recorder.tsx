@@ -15,7 +15,7 @@ import {
   markFinalized,
   type RecordingSession,
 } from "@/lib/recording/recording-store";
-import { extensionForMimeType, recordingSupported, useRecorder } from "@/lib/recording/use-recorder";
+import { baseMimeType, extensionForMimeType, recordingSupported, useRecorder } from "@/lib/recording/use-recorder";
 
 const AUTO_STOP_CHOICES = [
   { value: 0, label: "No limit" },
@@ -49,7 +49,7 @@ export function ClassRecorder({
   onRecordingReady,
   busy,
 }: {
-  onRecordingReady: (handoff: RecordingHandoff) => Promise<boolean>;
+  onRecordingReady: (handoff: RecordingHandoff) => Promise<{ ok: boolean; message?: string }>;
   busy: boolean;
 }) {
   const supported = useSyncExternalStore(subscribeToNothing, recordingSupported, assumeSupported);
@@ -67,13 +67,14 @@ export function ClassRecorder({
     try {
       const { blob } = await assembleSession(session.id);
       const recordedAt = new Date(session.startedAt);
+      const uploadType = baseMimeType(session.mimeType);
       const file = new File(
         [blob],
         recordingFilename(session.courseCode, extensionForMimeType(session.mimeType), recordedAt),
-        { type: session.mimeType, lastModified: session.startedAt },
+        { type: uploadType, lastModified: session.startedAt },
       );
-      const accepted = await onRecordingReady({ file, courseCode: session.courseCode, recordedAt });
-      if (accepted) {
+      const { ok, message } = await onRecordingReady({ file, courseCode: session.courseCode, recordedAt });
+      if (ok) {
         // Only drop the local copy once the queue has accepted the upload.
         await markFinalized(session.id);
         await deleteSession(session.id);
@@ -82,7 +83,9 @@ export function ClassRecorder({
         setRecoverable((current) => current.some((item) => item.id === session.id)
           ? current
           : [session, ...current]);
-        setHandoffError("The upload did not finish. The recording is still saved on this device.");
+        setHandoffError(message
+          ? `${message} The recording is still saved on this device.`
+          : "The upload did not finish. The recording is still saved on this device.");
       }
     } catch (caught) {
       setHandoffError(caught instanceof Error ? caught.message : "This recording could not be prepared.");

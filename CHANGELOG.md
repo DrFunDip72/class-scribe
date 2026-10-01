@@ -2,6 +2,11 @@
 
 ## 2026-09-30
 
+### Recorded-audio upload fix
+
+- Fixed in-app recordings failing to upload. `MediaRecorder` reports its type with codec parameters such as `audio/mp4;codecs=mp4a.40.2`, while the `recordings` bucket's allowed-type list and `queue_uploaded_recording` both match exactly, so Supabase rejected the object before it was stored. Codec parameters are now stripped in the recorder and again in the shared upload path.
+- The recorder now shows the real upload failure instead of a generic notice. The actual message was only rendered in the upload card further down the page, which is off-screen on a phone.
+
 ### Installable app and in-app class recording
 
 - Released as `dpl_BMPkvsLsshxaxRPp1Ar54BoPqqiJ`. Discovered during release that the Vercel project is not Git-connected, so `git push` never deployed, and that the project had no environment variables; added the two public Supabase values as Vercel-managed variables and deployed with `vercel deploy --prod`.

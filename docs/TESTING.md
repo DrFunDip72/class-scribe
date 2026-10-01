@@ -606,3 +606,17 @@ The stored segment records contain timestamps and text but omit confidence field
 7. `/login` returned HTTP 200, confirming the missing-environment-variable middleware 500 described in `docs/DEPLOYMENT.md` did not occur.
 
 **Not covered:** the install card and recorder were not exercised on a physical phone. Home-screen installation, screen-off capture, the automatic stop, crash recovery, and the upload handoff remain owner-operated tests.
+
+## Recorded-audio upload rejection — FIXED
+
+**Date:** 2026-09-30
+
+**Symptom:** On a physical Android phone the app installed and recorded (STRAT 392, 415 KB), but the upload failed with the recorder's generic "The upload did not finish" notice.
+
+1. Reproduced the cause by inspection rather than by guesswork: `storage.buckets.allowed_mime_types` for `recordings` is an exact-match list, and `queue_uploaded_recording` checks `v_mime_type not in (...)` against the same bare types.
+2. `MediaRecorder` sets `Blob.type` to the full negotiated type, `audio/mp4;codecs=mp4a.40.2` on Chrome for Android. `uploadPart` forwarded `file.type` unchanged, so Supabase Storage rejected the object before the RPC ever ran. Files chosen from the picker carry bare types such as `audio/mpeg`, which is why no earlier test caught it.
+3. Fixed by stripping codec parameters when the recording file is constructed and again in the shared `uploadPart`, so any future caller is covered.
+4. Verified that every type the recorder can negotiate normalises into the allowed list: `audio/mp4;codecs=mp4a.40.2`, `audio/webm;codecs=opus`, `audio/mp4`, `audio/webm`, and a mixed-case parameterised form all reduce to `audio/mp4` or `audio/webm`.
+5. The recorder now surfaces the underlying failure text. Previously the real message was written only to the upload card below the fold.
+
+**Not covered:** the corrected upload has not yet been run on the phone.

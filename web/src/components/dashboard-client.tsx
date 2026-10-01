@@ -113,6 +113,9 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
   const [preparationProgress, setPreparationProgress] = useState(0);
   const [preparationIndex, setPreparationIndex] = useState(0);
   const [batchCount, setBatchCount] = useState(0);
+  // The recorder sits above the upload card, so its handoff needs the actual
+  // failure text rather than a generic message the user must scroll to find.
+  const uploadErrorRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -218,8 +221,12 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
             const extension = filename.split(".").pop()?.toLowerCase() ?? "";
             const storageFilename = `part-${String(partIndex + 1).padStart(4, "0")}.${extension}`;
             const path = `${userId}/${jobId}/${storageFilename}`;
-            const mimeType = file.type && file.type !== "application/octet-stream"
-              ? file.type
+            // Strip codec parameters such as `audio/mp4;codecs=mp4a.40.2`.
+            // Supabase Storage's allowed-type list and queue_uploaded_recording
+            // both match exactly, so a parameterised type is rejected outright.
+            const declaredType = file.type.split(";")[0].trim().toLowerCase();
+            const mimeType = declaredType && declaredType !== "application/octet-stream"
+              ? declaredType
               : mimeByExtension[extension];
             if (!mimeType) throw new Error(`${sourceFile.name} is not a supported recording format.`);
 
@@ -273,7 +280,11 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
           await supabase.rpc("fail_recording_upload", { p_job_id: jobId });
           settledJobIds.add(jobId);
           updateUploadItem(jobId, { status: "failed", progress: 0 });
-          setError(fileError instanceof Error ? `${sourceFile.name}: ${fileError.message}` : `${sourceFile.name} did not finish uploading.`);
+          const fileMessage = fileError instanceof Error
+            ? `${sourceFile.name}: ${fileError.message}`
+            : `${sourceFile.name} did not finish uploading.`;
+          uploadErrorRef.current = fileMessage;
+          setError(fileMessage);
           await refresh();
         }
       }
@@ -300,7 +311,11 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
         await refresh();
       }
       setUploadItems([]);
-      setError(caught instanceof Error ? caught.message : "We couldn't start this upload. Please try again.");
+      const batchMessage = caught instanceof Error
+        ? caught.message
+        : "We couldn't start this upload. Please try again.";
+      uploadErrorRef.current = batchMessage;
+      setError(batchMessage);
       return false;
     } finally {
       setUploadState("idle");
@@ -313,7 +328,9 @@ export function DashboardClient({ userId, userEmail }: { userId: string; userEma
    * course code in both the filename and the batch label.
    */
   async function handleRecordingReady({ file, courseCode, recordedAt }: RecordingHandoff) {
-    return submitBatch({ files: [file], label: recordingLabel(courseCode, recordedAt), tier: "high" });
+    uploadErrorRef.current = null;
+    const queued = await submitBatch({ files: [file], label: recordingLabel(courseCode, recordedAt), tier: "high" });
+    return { ok: queued, message: uploadErrorRef.current ?? undefined };
   }
 
   async function retry(jobId: string) {

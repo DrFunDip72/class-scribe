@@ -38,6 +38,16 @@ export function extensionForMimeType(mimeType: string) {
   return mimeType.startsWith("audio/mp4") ? "m4a" : "webm";
 }
 
+/**
+ * MediaRecorder reports its type with codec parameters, such as
+ * `audio/mp4;codecs=mp4a.40.2`. Supabase Storage's allowed-type list and the
+ * `queue_uploaded_recording` RPC both match exactly, so the parameters must be
+ * dropped before the file reaches either.
+ */
+export function baseMimeType(mimeType: string) {
+  return mimeType.split(";")[0].trim().toLowerCase();
+}
+
 export function recordingSupported() {
   return typeof navigator !== "undefined"
     && Boolean(navigator.mediaDevices?.getUserMedia)

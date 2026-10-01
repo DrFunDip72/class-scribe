@@ -4,6 +4,8 @@
 
 ### Interface clean-up
 
+- Replaced the stacked per-class sections on Notes with class tabs. The progress filter became a compact segmented control above them, and each tab shows how many recordings it holds for the selected progress filter. In the All tab each row names its class; inside a class tab the class is implied, so rows show only the lecture date.
+
 - Leaving the Record screen now dismisses the upload confirmation, so returning lands on the class picker instead of a stale "Uploaded" screen.
 
 - Made the tab bar permanently visible. The page now scrolls inside the main area rather than the document, so the header, the recording bar, and the tabs are always on screen.

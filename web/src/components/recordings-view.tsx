@@ -164,7 +164,18 @@ export function RecordingsView() {
     {workspace.loading
       ? <div className="empty-state compact"><LoaderCircle className="spin" /><p>Loading your recordings…</p></div>
       : workspace.jobs.length === 0
-        ? <div className="empty-state"><FileAudio /><h3>No recordings yet</h3><p>Record a class and it will appear here.</p></div>
+        ? <div className="empty-state">
+          <FileAudio />
+          <h3>No recordings yet</h3>
+          <p>Record a class and it will appear here.</p>
+          <ol className="next-steps">
+            <li><span>1</span>Your recording uploads securely and privately.</li>
+            <li><span>2</span>Processing starts as soon as the upload finishes.</li>
+            <li><span>3</span>Your transcript and study notes appear here.</li>
+            <li><span>4</span>You can get an email or pop-up when they&rsquo;re ready.</li>
+          </ol>
+          <Link className="button button-primary" href="/record">Record a class</Link>
+        </div>
         : groups.length === 0
           ? <div className="empty-state compact"><CheckCheck /><h3>Nothing in this view</h3><p>Choose another filter.</p></div>
           : <div className="course-list">{groups.map((group) => <section className="course-group" key={group.key}>

@@ -633,3 +633,18 @@ The stored segment records contain timestamps and text but omit confidence field
 6. The migration adding `user_preferences` produced no new Supabase security advisories; RLS is enabled with per-account select, insert, and update policies.
 
 **Not covered:** no browser automation host was available this session, so no screen was rendered or interacted with. The tab bar, the three recording screens, the course/date grouping, Settings, Account, and the persistent recording and upload bars are unverified visually and behaviourally. Critically, recording survival across a tab change has not been observed — it is the primary reason for ADR-048 and must be tested on the phone.
+
+## App shell server render — PASS
+
+**Date:** 2026-09-30
+
+No browser automation host was available, so the whole shell was mounted on a temporary public route and its server-rendered HTML inspected. The route was deleted afterward and lint and build re-run clean without it.
+
+1. The route returned HTTP 200 with 29,455 bytes, so `WorkspaceProvider`, `RecorderProvider`, `AppShell`, and all five views rendered without throwing.
+2. Every view produced its own heading: "Record a class", "Your notes", "Settings", "Account", and "Upload recordings".
+3. The tab bar rendered with links to `/record`, `/recordings`, `/settings`, plus `/account` from the header and `/upload` from the record screen.
+4. All four course cards rendered exactly once each: HRM 391, PSE 390, PHIL 201, STRAT 392.
+5. Expected structural classes were present: `app-frame`, `app-main`, `tab-bar`, `recorder-class-option`, `recorder-limit`, `button-large`, `settings-card`, `install-card`, `history-filters`, `empty-state`.
+6. No React error markers appeared in the output.
+
+**Not covered:** this proves server render and markup only. Client interaction, the tab bar's active state, the full-screen recording and done screens, course/date grouping with real rows, and recording survival across a tab change all remain untested.

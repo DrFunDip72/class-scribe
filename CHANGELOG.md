@@ -4,6 +4,8 @@
 
 ### Multi-page app shell
 
+- Carried the old sidebar's four-step explainer into the Notes empty state, where a first-time user actually needs it, rather than dropping it with the sidebar.
+
 - Replaced the single scrolling dashboard with a tabbed app: Record, Notes, and Settings, plus Account, Upload, and the existing result page. `/dashboard` now redirects to `/record`, which is also the manifest `start_url`, because the installed app has the old URL baked in.
 - Moved the recorder into the authenticated layout. A route change unmounts page components, so leaving the recording page would previously have torn down the `MediaRecorder` and ended the lecture. Uploads moved there too, so they continue while the user reads notes on another tab.
 - Added a persistent recording bar and upload progress bar that stay visible from every tab and link back to the recording.

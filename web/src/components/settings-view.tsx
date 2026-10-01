@@ -39,19 +39,6 @@ export function SettingsView() {
 
     <NotificationSettings userId={workspace.userId} accountEmail={workspace.userEmail} />
 
-    <div className="settings-card">
-      <div className="card-heading"><div><h2>Transcription service</h2><p>Your computer does the processing.</p></div></div>
-      <div className={`worker-card ${workspace.activeWorker ? "online" : ""}`}>
-        <span className="worker-dot" />
-        <div>
-          <strong>{workspace.activeWorker ? "Service ready" : "Service unavailable"}</strong>
-          <small>{workspace.activeWorker
-            ? workspace.activeWorker.state === "processing" ? "Creating class notes now" : "Recordings will process automatically"
-            : "Uploads are saved and will wait safely"}</small>
-        </div>
-      </div>
-    </div>
-
     <Link className="settings-link" href="/account">
       <span className="install-icon"><CircleUser size={17} /></span>
       <div><strong>Account</strong><small>{workspace.userEmail}</small></div>

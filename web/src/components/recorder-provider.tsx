@@ -14,7 +14,15 @@ import { useWorkspace } from "@/components/workspace-provider";
 
 export type CompletedRecording = { jobId: string | null; courseCode: CourseCode; recordedAt: Date };
 
+/**
+ * A single state for the Record screen to switch on. Without it the screen
+ * briefly fell back to the class picker between the recorder going idle and
+ * the upload completing, which read as the home screen flashing.
+ */
+export type RecorderStage = "idle" | "starting" | "recording" | "saving" | "done";
+
 type RecorderValue = {
+  stage: RecorderStage;
   status: ReturnType<typeof useRecorder>["status"];
   elapsedMs: number;
   storedBytes: number;
@@ -113,7 +121,15 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     recorder.setError(null);
   }, [recorder]);
 
+  const stage: RecorderStage =
+    recorder.status === "recording" ? "recording"
+      : recorder.status === "starting" ? "starting"
+        : recorder.status === "finishing" || handingOff ? "saving"
+          : completed ? "done"
+            : "idle";
+
   const value: RecorderValue = {
+    stage,
     status: recorder.status,
     elapsedMs: recorder.elapsedMs,
     storedBytes: recorder.storedBytes,

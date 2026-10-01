@@ -66,6 +66,16 @@ type WorkspaceValue = {
   retry: (jobId: string) => Promise<string | null>;
   saveRecordingState: (job: Job, update: Database["public"]["Tables"]["recording_user_states"]["Update"]) => Promise<string | null>;
   savingJobIds: string[];
+  /**
+   * Files chosen on the Record screen and carried to the Upload screen. The
+   * picker must open from a real user gesture, so it cannot be triggered after
+   * navigating; picking first and navigating second keeps it to one tap.
+   */
+  stagedFiles: File[];
+  stageFiles: (files: File[]) => void;
+  addStagedFiles: (files: File[]) => void;
+  removeStagedFile: (index: number) => void;
+  clearStagedFiles: () => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
@@ -104,6 +114,7 @@ export function WorkspaceProvider({
   const [preparationIndex, setPreparationIndex] = useState(0);
   const [batchCount, setBatchCount] = useState(0);
   const [savingJobIds, setSavingJobIds] = useState<string[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   // Captured when the poll lands, so freshness is never computed during render.
   const [checkedAt, setCheckedAt] = useState(0);
   const uploadingRef = useRef(false);
@@ -302,6 +313,11 @@ export function WorkspaceProvider({
     defaultTier, saveDefaultTier,
     uploadState, uploadItems, uploadProgress, preparationProgress, preparationIndex, batchCount,
     submitBatch, retry, saveRecordingState, savingJobIds,
+    stagedFiles,
+    stageFiles: setStagedFiles,
+    addStagedFiles: (incoming: File[]) => setStagedFiles((current) => [...current, ...incoming]),
+    removeStagedFile: (index: number) => setStagedFiles((current) => current.filter((_, i) => i !== index)),
+    clearStagedFiles: () => setStagedFiles([]),
   };
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

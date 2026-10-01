@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Check, Share, Smartphone } from "lucide-react";
+import { Share, Smartphone } from "lucide-react";
 import {
   getInstallState,
   getPlatform,
@@ -28,12 +28,8 @@ export function InstallCard() {
   const platform = useSyncExternalStore(subscribeToNothing, getPlatform, getServerPlatform);
   const [working, setWorking] = useState(false);
 
-  if (state === "installed") {
-    return <section className="install-card installed">
-      <span className="install-icon"><Check size={17} /></span>
-      <div><strong>Installed</strong><small>You’re running Class Scribe as an app.</small></div>
-    </section>;
-  }
+  // Nothing to offer once it is installed; a confirmation card is just noise.
+  if (state === "installed") return null;
 
   return <section className="install-card">
     <span className="install-icon"><Smartphone size={17} /></span>

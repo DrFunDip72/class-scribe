@@ -2,6 +2,16 @@
 
 ## 2026-09-30
 
+### Interface clean-up
+
+- Made the tab bar permanently visible. The page now scrolls inside the main area rather than the document, so the header, the recording bar, and the tabs are always on screen.
+- Removed the transcription-service status card from Settings and the "Installed" confirmation card, and reworded the processing-paused notice so it describes the service rather than a Windows computer.
+- Rebuilt the Notes list. Rows are titled by lecture date instead of a raw filename, show one line of status, and are tappable in full when ready. Done and Archive moved off the rows to the result page, where they already existed, and the duplicate date subheadings are gone.
+- "Upload a file instead" now opens the file picker immediately and carries the chosen files to the upload page, so it is one tap. The selection lives in the workspace provider and survives navigation.
+- Added a custom automatic-stop length of 1 to 360 minutes alongside the presets.
+- Finishing a recording no longer flashes the class picker. An explicit recorder stage shows a "Saving your recording" screen with upload progress until the upload settles.
+- Result pages are titled "STRAT 392 · Wed, Sep 30" rather than the storage filename, show the recording length, and have tighter mobile spacing and a larger transcript size. Copies and downloads still carry the original filename.
+
 ### Multi-page app shell
 
 - Carried the old sidebar's four-step explainer into the Notes empty state, where a first-time user actually needs it, rather than dropping it with the sidebar.

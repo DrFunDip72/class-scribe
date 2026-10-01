@@ -20,25 +20,26 @@ function uploadItemLabel(status: string, progress: number) {
 export function UploadView() {
   const workspace = useWorkspace();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [files, setFiles] = useState<File[]>([]);
   const [label, setLabel] = useState("");
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const idle = workspace.uploadState === "idle";
+  // The selection lives in the provider, so files chosen on the Record screen
+  // are already here and the choice survives leaving this page.
+  const files = workspace.stagedFiles;
 
   function addFiles(incoming: File[]) {
     setError(null);
     setSuccess(null);
-    const combined = [...files, ...incoming];
-    if (combined.length > MAX_FILES) { setError(`You can upload a maximum of ${MAX_FILES} recordings at once.`); return; }
+    if (files.length + incoming.length > MAX_FILES) { setError(`You can upload a maximum of ${MAX_FILES} recordings at once.`); return; }
     for (const file of incoming) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       if (!acceptedExtensions.has(ext)) { setError(`${file.name} is not a supported recording format.`); return; }
       if (file.size === 0) { setError(`${file.name} is empty.`); return; }
     }
-    setFiles(combined);
+    workspace.addStagedFiles(incoming);
   }
 
   async function start() {
@@ -49,7 +50,7 @@ export function UploadView() {
     if (result.queued > 0) {
       const tier = getTranscriptionTier(workspace.defaultTier);
       setSuccess(`${result.queued} recording${result.queued === 1 ? " is" : "s are"} on the way with ${tier.label} quality.${result.failed ? ` ${result.failed} did not finish.` : ""}`);
-      setFiles([]);
+      workspace.clearStagedFiles();
       setLabel("");
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -97,7 +98,7 @@ export function UploadView() {
           <small>{item ? uploadItemLabel(item.status, item.progress) : needsLocalPreparation(file) ? "Will be prepared before upload" : "Ready to upload"}</small>
           {item && ["preparing", "uploading"].includes(item.status) ? <div className="progress-track slim"><span style={{ width: `${item.progress * 100}%` }} /></div> : null}
         </div>
-        <button aria-label={`Remove ${file.name}`} disabled={!idle} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}><X size={16} /></button>
+        <button aria-label={`Remove ${file.name}`} disabled={!idle} onClick={() => workspace.removeStagedFile(index)}><X size={16} /></button>
       </div>;
     })}</div> : null}
 

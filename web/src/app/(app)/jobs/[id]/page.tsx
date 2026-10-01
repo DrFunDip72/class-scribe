@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, Circle, Clock3, FileAudio } from "lucide-react
 import { ResultActions } from "@/components/result-actions";
 import { createClient } from "@/lib/supabase/server";
 import { getTranscriptionTier } from "@/lib/transcription-tiers";
+import { formatDuration, recordingTitle } from "@/lib/recording-title";
 
 export const metadata: Metadata = { title: "Lecture notes" };
 
@@ -22,6 +23,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   ]);
   if (!job) notFound();
   const tier = getTranscriptionTier(job.transcription_tier);
+  // Customers see the class and date, not `STRAT-392_2026-09-30.m4a`.
+  const title = recordingTitle(job.original_filename, job.created_at);
 
   if (!result) {
     const currentStep = job.status === "uploading"
@@ -37,7 +40,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       <Link className="back-link" href="/recordings"><ArrowLeft size={15} /> Your notes</Link>
       <div className="processing-card">
         <Clock3 />
-        <h1>{job.original_filename}</h1>
+        <h1>{title}</h1>
         <p>{currentStep} · {tier.label} quality</p>
         <div className="progress-track"><span style={{ width: `${job.progress}%` }} /></div>
         <Link className="button button-primary" href={`/jobs/${id}`}>Refresh status</Link>
@@ -58,8 +61,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       <span className="result-file-icon"><FileAudio /></span>
       <div>
         <span className="section-kicker">Notes ready</span>
-        <h1>{job.original_filename}</h1>
-        <p><CheckCircle2 size={15} /> Ready {job.completed_at ? new Date(job.completed_at).toLocaleString() : "now"} · {tier.label} quality</p>
+        <h1>{title}</h1>
+        <p><CheckCircle2 size={15} /> {formatDuration(job.duration_seconds) ?? "Ready"}{job.completed_at ? ` · ${new Date(job.completed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}</p>
       </div>
     </header>
     <section className="notes-section summary-section"><span className="section-number">01</span><div><h2>Summary</h2><p className="summary-copy">{result.summary}</p></div></section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { recordingFilename, recordingLabel, type ClassRow } from "@/lib/classes";
+import { localDateKey, recordingFilename, recordingLabel, type ClassRow } from "@/lib/classes";
 import {
   assembleSession,
   deleteSession,
@@ -78,6 +78,9 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
         label: recordingLabel(session.className, recordedAt),
         tier: "high",
         classId: session.classId,
+        // Same date the filename carries, so the published note and the
+        // archived audio agree on which lecture this is.
+        appRecording: { courseCode: session.classCode, lectureDate: localDateKey(recordedAt) },
       });
       if (result.ok) {
         // Only drop the local copy once the queue has accepted the upload.

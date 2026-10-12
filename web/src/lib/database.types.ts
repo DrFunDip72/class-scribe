@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_recordings: {
+        Row: {
+          archived_bytes: number | null
+          archived_path: string | null
+          course_code: string
+          created_at: string
+          error_message: string | null
+          github_path: string | null
+          github_repository: string | null
+          github_sha: string | null
+          id: string
+          job_id: string
+          lecture_date: string
+          source_filename: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_bytes?: number | null
+          archived_path?: string | null
+          course_code: string
+          created_at?: string
+          error_message?: string | null
+          github_path?: string | null
+          github_repository?: string | null
+          github_sha?: string | null
+          id?: string
+          job_id: string
+          lecture_date: string
+          source_filename: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_bytes?: number | null
+          archived_path?: string | null
+          course_code?: string
+          created_at?: string
+          error_message?: string | null
+          github_path?: string | null
+          github_repository?: string | null
+          github_sha?: string | null
+          id?: string
+          job_id?: string
+          lecture_date?: string
+          source_filename?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_recordings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "transcription_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           archived_at: string | null
@@ -347,6 +409,7 @@ export type Database = {
           mime_type: string | null
           original_filename: string
           progress: number
+          retain_source_audio: boolean
           size_bytes: number | null
           stage: string
           started_at: string | null
@@ -371,6 +434,7 @@ export type Database = {
           mime_type?: string | null
           original_filename: string
           progress?: number
+          retain_source_audio?: boolean
           size_bytes?: number | null
           stage?: string
           started_at?: string | null
@@ -395,6 +459,7 @@ export type Database = {
           mime_type?: string | null
           original_filename?: string
           progress?: number
+          retain_source_audio?: boolean
           size_bytes?: number | null
           stage?: string
           started_at?: string | null
@@ -582,6 +647,7 @@ export type Database = {
           mime_type: string | null
           original_filename: string
           progress: number
+          retain_source_audio: boolean
           size_bytes: number | null
           stage: string
           started_at: string | null
@@ -609,6 +675,18 @@ export type Database = {
       queue_uploaded_recording: {
         Args: { p_job_id: string; p_parts: Json }
         Returns: string
+      }
+      register_app_recording: {
+        Args: {
+          p_course_code: string
+          p_job_id: string
+          p_lecture_date: string
+        }
+        Returns: string | null
+      }
+      release_app_recording_audio: {
+        Args: { p_job_id: string }
+        Returns: undefined
       }
       set_job_class: {
         Args: { p_class_id: string | null; p_job_id: string }

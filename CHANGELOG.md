@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-12
+
+### In-app recordings reach Drive and GitHub
+
+- Fixed in-app recordings never being published. `export_completed` read `drive_ingestions` as its only input, so a recording made in the app — which creates a job row and no ingestion row — was never considered, and raised no error. Every lecture recorded in the app was missing from its public repository while every Drive-imported lecture was published; October 7 proved it, with HRM published from Drive and PHIL and STRAT silently absent from the same day.
+- Added `transcription_jobs.retain_source_audio` and an `app_recordings` table carrying the course, lecture date, archived path, and publication state. The Record screen calls a new `register_app_recording` RPC after the queue accepts an upload; it is deliberately non-fatal, because the transcription is already safe by then.
+- `worker.py` now keeps a retained job's uploaded parts instead of deleting them on completion. Without this the audio was unreachable: the worker runs as `SYSTEM`, which cannot see the per-user `G:` Drive mount, and it discarded each local part as soon as it was transcribed.
+- The hourly automation rejoins a finished recording's parts, writes them to `DRIVE_ARCHIVE_FOLDER`, records the path and size, and only then removes the stored objects and clears the retention flag. The folder is validated at startup to sit outside the import inbox, since archiving into it would make the importer transcribe every lecture a second time.
+- App recordings publish through the existing formatter, note renderer, and release-asset uploader, passing the archived file as a local source rather than resolving one from Drive.
+- Published notes for the four lectures whose audio was deleted before this existed — HRM October 5, PHIL October 5, PHIL October 7, STRAT October 7. They carry `public_audio_url: null`, and `published_note_is_complete` now takes an `expect_audio` flag so they are not rewritten on every pass.
+- The weekly audit, which runs as `SYSTEM` and therefore works while the owner is logged out, now reports app recordings stalled over 24 hours so retained audio cannot pile up unnoticed.
+- Added a `publish-app` command that archives and publishes app recordings without triggering a Drive import.
+
 ## 2026-10-01
 
 ### Account-managed classes

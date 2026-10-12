@@ -507,6 +507,9 @@ Generated MP3 input was transcribed by faster-whisper small on CPU INT8, then su
 - [ ] Force-stop Chrome mid-recording and confirm the unfinished recording is offered and uploads correctly.
 - [ ] Confirm a timed automatic stop ends the recording on time with the screen off.
 - [ ] Confirm Chrome is excluded from battery optimization on the recording phone.
+- [ ] Record a lecture in the app, then confirm the hourly pass writes its audio to the Drive archive folder, removes the stored parts, and publishes a note with a working `public_audio_url`.
+- [ ] Confirm the archived file is never re-imported: run a Drive scan afterwards and check no second job appears for the same lecture.
+- [ ] Confirm a recording left unarchived for a day appears in the weekly audit's stalled list while logged out.
 - [ ] Repeat the recorder layout review at 320 CSS pixels.
 
 Do not promise processing time until real long-class benchmarks are recorded.

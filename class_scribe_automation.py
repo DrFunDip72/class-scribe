@@ -99,6 +99,10 @@ class Settings:
     transcription_tier: str
     drive_source: str
     drive_desktop_folder: Path
+    # Deliberately a different folder from `drive_desktop_folder`. The importer
+    # only ever lists the URecorder inbox, so an app recording archived here can
+    # never be discovered and transcribed a second time.
+    drive_archive_folder: Path
     rclone_path: Path | None
     fluxprompt_api_key: str | None
     fluxprompt_api_url: str
@@ -194,6 +198,12 @@ def load_settings() -> Settings:
     drive_source = env.get("DRIVE_IMPORT_SOURCE", "rclone").lower()
     if drive_source not in {"desktop", "rclone", "hybrid"}:
         raise AutomationError("DRIVE_IMPORT_SOURCE must be desktop, rclone, or hybrid")
+    inbox = Path(env.get("DRIVE_DESKTOP_FOLDER", r"G:\My Drive\URecorder"))
+    archive = Path(env.get("DRIVE_ARCHIVE_FOLDER", r"G:\My Drive\Class Scribe Recordings"))
+    # Archiving into the import inbox would make the importer re-import the
+    # app's own recording and transcribe every lecture twice, forever.
+    if archive == inbox or inbox in archive.parents or archive in inbox.parents:
+        raise AutomationError("DRIVE_ARCHIVE_FOLDER must sit outside the Drive import folder")
     return Settings(
         supabase_url=env["SUPABASE_URL"],
         supabase_publishable_key=env["SUPABASE_PUBLISHABLE_KEY"],
@@ -203,6 +213,9 @@ def load_settings() -> Settings:
         transcription_tier=tier,
         drive_source=drive_source,
         drive_desktop_folder=Path(env.get("DRIVE_DESKTOP_FOLDER", r"G:\My Drive\URecorder")),
+        drive_archive_folder=Path(
+            env.get("DRIVE_ARCHIVE_FOLDER", r"G:\My Drive\Class Scribe Recordings")
+        ),
         rclone_path=find_rclone() if drive_source in {"rclone", "hybrid"} else None,
         fluxprompt_api_key=env.get("FLUXPROMPT_API_KEY") or None,
         fluxprompt_api_url=env.get("FLUXPROMPT_API_URL", "https://api.fluxprompt.ai/flux/api-v2"),
@@ -1139,7 +1152,7 @@ def render_note(
         f"class_scribe_id: {ingestion['job_id']}",
         f"course: {yaml_string(course_title)}",
         f"lecture_date: {lecture_date.isoformat()}",
-        "source: google-drive-automation",
+        f"source: {str(ingestion.get('source') or 'google-drive-automation')}",
         f"transcription_model: {yaml_string(str(result.get('transcription_model') or 'unknown'))}",
         f"summary_model: {yaml_string(str(result.get('summary_model') or 'unknown'))}",
         f"transcript_formatting: {yaml_string('local-ai-structure-preserving' if formatted_transcript else 'raw-segments')}",
@@ -1403,11 +1416,18 @@ def inference_queue_is_busy(db: Client) -> bool:
     return bool(rows)
 
 
-def published_note_is_complete(content: str, job_id: str) -> bool:
+def published_note_is_complete(content: str, job_id: str, *, expect_audio: bool = True) -> bool:
+    if note_class_scribe_id(content) != job_id:
+        return False
+    if 'transcript_formatting: "local-ai-structure-preserving"' not in content:
+        return False
+    # A lecture whose source audio was deleted before it could be archived can
+    # never gain an audio asset. Without this the exporter would rewrite its
+    # note on every run, waiting for a URL that is not coming.
+    if not expect_audio:
+        return re.search(r"^public_audio_url:\s*null\s*$", content, flags=re.MULTILINE) is not None
     return (
-        note_class_scribe_id(content) == job_id
-        and 'transcript_formatting: "local-ai-structure-preserving"' in content
-        and re.search(r'^public_audio_url:\s*"https://', content, flags=re.MULTILINE) is not None
+        re.search(r'^public_audio_url:\s*"https://', content, flags=re.MULTILINE) is not None
         and re.search(r'^public_audio_sha256:\s*"[0-9a-f]{64}"', content, flags=re.MULTILINE) is not None
     )
 
@@ -1420,7 +1440,17 @@ def publish_owner_archive(
     ingestion: dict[str, Any],
     job: dict[str, Any],
     result: dict[str, Any],
-) -> tuple[str, FormattedTranscript, PublishedAudio]:
+    *,
+    local_source: Path | None = None,
+    publish_audio: bool = True,
+) -> tuple[str, FormattedTranscript, PublishedAudio | None]:
+    """Publish one lecture's note and public MP3.
+
+    `local_source` names audio already on disk — an app recording this machine
+    archived to Drive — which skips Drive discovery entirely. `publish_audio`
+    is false only for a lecture whose source audio no longer exists anywhere;
+    its note is published without an audio asset.
+    """
     if inference_queue_is_busy(db):
         raise InferenceQueueBusy("The transcription queue became active")
 
@@ -1430,29 +1460,39 @@ def publish_owner_archive(
         return request_transcript_structure(settings, chunk, section_number, section_count)
 
     formatted = format_transcript_markdown(result, plan)
-    drive_file = resolve_drive_recording(drive_files, ingestion, job)
-    if inference_queue_is_busy(db):
-        raise InferenceQueueBusy("The transcription queue became active")
-    STATE_ROOT.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="class-scribe-public-audio-", dir=STATE_ROOT) as temporary:
-        temp_root = Path(temporary)
-        source = temp_root / f"source{Path(str(drive_file['Path'])).suffix.lower()}"
-        materialize_drive_file(settings, drive_file, source)
-        expected_source_size = int(drive_file.get("Size") or 0)
-        if expected_source_size and source.stat().st_size != expected_source_size:
-            raise AutomationError("The public-audio source size did not match Drive metadata")
-        mp3 = temp_root / public_audio_asset_name(ingestion)
-        prepare_public_mp3(source, mp3)
+    audio: PublishedAudio | None = None
+    if publish_audio:
+        drive_file: dict[str, Any] | None = None
+        if local_source is None:
+            drive_file = resolve_drive_recording(drive_files, ingestion, job)
         if inference_queue_is_busy(db):
             raise InferenceQueueBusy("The transcription queue became active")
-        repository = COURSE_REPOSITORIES[str(ingestion["course_code"])]
-        audio = github.publish_audio_asset(
-            repository,
-            date.fromisoformat(str(ingestion["lecture_date"])),
-            mp3.name,
-            mp3,
-            str(ingestion["job_id"]),
-        )
+        STATE_ROOT.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="class-scribe-public-audio-", dir=STATE_ROOT) as temporary:
+            temp_root = Path(temporary)
+            if local_source is not None:
+                if not local_source.is_file():
+                    raise AutomationError("The archived app recording is no longer on disk")
+                source = local_source
+            else:
+                assert drive_file is not None
+                source = temp_root / f"source{Path(str(drive_file['Path'])).suffix.lower()}"
+                materialize_drive_file(settings, drive_file, source)
+                expected_source_size = int(drive_file.get("Size") or 0)
+                if expected_source_size and source.stat().st_size != expected_source_size:
+                    raise AutomationError("The public-audio source size did not match Drive metadata")
+            mp3 = temp_root / public_audio_asset_name(ingestion)
+            prepare_public_mp3(source, mp3)
+            if inference_queue_is_busy(db):
+                raise InferenceQueueBusy("The transcription queue became active")
+            repository = COURSE_REPOSITORIES[str(ingestion["course_code"])]
+            audio = github.publish_audio_asset(
+                repository,
+                date.fromisoformat(str(ingestion["lecture_date"])),
+                mp3.name,
+                mp3,
+                str(ingestion["job_id"]),
+            )
 
     content = render_note(
         ingestion,
@@ -1467,6 +1507,158 @@ def publish_owner_archive(
         str(ingestion["job_id"]),
     )
     return sha, formatted, audio
+
+
+def concatenate_audio_parts(parts: list[Path], destination: Path) -> None:
+    """Join upload parts back into one file without re-encoding."""
+    if not parts:
+        raise AutomationError("The app recording has no audio parts to archive")
+    if len(parts) == 1:
+        shutil.copyfile(parts[0], destination)
+        return
+    listing = destination.parent / "parts.txt"
+    listing.write_text(
+        "".join(f"file '{path.as_posix()}'\n" for path in parts),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            find_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "concat", "-safe", "0", "-i", str(listing),
+            "-c", "copy", str(destination),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=60 * 60,
+        check=False,
+    )
+    listing.unlink(missing_ok=True)
+    if completed.returncode != 0 or not destination.exists() or destination.stat().st_size < 1:
+        raise AutomationError("FFmpeg could not rejoin the archived recording parts")
+
+
+def archive_app_recording_audio(settings: Settings, db: Client, recording: dict[str, Any]) -> tuple[Path, int]:
+    """Write one app recording's audio to Drive and return its path and size."""
+    parts = retry(
+        lambda: db.table("transcription_job_parts")
+        .select("part_index,storage_path,size_bytes")
+        .eq("job_id", recording["job_id"])
+        .order("part_index")
+        .execute()
+    ).data or []
+    if not parts:
+        raise AutomationError("The recording's audio parts are no longer in storage")
+
+    folder = settings.drive_archive_folder
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise AutomationError("The Drive archive folder is unavailable") from error
+
+    extension = Path(str(parts[0]["storage_path"])).suffix.lower() or ".m4a"
+    target = folder / f"{recording['course_code']}_{recording['lecture_date']}{extension}"
+    expected_bytes = sum(int(part.get("size_bytes") or 0) for part in parts)
+
+    # Already archived by an earlier run that died before recording the row.
+    if target.exists() and target.stat().st_size >= expected_bytes > 0:
+        return target, target.stat().st_size
+
+    STATE_ROOT.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="class-scribe-archive-", dir=STATE_ROOT) as temporary:
+        temp_root = Path(temporary)
+        local_parts: list[Path] = []
+        for index, part in enumerate(parts):
+            storage_path = str(part["storage_path"])
+            payload = retry(lambda path=storage_path: db.storage.from_("recordings").download(path))
+            local = temp_root / f"part-{index:04d}{Path(storage_path).suffix.lower() or '.m4a'}"
+            local.write_bytes(payload)
+            local_parts.append(local)
+        staged = temp_root / f"archive{extension}"
+        concatenate_audio_parts(local_parts, staged)
+        # Write to Drive via a temporary name so a crash mid-copy can never
+        # leave a truncated file that later looks like a complete archive.
+        pending = folder / f".{target.name}.partial"
+        shutil.copyfile(staged, pending)
+        if pending.stat().st_size != staged.stat().st_size:
+            pending.unlink(missing_ok=True)
+            raise AutomationError("The archived recording did not copy to Drive intact")
+        pending.replace(target)
+    return target, target.stat().st_size
+
+
+def archive_app_recordings(settings: Settings, db: Client, state: dict[str, Any]) -> int:
+    """Move finished app recordings out of Supabase Storage and into Drive.
+
+    Runs before `export_completed` so a lecture's audio is in Drive before its
+    note is published, and clears the worker's retention flag only once the
+    audio is somewhere else.
+    """
+    recordings = retry(
+        lambda: db.table("app_recordings").select("*")
+        .eq("status", "recorded").order("created_at").execute()
+    ).data or []
+    archived = 0
+    for recording in recordings:
+        job_rows = retry(
+            lambda job_id=recording["job_id"]: db.table("transcription_jobs")
+            .select("id,status").eq("id", job_id).execute()
+        ).data or []
+        if not job_rows:
+            continue
+        status = str(job_rows[0]["status"])
+        if status == "failed":
+            db.table("app_recordings").update({
+                "status": "failed", "error_message": "Transcription failed",
+            }).eq("id", recording["id"]).execute()
+            continue
+        if status != "completed":
+            continue
+        try:
+            target, size_bytes = archive_app_recording_audio(settings, db, recording)
+        except Exception as error:
+            # Leave the row in `recorded` and the retention flag set: the audio
+            # stays in storage and the next run tries again.
+            logging.warning(
+                "Could not archive %s %s yet: %s",
+                recording["course_code"], recording["lecture_date"], error,
+            )
+            db.table("app_recordings").update({
+                "error_message": str(error)[:300],
+            }).eq("id", recording["id"]).execute()
+            issue_once(
+                settings, state, f"app:{recording['id']}:archive",
+                "An app recording could not be archived to Drive",
+            )
+            continue
+        db.table("app_recordings").update({
+            "status": "archived",
+            "archived_path": str(target),
+            "archived_bytes": size_bytes,
+            "error_message": None,
+        }).eq("id", recording["id"]).execute()
+        # Only now is it safe to let the worker's copy go.
+        try:
+            storage_paths = [
+                str(part["storage_path"])
+                for part in (retry(
+                    lambda: db.table("transcription_job_parts").select("storage_path")
+                    .eq("job_id", recording["job_id"]).execute()
+                ).data or [])
+            ]
+            if storage_paths:
+                retry(lambda: db.storage.from_("recordings").remove(storage_paths), attempts=3)
+            retry(lambda: db.rpc("release_app_recording_audio", {"p_job_id": recording["job_id"]}).execute())
+        except Exception:
+            logging.warning(
+                "Archived %s %s, but releasing its stored audio needs attention.",
+                recording["course_code"], recording["lecture_date"],
+            )
+        archived += 1
+        logging.info(
+            "Archived %s %s to %s (%d bytes)",
+            recording["course_code"], recording["lecture_date"], target, size_bytes,
+        )
+    return archived
 
 
 def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> int:
@@ -1550,14 +1742,154 @@ def export_completed(settings: Settings, db: Client, state: dict[str, Any]) -> i
             logging.info(
                 "Published %s note and %d-byte public audio for %s with %d transcript sections and %d paragraphs",
                 repository,
-                audio.size_bytes,
+                audio.size_bytes if audio else 0,
                 ingestion["lecture_date"],
                 formatted.section_count,
                 formatted.paragraph_count,
             )
+
+        # App recordings publish through the same formatter, note renderer and
+        # release-asset uploader. The only difference is where the audio comes
+        # from: a file this machine already archived to Drive, rather than one
+        # discovered in the URecorder inbox.
+        exported += export_app_recordings(settings, db, github, state, queue_busy)
     finally:
         github.close()
         token = ""
+    return exported
+
+
+def publish_app_recordings(settings: Settings, db: Client, state: dict[str, Any]) -> dict[str, int]:
+    """Archive and publish app recordings without touching the Drive inbox.
+
+    The hourly pass does this as part of its wider run; this is the same work
+    on its own, for operating the pipeline without triggering an import.
+    """
+    archived = archive_app_recordings(settings, db, state)
+    if not GITHUB_TOKEN_PATH.exists():
+        raise AutomationError("The GitHub automation token is missing")
+    token = GITHUB_TOKEN_PATH.read_text(encoding="utf-8").strip()
+    github = GitHubClient(token)
+    try:
+        queue_busy = inference_queue_is_busy(db)
+        if queue_busy:
+            logging.info("Deferring app transcript formatting while the inference queue is active")
+        exported = export_app_recordings(settings, db, github, state, queue_busy)
+    finally:
+        github.close()
+        token = ""
+    return {"archived": archived, "exported": exported}
+
+
+def export_app_recordings(
+    settings: Settings,
+    db: Client,
+    github: GitHubClient,
+    state: dict[str, Any],
+    queue_busy: bool,
+) -> int:
+    recordings = retry(
+        lambda: db.table("app_recordings").select("*")
+        .eq("status", "archived").order("lecture_date").execute()
+    ).data or []
+    exported = 0
+    for recording in recordings:
+        job_rows = retry(
+            lambda job_id=recording["job_id"]: db.table("transcription_jobs")
+            .select("id,status,duration_seconds,error_code,original_filename").eq("id", job_id).execute()
+        ).data or []
+        if not job_rows:
+            continue
+        job = job_rows[0]
+        if job["status"] != "completed":
+            continue
+        results = retry(
+            lambda job_id=recording["job_id"]: db.table("transcription_results")
+            .select("*").eq("job_id", job_id).execute()
+        ).data or []
+        if not results:
+            continue
+        result = results[0]
+        issues = quality_issues(job, result)
+        if issues:
+            db.table("app_recordings").update({
+                "status": "needs_review", "error_message": "; ".join(issues)[:300],
+            }).eq("id", recording["id"]).execute()
+            issue_once(
+                settings, state, f"app:{recording['job_id']}:quality",
+                "A completed app recording failed the publishing quality check",
+            )
+            continue
+        if queue_busy:
+            continue
+
+        # A null archive path means the audio was deleted before this pipeline
+        # existed. Those lectures publish their note alone.
+        archived_path = recording.get("archived_path")
+        local_source = Path(str(archived_path)) if archived_path else None
+        publish_audio = local_source is not None
+
+        ingestion = {
+            "job_id": recording["job_id"],
+            "course_code": recording["course_code"],
+            "lecture_date": recording["lecture_date"],
+            "source_filename": recording["source_filename"],
+            "source_part": None,
+            "source": "class-scribe-app",
+        }
+        repository = COURSE_REPOSITORIES[str(recording["course_code"])]
+        path = note_path(ingestion)
+        existing = github.get_note(repository, path)
+        if existing:
+            existing_text = base64.b64decode(existing.get("content", "")).decode("utf-8")
+            if published_note_is_complete(
+                existing_text, str(recording["job_id"]), expect_audio=publish_audio
+            ):
+                db.table("app_recordings").update({
+                    "status": "exported", "github_repository": repository,
+                    "github_path": path, "github_sha": str(existing["sha"]), "error_message": None,
+                }).eq("id", recording["id"]).execute()
+                exported += 1
+                continue
+            # A Drive import already owns this date. Overwriting it would
+            # replace a note that has real audio with one that may not.
+            if note_class_scribe_id(existing_text) not in {None, str(recording["job_id"])}:
+                db.table("app_recordings").update({
+                    "status": "needs_review",
+                    "error_message": "Another recording already published this lecture date",
+                }).eq("id", recording["id"]).execute()
+                issue_once(
+                    settings, state, f"app:{recording['job_id']}:conflict",
+                    "An app recording collided with an already published lecture",
+                )
+                continue
+        try:
+            sha, formatted, audio = publish_owner_archive(
+                settings, db, github, [], ingestion, job, result,
+                local_source=local_source,
+                publish_audio=publish_audio,
+            )
+        except InferenceQueueBusy:
+            logging.info("Deferring app recording publication because the inference queue became active")
+            break
+        except (PublicNoteConflict, PublicAudioConflict) as error:
+            db.table("app_recordings").update({
+                "status": "needs_review", "error_message": str(error)[:300],
+            }).eq("id", recording["id"]).execute()
+            issue_once(settings, state, f"app:{recording['job_id']}:conflict", str(error))
+            continue
+        db.table("app_recordings").update({
+            "status": "exported", "github_repository": repository,
+            "github_path": path, "github_sha": sha, "error_message": None,
+        }).eq("id", recording["id"]).execute()
+        exported += 1
+        logging.info(
+            "Published %s note for %s from the app recorder with %d transcript sections (%s)",
+            repository,
+            recording["lecture_date"],
+            formatted.section_count,
+            f"{audio.size_bytes}-byte public audio" if audio else "no public audio",
+        )
     return exported
 
 
@@ -1800,17 +2132,53 @@ def audit_repositories(
         github.close()
         token = ""
 
+    # The archive step needs the signed-in session for `G:`, so it cannot run
+    # while the owner is logged out. This audit runs as SYSTEM, which makes it
+    # the only place that can notice retained audio piling up in storage.
+    stalled: list[dict[str, Any]] = []
+    try:
+        db = connect_supabase(settings)
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        stalled = retry(
+            lambda: db.table("app_recordings")
+            .select("course_code,lecture_date,created_at,error_message")
+            .eq("status", "recorded").lt("created_at", cutoff)
+            .order("created_at").execute()
+        ).data or []
+    except Exception as error:
+        logging.warning("Could not check for stalled app-recording archives: %s", error)
+
     rows = "".join(
         f"{course}: expected {details['expected']}, found {details['found']}. "
         for course, details in results.items()
     )
+    stalled_note = ""
+    if stalled:
+        listed = ", ".join(f"{row['course_code']} {row['lecture_date']}" for row in stalled[:6])
+        stalled_note = (
+            f" {len(stalled)} app recording(s) are still waiting to be archived to Drive "
+            f"and their audio is being held in storage ({listed}). "
+            "Sign in to the recording machine so the hourly pass can archive them."
+        )
     subject = "Class Scribe weekly archive check"
-    message = ("All expected weekly course notes are present. " if problems == 0 else f"The weekly archive check found {problems} missing course note(s). ") + rows
+    message = ("All expected weekly course notes are present. " if problems == 0 else f"The weekly archive check found {problems} missing course note(s). ") + rows + stalled_note
     if send_email:
         send_automation_email(settings, subject, message)
-    logging.info("Weekly GitHub audit finished with %d missing note(s)", problems)
+    logging.info(
+        "Weekly GitHub audit finished with %d missing note(s) and %d stalled archive(s)",
+        problems,
+        len(stalled),
+    )
     week_start = reference - timedelta(days=reference.weekday())
-    return {"week": week_start.isoformat(), "problems": problems, "courses": results}
+    return {
+        "week": week_start.isoformat(),
+        "problems": problems,
+        "courses": results,
+        "stalled_app_archives": [
+            {"course_code": row["course_code"], "lecture_date": row["lecture_date"]}
+            for row in stalled
+        ],
+    }
 
 
 def should_scan_drive(now: datetime, state: dict[str, Any]) -> bool:
@@ -1828,6 +2196,9 @@ def run_hourly(settings: Settings, force_import: bool = False) -> dict[str, int]
     logging.info("Hourly automation pass started; Drive scan=%s", scan_drive)
     if scan_drive:
         imported = import_drive_files(settings, db, state)
+    # Before the export: a lecture's audio belongs in Drive before its note
+    # goes public, and the worker is holding storage until this runs.
+    archived = archive_app_recordings(settings, db, state)
     exported = export_completed(settings, db, state)
     backfilled = 0
     if not state.get("public_archive_backfill_complete"):
@@ -1840,12 +2211,18 @@ def run_hourly(settings: Settings, force_import: bool = False) -> dict[str, int]
         except InferenceQueueBusy:
             logging.info("Deferring historical public archive backfill while the inference queue is active")
     logging.info(
-        "Hourly automation pass completed; imported=%d exported=%d backfilled=%d",
+        "Hourly automation pass completed; imported=%d archived=%d exported=%d backfilled=%d",
         imported,
+        archived,
         exported,
         backfilled,
     )
-    return {"imported": imported, "exported": exported, "backfilled": backfilled}
+    return {
+        "imported": imported,
+        "archived": archived,
+        "exported": exported,
+        "backfilled": backfilled,
+    }
 
 
 def main() -> int:
@@ -1864,6 +2241,10 @@ def main() -> int:
         "--force-new",
         action="store_true",
         help="Queue a fresh job instead of linking matching Class Scribe work",
+    )
+    subparsers.add_parser(
+        "publish-app",
+        help="Archive in-app recordings to Drive and publish their notes, without a Drive import",
     )
     audit_parser = subparsers.add_parser("audit", help="Run the weekly GitHub audit")
     audit_parser.add_argument("--dry-run", action="store_true", help="Check repositories without sending email")
@@ -1896,6 +2277,10 @@ def main() -> int:
                 force_new=args.force_new,
             )
             print(json.dumps({"imported": imported}))
+            return 0
+        if args.command == "publish-app":
+            state = load_state()
+            print(json.dumps(publish_app_recordings(settings, connect_supabase(settings), state)))
             return 0
         if args.command == "audit":
             print(json.dumps(audit_repositories(settings, send_email=not args.dry_run), indent=2))

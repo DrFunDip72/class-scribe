@@ -742,10 +742,21 @@ class Worker:
             "error_code": None,
             "error_message": None,
         }).eq("id", job["id"]).execute())
-        try:
-            self.retry(lambda: self.db.storage.from_("recordings").remove(storage_paths), attempts=3)
-        except Exception:
-            LOG.warning("Job %s completed, but source audio-part cleanup needs attention.", short_id(job["id"]))
+        # An app recording is the only copy of that lecture: the phone deletes
+        # its local chunks once the queue accepts the upload, and nothing wrote
+        # it to Drive. The owner automation archives it and clears this flag,
+        # so cleanup here would destroy the audio before it is anywhere else.
+        if job.get("retain_source_audio"):
+            LOG.info(
+                "Job %s completed; keeping %d audio part(s) for the owner archive.",
+                short_id(job["id"]),
+                len(storage_paths),
+            )
+        else:
+            try:
+                self.retry(lambda: self.db.storage.from_("recordings").remove(storage_paths), attempts=3)
+            except Exception:
+                LOG.warning("Job %s completed, but source audio-part cleanup needs attention.", short_id(job["id"]))
         try:
             self.enqueue_push_deliveries(job)
             self.process_push_deliveries()

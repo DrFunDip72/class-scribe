@@ -5,6 +5,7 @@ from pathlib import Path
 
 from class_scribe_automation import (
     AutomationError,
+    FormattedTranscript,
     InferenceQueueBusy,
     PublishedAudio,
     TranscriptFormatterUnavailable,
@@ -13,8 +14,11 @@ from class_scribe_automation import (
     desktop_drive_json,
     expected_week_dates,
     format_transcript_markdown,
+    concatenate_audio_parts,
     merge_drive_files,
     note_class_scribe_id,
+    note_path,
+    published_note_is_complete,
     parse_recording_name,
     quality_issues,
     render_note,
@@ -91,6 +95,7 @@ class PublishingTests(unittest.TestCase):
                 transcription_tier="high",
                 drive_source="desktop",
                 drive_desktop_folder=folder,
+                drive_archive_folder=folder.parent / "Class Scribe Recordings",
                 rclone_path=None,
                 fluxprompt_api_key=None,
                 fluxprompt_api_url="https://example.com",
@@ -122,6 +127,7 @@ class PublishingTests(unittest.TestCase):
                 transcription_tier="high",
                 drive_source="desktop",
                 drive_desktop_folder=folder,
+                drive_archive_folder=folder.parent / "Class Scribe Recordings",
                 rclone_path=None,
                 fluxprompt_api_key=None,
                 fluxprompt_api_url="https://example.com",
@@ -318,6 +324,81 @@ class PublishingTests(unittest.TestCase):
         self.assertTrue(should_scan_drive(tuesday, {"last_drive_scan": "2026-09-14T12:00:00+00:00"}))
         friday = datetime(2026, 9, 18, 8, tzinfo=timezone.utc)
         self.assertFalse(should_scan_drive(friday, {}))
+
+
+class AppRecordingPublishingTests(unittest.TestCase):
+    """The in-app recorder publishes through the same path as a Drive import."""
+
+    base = {
+        "job_id": "11111111-1111-1111-1111-111111111111",
+        "course_code": "PHIL-201",
+        "lecture_date": "2026-10-07",
+        "source_filename": "PHIL-201_2026-10-07.m4a",
+        "source_part": None,
+        "source": "class-scribe-app",
+    }
+    result = {
+        "transcription_model": "whisper",
+        "summary_model": "qwen3",
+        "summary": "A lecture.",
+        "key_points": ["One"],
+        "action_items": [],
+        "segments": [],
+        "transcript": "Hello.",
+    }
+
+    def test_app_recording_shares_the_drive_note_path(self) -> None:
+        self.assertEqual(note_path(self.base), "notes/2026/2026-10-07.md")
+
+    def test_note_records_the_app_as_its_source(self) -> None:
+        note = render_note(self.base, self.result)
+        self.assertIn("source: class-scribe-app", note)
+
+    def test_drive_notes_keep_their_original_source_label(self) -> None:
+        ingestion = {key: value for key, value in self.base.items() if key != "source"}
+        self.assertIn("source: google-drive-automation", render_note(ingestion, self.result))
+
+    def test_audio_less_note_counts_as_complete_only_when_audio_is_not_expected(self) -> None:
+        note = render_note(self.base, self.result, formatted_transcript=FormattedTranscript(
+            markdown="## Part", section_count=1, paragraph_count=1, used_ai=True,
+        ))
+        # Published once, it must never be rewritten while waiting for a URL
+        # that cannot arrive.
+        self.assertTrue(published_note_is_complete(note, self.base["job_id"], expect_audio=False))
+        self.assertFalse(published_note_is_complete(note, self.base["job_id"], expect_audio=True))
+
+    def test_note_with_audio_is_incomplete_when_audio_was_expected_to_be_absent(self) -> None:
+        note = render_note(
+            self.base,
+            self.result,
+            formatted_transcript=FormattedTranscript(
+                markdown="## Part", section_count=1, paragraph_count=1, used_ai=True,
+            ),
+            published_audio=PublishedAudio(
+                browser_download_url="https://example.com/a.mp3",
+                sha256="a" * 64,
+                size_bytes=10,
+                asset_name="2026-10-07.mp3",
+            ),
+        )
+        self.assertTrue(published_note_is_complete(note, self.base["job_id"], expect_audio=True))
+        self.assertFalse(published_note_is_complete(note, self.base["job_id"], expect_audio=False))
+
+    def test_single_part_archive_is_copied_verbatim(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            part = root / "part-0000.m4a"
+            part.write_bytes(b"audio-bytes")
+            destination = root / "PHIL-201_2026-10-07.m4a"
+            concatenate_audio_parts([part], destination)
+            self.assertEqual(destination.read_bytes(), b"audio-bytes")
+
+    def test_archiving_nothing_is_an_error_rather_than_an_empty_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "empty.m4a"
+            with self.assertRaises(AutomationError):
+                concatenate_audio_parts([], destination)
+            self.assertFalse(destination.exists())
 
 
 if __name__ == "__main__":

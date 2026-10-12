@@ -1,6 +1,6 @@
 # Current Status
 
-**Last updated:** 2026-10-01
+**Last updated:** 2026-10-12
 **Phase:** Built and deployed with source recordings larger than 50 MB, selectable Fast/Balanced/High local transcription, local audio/video preparation, resumable multipart uploads, progressive per-recording queue admission, one-result multipart processing, unattended pre-login worker startup, optional browser/email completion notifications, persistent Copied/Done/Archived workflow tracking, a client-facing mobile-first interface, home-screen installation, in-app class recording, and owner-only Google-Drive-desktop-to-public-GitHub class automation. The zero-incremental-cost external outage monitor works but is not yet acceptance-complete because GitHub's schedule is best-effort.
 
 ## Live resources
@@ -49,6 +49,7 @@ No credentials are stored in this document.
 - Dashboard Add to home screen card with a real Install button where the browser supports it, per-platform manual steps otherwise, and an installed state detected from `display-mode: standalone`.
 - Installable phone app: PNG/maskable/Apple touch icons, scoped standalone manifest with a Record shortcut, layout-level service-worker registration independent of notifications, and a network-first fetch handler whose cache holds only an offline page and brand icons.
 - In-app class recording for the four configured courses with an optional 50/75/110-minute automatic stop, a live timer, durable five-second IndexedDB timeslices, recovery of an unfinished recording, and one-tap handoff into the existing High-tier upload queue. Verified in a desktop browser only; screen-off capture on a physical Android phone is still untested.
+- In-app recordings now publish to their public course repository. The Record screen registers the recording, the worker retains its uploaded audio, and the hourly owner pass archives that audio to `G:\My Drive\Class Scribe Recordings` before publishing the note and public MP3 through the existing Drive-import path. Verified end to end against the four lectures whose audio predates the pipeline; a recording made after it needs one owner-operated pass to confirm the archive step on real audio.
 - Phone layouts down to 320 CSS pixels avoid horizontal scrolling, use 44-pixel-or-larger visible touch targets, wrap long recording content, and present Copy choices in a viewport-safe bottom action sheet.
 - Business-model documentation now separates the free validation ceiling from compliant paid operation, models unit economics and capacity, and estimates the work required for three growth levels.
 - Created four public course repositories (`HRM-391`, `PSE-390`, `STRAT-392`, and `PHIL-201`) and performed the initial one-time export of the owner's September 2 completed results as dated Markdown notes for intentional sharing. The later owner automation now handles GitHub delivery; Notion delivery remains unimplemented.

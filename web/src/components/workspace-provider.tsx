@@ -18,7 +18,18 @@ export type Worker = Database["public"]["Tables"]["worker_heartbeats"]["Row"];
 export type UploadState = "idle" | "starting" | "preparing" | "uploading";
 export type UploadItemStatus = "waiting" | "preparing" | "uploading" | "queued" | "failed";
 export type UploadItem = { jobId: string; name: string; status: UploadItemStatus; progress: number };
-export type BatchInput = { files: File[]; label: string; tier: TranscriptionTier; classId?: string | null };
+/**
+ * `appRecording` marks a batch that came from the in-app recorder rather than
+ * the file picker. It is the only copy of that lecture, so the audio must be
+ * retained for the owner automation to archive to Drive and publish.
+ */
+export type BatchInput = {
+  files: File[];
+  label: string;
+  tier: TranscriptionTier;
+  classId?: string | null;
+  appRecording?: { courseCode: string; lectureDate: string } | null;
+};
 export type BatchResult = { ok: boolean; queued: number; failed: number; jobIds: string[]; message?: string };
 
 type UploadPartRecord = { storage_path: string; size_bytes: number; mime_type: string; extension: string };
@@ -260,6 +271,21 @@ export function WorkspaceProvider({
             p_parts: parts as unknown as Json,
           });
           if (queueError) throw queueError;
+
+          // Deliberately after the queue call and deliberately non-fatal: the
+          // transcription is already safe at this point, and a failure here
+          // only means the lecture waits for the next run to be published.
+          // Raising would mark a perfectly good recording as failed.
+          if (input.appRecording) {
+            const { error: registerError } = await supabase.rpc("register_app_recording", {
+              p_job_id: jobId,
+              p_course_code: input.appRecording.courseCode,
+              p_lecture_date: input.appRecording.lectureDate,
+            });
+            if (registerError) {
+              console.warn("This recording was queued but not registered for publishing.", registerError);
+            }
+          }
 
           queuedCount += 1;
           queuedJobIds.push(jobId);

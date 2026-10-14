@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-14
+
+### Screen-off uploads survive, and recordings upload themselves
+
+- Fixed the bug that lost screen-off uploads. `use-recorder.ts` stopped the microphone before starting the upload, and that capture is the only thing keeping Android Chrome from freezing a backgrounded tab once the screen wake lock is gone. `teardown()` is now split: the recorder is released immediately, the capture only after the handoff settles. Confirmed against a real failure — a 75-minute HRM lecture auto-stopped at 10:46 and the phone sent zero POSTs to Supabase afterwards; `begin_upload_batch` never left the device.
+- Recordings left on the device now upload on their own, one at a time, instead of waiting for someone to notice the recovery card and tap Upload. A failed attempt retries once automatically, then waits for the page to become visible or the network to return rather than spinning. The card reads as status, with Retry for an immediate manual attempt.
+- Gave resumable uploads a fingerprint scoped to the job's storage path. The tus default is name + type + size + lastModified, which a retry of the same recording reproduces exactly, so a retry resumed into the previous attempt's object while the new job registered its own path — audio uploaded successfully and the worker still got a 404. That is what happened to PSE-390 on October 5.
+
 ## 2026-10-12
 
 ### In-app recordings reach Drive and GitHub

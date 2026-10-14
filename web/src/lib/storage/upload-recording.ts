@@ -45,6 +45,13 @@ async function uploadResumably({
       headers: {
         authorization: `Bearer ${session.access_token}`,
       },
+      // The default browser fingerprint is name + type + size + lastModified,
+      // all of which a retry of the same recording reproduces exactly. A retry
+      // would then resume into the *previous* attempt's object while the new
+      // job registers its own path, and the worker would 404 on audio that was
+      // uploaded successfully. Scoping it to this job's path keeps a genuine
+      // mid-upload resume working while making cross-attempt reuse impossible.
+      fingerprint: async () => `class-scribe:${path}`,
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       chunkSize: TUS_CHUNK_BYTES,

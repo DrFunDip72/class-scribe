@@ -58,9 +58,12 @@ export function recordingSupported() {
 /**
  * `onFinished` fires from the MediaRecorder stop event once every captured
  * timeslice is durably stored, which keeps the completion handoff out of a
- * React effect.
+ * React effect. It is awaited: the microphone is held open until it settles,
+ * so a promise returned here keeps the page alive for the upload.
  */
-export function useRecorder(options: { onFinished?: (session: RecordingSession) => void } = {}) {
+export function useRecorder(
+  options: { onFinished?: (session: RecordingSession) => void | Promise<void> } = {},
+) {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [session, setSession] = useState<RecordingSession | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -96,17 +99,39 @@ export function useRecorder(options: { onFinished?: (session: RecordingSession) 
     }
   }, []);
 
-  const teardown = useCallback(() => {
+  /**
+   * Releases the recorder itself. Safe to call the moment capture stops: it
+   * frees `start()` to run again without touching the microphone.
+   */
+  const releaseRecorder = useCallback(() => {
     if (autoStopTimerRef.current !== null) {
       window.clearTimeout(autoStopTimerRef.current);
       autoStopTimerRef.current = null;
     }
     autoStopAtRef.current = null;
     recorderRef.current = null;
+  }, []);
+
+  /**
+   * Releases the microphone, which is deliberately separate.
+   *
+   * A live capture is the only thing that keeps Android Chrome from freezing a
+   * backgrounded tab: the screen wake lock is dropped as soon as the page is
+   * hidden, so with the screen off this stream is the single reason the page
+   * is still running. Releasing it before the upload finishes froze the tab
+   * mid-handoff and lost the lecture, so this now runs only once the recording
+   * is somewhere other than this device.
+   */
+  const releaseCapture = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     releaseWakeLock();
   }, [releaseWakeLock]);
+
+  const teardown = useCallback(() => {
+    releaseRecorder();
+    releaseCapture();
+  }, [releaseRecorder, releaseCapture]);
 
   useEffect(() => teardown, [teardown]);
 
@@ -245,12 +270,22 @@ export function useRecorder(options: { onFinished?: (session: RecordingSession) 
         } catch {
           // Already surfaced by the append handler.
         }
-        teardown();
+        // Only the recorder goes now. The microphone stays open across the
+        // handoff so the page survives long enough to upload with the screen
+        // off; `releaseCapture` runs in the finally below.
+        releaseRecorder();
         const finished = sessionRef.current;
         setSession(finished ? { ...finished } : null);
-        setStatus("idle");
-        stoppingRef.current = false;
-        if (finished) onFinishedRef.current?.(finished);
+        try {
+          if (finished) await onFinishedRef.current?.(finished);
+        } catch {
+          // The handoff reports its own failures; the recording stays on the
+          // device either way.
+        } finally {
+          releaseCapture();
+          setStatus("idle");
+          stoppingRef.current = false;
+        }
       })();
     };
 
@@ -265,7 +300,7 @@ export function useRecorder(options: { onFinished?: (session: RecordingSession) 
     if (options.autoStopMinutes) {
       autoStopTimerRef.current = window.setTimeout(stop, options.autoStopMinutes * 60_000 + 2_000);
     }
-  }, [acquireWakeLock, stop, teardown]);
+  }, [acquireWakeLock, releaseCapture, releaseRecorder, stop]);
 
   return { status, session, elapsedMs, storedBytes, error, setError, start, stop };
 }

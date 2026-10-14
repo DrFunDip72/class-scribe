@@ -149,7 +149,16 @@ export function RecordView() {
     </p> : null}
 
     {recorder.recoverable.length ? <div className="recorder-recovery">
-      <strong><AlertCircle size={15} /> Unfinished recording{recorder.recoverable.length === 1 ? "" : "s"} on this device</strong>
+      <strong>
+        {recorder.busy ? <Loader2 size={15} className="spin" /> : <AlertCircle size={15} />}
+        {" "}
+        {recorder.busy
+          ? `Uploading recording${recorder.recoverable.length === 1 ? "" : "s"} saved on this device`
+          : `Recording${recorder.recoverable.length === 1 ? "" : "s"} still on this device`}
+      </strong>
+      {/* Uploading happens on its own; Retry is here for the case where it has
+          already failed and the owner does not want to wait for the next
+          unlock or reconnection to trigger another attempt. */}
       {recorder.recoverable.map((session) => <div key={session.id} className="recorder-recovery-row">
         <div>
           <strong>{session.className}</strong>
@@ -157,7 +166,7 @@ export function RecordView() {
         </div>
         <div className="recorder-recovery-actions">
           <button type="button" className="button button-small button-primary" disabled={recorder.busy} onClick={() => void recorder.uploadRecoverable(session)}>
-            <UploadCloud size={15} /> Upload
+            <UploadCloud size={15} /> Retry
           </button>
           <button type="button" className="ghost-button" disabled={recorder.busy} onClick={() => void recorder.discardRecoverable(session)} aria-label={`Discard ${session.className} recording`}>
             <Trash2 size={15} />

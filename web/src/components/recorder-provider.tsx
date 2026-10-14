@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { localDateKey, recordingFilename, recordingLabel, type ClassRow } from "@/lib/classes";
 import {
   assembleSession,
@@ -101,10 +101,46 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     }
   }, [workspace]);
 
-  const recorder = useRecorder({ onFinished: (session) => { void handOff(session); } });
+  // Awaited by the recorder, which holds the microphone open until it settles.
+  // That capture is what keeps Android from freezing the tab mid-upload.
+  const recorder = useRecorder({ onFinished: handOff });
 
   useEffect(() => {
     void listRecoverableSessions().then(setRecoverable).catch(() => {});
+  }, []);
+
+  /**
+   * Sessions already tried without the owner asking, so a failing upload
+   * retries on a real signal rather than spinning.
+   */
+  const autoAttemptedRef = useRef<Set<string>>(new Set());
+
+  // Anything still on the device uploads itself. A lecture that only reaches
+  // the queue when someone notices a card and taps a button is a lecture that
+  // goes missing; this is the safety net under the capture keepalive.
+  useEffect(() => {
+    if (handingOff || recorder.status !== "idle") return;
+    const next = recoverable.find((session) => !autoAttemptedRef.current.has(session.id));
+    if (!next) return;
+    autoAttemptedRef.current.add(next.id);
+    void handOff(next);
+  }, [recoverable, handingOff, recorder.status, handOff]);
+
+  // Unlocking the phone or regaining a connection is the moment a transfer
+  // that died while the device slept can actually succeed, so clear the
+  // attempt record and look again.
+  useEffect(() => {
+    const retry = () => {
+      if (document.visibilityState !== "visible") return;
+      autoAttemptedRef.current.clear();
+      void listRecoverableSessions().then(setRecoverable).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", retry);
+    window.addEventListener("online", retry);
+    return () => {
+      document.removeEventListener("visibilitychange", retry);
+      window.removeEventListener("online", retry);
+    };
   }, []);
 
   const start = useCallback((options: { target: ClassRow; autoStopMinutes: number | null }) => {

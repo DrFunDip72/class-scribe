@@ -1537,6 +1537,35 @@ def concatenate_audio_parts(parts: list[Path], destination: Path) -> None:
         raise AutomationError("FFmpeg could not rejoin the archived recording parts")
 
 
+def copy_into_drive(source: Path, destination: Path, timeout_seconds: float = 60.0) -> int:
+    """Copy a file into a Drive for Desktop folder and confirm it arrived whole.
+
+    Drive reports a chunk-aligned size for a short time after the write call
+    returns: a 28,791,274-byte archive stats as exactly 27 MiB until the tail
+    is flushed. Comparing sizes immediately therefore fails a copy that is
+    perfectly fine, so wait for the reported size to settle before trusting it.
+    """
+    expected = source.stat().st_size
+    shutil.copyfile(source, destination)
+    deadline = time.monotonic() + timeout_seconds
+    observed = -1
+    while True:
+        try:
+            observed = destination.stat().st_size
+        except OSError:
+            observed = -1
+        if observed == expected:
+            return observed
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.25)
+    destination.unlink(missing_ok=True)
+    raise AutomationError(
+        f"The archived recording did not copy to Drive intact "
+        f"({observed} of {expected} bytes after {timeout_seconds:.0f}s)"
+    )
+
+
 def archive_app_recording_audio(settings: Settings, db: Client, recording: dict[str, Any]) -> tuple[Path, int]:
     """Write one app recording's audio to Drive and return its path and size."""
     parts = retry(
@@ -1578,10 +1607,7 @@ def archive_app_recording_audio(settings: Settings, db: Client, recording: dict[
         # Write to Drive via a temporary name so a crash mid-copy can never
         # leave a truncated file that later looks like a complete archive.
         pending = folder / f".{target.name}.partial"
-        shutil.copyfile(staged, pending)
-        if pending.stat().st_size != staged.stat().st_size:
-            pending.unlink(missing_ok=True)
-            raise AutomationError("The archived recording did not copy to Drive intact")
+        copy_into_drive(staged, pending)
         pending.replace(target)
     return target, target.stat().st_size
 

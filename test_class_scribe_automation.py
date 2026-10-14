@@ -15,6 +15,7 @@ from class_scribe_automation import (
     expected_week_dates,
     format_transcript_markdown,
     concatenate_audio_parts,
+    copy_into_drive,
     merge_drive_files,
     note_class_scribe_id,
     note_path,
@@ -392,6 +393,68 @@ class AppRecordingPublishingTests(unittest.TestCase):
             destination = root / "PHIL-201_2026-10-07.m4a"
             concatenate_audio_parts([part], destination)
             self.assertEqual(destination.read_bytes(), b"audio-bytes")
+
+
+    def test_copy_into_drive_tolerates_a_lagging_reported_size(self) -> None:
+        """Drive reports a chunk-aligned size until the tail is flushed."""
+        import class_scribe_automation as module
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "archive.m4a"
+            source.write_bytes(b"x" * 1000)
+            destination = root / ".archive.m4a.partial"
+
+            real_copyfile = module.shutil.copyfile
+            stats = {"calls": 0}
+            real_stat = Path.stat
+
+            def lagging_stat(self, *args, **kwargs):
+                result = real_stat(self, *args, **kwargs)
+                if self == destination:
+                    stats["calls"] += 1
+                    if stats["calls"] < 3:
+                        class Stale:
+                            st_size = 896
+                        return Stale()
+                return result
+
+            Path.stat = lagging_stat
+            try:
+                size = copy_into_drive(source, destination, timeout_seconds=5)
+            finally:
+                Path.stat = real_stat
+            self.assertEqual(size, 1000)
+            self.assertTrue(destination.exists())
+            self.assertEqual(destination.read_bytes(), b"x" * 1000)
+            self.assertGreaterEqual(stats["calls"], 3)
+            self.assertIs(module.shutil.copyfile, real_copyfile)
+
+    def test_copy_into_drive_reports_the_sizes_when_it_really_is_short(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "archive.m4a"
+            source.write_bytes(b"y" * 2048)
+            destination = root / ".archive.m4a.partial"
+
+            import class_scribe_automation as module
+            real_copyfile = module.shutil.copyfile
+
+            def truncating_copy(src, dst, **kwargs):
+                Path(dst).write_bytes(Path(src).read_bytes()[:100])
+                return dst
+
+            module.shutil.copyfile = truncating_copy
+            try:
+                with self.assertRaises(AutomationError) as caught:
+                    copy_into_drive(source, destination, timeout_seconds=0.5)
+            finally:
+                module.shutil.copyfile = real_copyfile
+            # The sizes belong in the message: without them this failure looked
+            # identical to a genuine corruption for a full day.
+            self.assertIn("100", str(caught.exception))
+            self.assertIn("2048", str(caught.exception))
+            self.assertFalse(destination.exists())
 
     def test_archiving_nothing_is_an_error_rather_than_an_empty_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
